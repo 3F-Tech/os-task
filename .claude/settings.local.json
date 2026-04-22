@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(wsl -d Ubuntu -e bash -c \"ls /home/pedro/huly-selfhost/ && cat /home/pedro/huly-selfhost/.env 2>/dev/null || cat /home/pedro/huly-selfhost/secret.env 2>/dev/null\" 2>&1)"
+    ]
+  }
+}

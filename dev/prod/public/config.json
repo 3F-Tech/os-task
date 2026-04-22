@@ -1,10 +1,10 @@
 {
   "ACCOUNTS_URL": "/account",
-  "COLLABORATOR_URL": "ws://huly.local:3078",
-  "PREVIEW_URL": "http://huly.local:4040",
-  "FILES_URL": "http://huly.local:4030/blob/:workspace/:blobId/:filename",
+  "COLLABORATOR_URL": "ws://localhost:7000/_collaborator",
+  "PREVIEW_URL": "/files",
+  "FILES_URL": "/files",
   "UPLOAD_URL": "/files",
-  "DATALAKE_URL": "http://huly.local:4030",
+  "DATALAKE_URL": "http://localhost:7000",
   "TELEGRAM_URL": "http://huly.local:8086",
   "GMAIL_URL": "http://huly.local:8093",
   "CALENDAR_URL": "http://localhost:8095",
@@ -19,7 +19,7 @@
   "BRANDING_URL": "/branding.json",
   "VERSION": null,
   "MODEL_VERSION": null,
-  "STATS_URL": "http://huly.local:4900",
+  "STATS_URL": "http://localhost:7000/_stats",
   "PASSWORD_STRICTNESS": "none",
   "STREAM_URL": "http://huly.local:1080/recording",
   "PAYMENT_URL": "http://huly.local:3040",
@@ -31,6 +31,6 @@
   "PULSE_URL": "ws://huly.local:8099/ws",
   "HULYLAKE_URL": "http://huly.local:8096",
   "EXCLUDED_APPLICATIONS_FOR_ANONYMOUS": "[]",
-  "ANALYTICS_COLLECTOR_URL": "http://huly.local:4017",
+  "ANALYTICS_COLLECTOR_URL": "",
   "LINK_PREVIEW_URL": "http://huly.local:4041"
 }
