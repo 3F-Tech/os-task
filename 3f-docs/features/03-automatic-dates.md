@@ -314,12 +314,78 @@ A função `doIssueUpdate` é complexa e cuida de estimativas e parents. Qualque
 
 ---
 
-## Decisões de Design
+## Decisões de Design (tomadas durante implementação)
 
 | Questão | Decisão | Justificativa |
 |---|---|---|
-| `startDate` preenchido no trigger ou no frontend? | Trigger (com fallback) | Consistente com padrão do Huly; o frontend pode opcionalmente preencher também |
-| `completedDate` reseta ao sair do Done? | Sim | Evita data de conclusão falsa em issues reabertas |
+| `startDate` preenchido no trigger ou no frontend? | **Ambos** — frontend é a via primária, trigger é fallback | Frontend garante que o campo vai populado no `TxCreateDoc`; trigger cobre criação programática |
+| `completedDate` reseta ao sair do Done? | **Não** | Preserva a data real de conclusão; histórico não é apagado se reaberta |
 | `completedDate` aparece na UI quando nula? | Não (só após preenchida) | Reduz ruído visual; segue o padrão do `dueDate` no ControlPanel |
-| `startDate` obrigatório na listagem? | Sempre visível | É informação de auditoria fundamental |
-| Backfill de issues antigas? | Não (fase 1) | Complexidade vs. benefício; `createdOn` do Doc ainda disponível para consulta |
+| `startDate` visível na UI? | Sempre visível | É informação de auditoria fundamental, todo issue tem uma |
+| Trigger separado ou dentro de `doIssueUpdate`? | **Trigger separado `OnAutomaticDates`** | Isola lógica, minimiza risco de regressão, facilita merge com F01/F02 |
+| `doIssueUpdate` modificado? | **Não** | Nenhuma linha foi alterada — conforme decisão do ultraplan-review |
+| Backfill de issues antigas? | Não (fase 1) | Complexidade vs. benefício; `createdOn` do Doc base preserva a data real |
+
+---
+
+## Arquivos Modificados (lista final real)
+
+| Arquivo | Tipo | O que mudou |
+|---|---|---|
+| `plugins/tracker/src/index.ts` | Modificado | + `startDate` e `completedDate` na interface `Issue` |
+| `models/tracker/src/types.ts` | Modificado | + 2 `@Prop(TypeDate(...))` em `TIssue` |
+| `plugins/tracker-resources/src/plugin.ts` | Modificado | + `CompletedDate: '' as IntlString` |
+| `server-plugins/tracker/src/index.ts` | Modificado | + `OnAutomaticDates` no objeto `trigger` |
+| `server-plugins/tracker-resources/src/index.ts` | Modificado | + `Timestamp`, `task`, `IssueStatus` nos imports; + `handleAutomaticDates`; + `OnAutomaticDates` exportada |
+| `models/server-tracker/src/index.ts` | Modificado | + `builder.createDoc` registrando `OnAutomaticDates` |
+| `plugins/tracker-resources/src/components/CreateIssue.svelte` | Modificado | + `startDate: Date.now()` e `completedDate: null` no `DocData<Issue>` |
+| `plugins/tracker-resources/src/components/issues/StartDateEditor.svelte` | Novo | Componente editor de `startDate` |
+| `plugins/tracker-resources/src/components/issues/CompletedDateEditor.svelte` | Novo | Componente editor de `completedDate` |
+| `plugins/tracker-resources/src/components/issues/edit/ControlPanel.svelte` | Modificado | + imports dos editores + `startDate`/`completedDate` no `ignoreKeys` + renderização |
+| `plugins/tracker-assets/lang/*.json` (12 arquivos) | Modificado | + `"CompletedDate"` em todos os idiomas |
+
+---
+
+## Como Testar a Feature
+
+### Pré-requisitos
+
+```bash
+rush build
+docker compose up -d
+# Acesse http://localhost:7000
+```
+
+### Teste 1 — startDate preenchida automaticamente na criação
+
+1. Abra um projeto no Tracker
+2. Crie uma nova issue sem preencher campos de data
+3. Abra a issue criada
+4. No painel lateral verifique que **Start date** está preenchida
+
+**Resultado esperado:** `Start date` = timestamp de criação da issue
+
+### Teste 2 — completedDate preenchida ao marcar como Done
+
+1. Abra uma issue existente
+2. Mude o status para qualquer estado com categoria **Won** (Done/Finalizado)
+3. Recarregue o painel lateral
+4. Verifique que **Completed date** aparece com a data/hora da mudança de status
+
+**Resultado esperado:** `Completed date` = timestamp exato da mudança para Done
+
+### Teste 3 — completedDate manual é respeitada (não sobrescrita)
+
+1. Abra uma issue com `completedDate` já preenchida
+2. Mude o status para Done novamente
+3. Verifique que a `completedDate` original **não foi alterada**
+
+**Resultado esperado:** trigger só preenche se `completedDate == null`
+
+### Teste 4 — completedDate NÃO é limpa ao reabrir issue
+
+1. Marque uma issue como Done (completedDate é preenchida)
+2. Mude o status de volta para Em andamento
+3. Verifique que `completedDate` **permanece preenchida**
+
+**Resultado esperado:** data de conclusão é preservada mesmo após reabrir
