@@ -75,6 +75,7 @@ export default mergeIds(trackerId, tracker, {
     ComponentLead: '' as IntlString,
     ComponentMembers: '' as IntlString,
     StartDate: '' as IntlString,
+    CompletedDate: '' as IntlString,
     TargetDate: '' as IntlString,
     Planned: '' as IntlString,
     InProgress: '' as IntlString,

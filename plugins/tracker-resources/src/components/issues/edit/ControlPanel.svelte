@@ -32,9 +32,11 @@
   import ComponentEditor from '../../components/ComponentEditor.svelte'
   import MilestoneEditor from '../../milestones/MilestoneEditor.svelte'
   import AssigneeEditor from '../AssigneeEditor.svelte'
+  import CompletedDateEditor from '../CompletedDateEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
   import PriorityEditor from '../PriorityEditor.svelte'
   import RelationEditor from '../RelationEditor.svelte'
+  import StartDateEditor from '../StartDateEditor.svelte'
   import StatusEditor from '../StatusEditor.svelte'
   import notification from '@hcengineering/notification'
 
@@ -61,6 +63,8 @@
     'assignee',
     'component',
     'dueDate',
+    'startDate',
+    'completedDate',
     'milestone',
     'relations',
     'blockedBy',
@@ -209,6 +213,20 @@
       <Label label={tracker.string.DueDate} />
     </span>
     <DueDateEditor value={issue} width={'100%'} editable={!readonly} />
+  {/if}
+
+  <div class="divider" />
+
+  <span class="labelOnPanel">
+    <Label label={tracker.string.StartDate} />
+  </span>
+  <StartDateEditor value={issue} width={'100%'} editable={!readonly} />
+
+  {#if issue.completedDate !== null}
+    <span class="labelOnPanel">
+      <Label label={tracker.string.CompletedDate} />
+    </span>
+    <CompletedDateEditor value={issue} width={'100%'} editable={!readonly} />
   {/if}
 
   {#if keys.length > 0}

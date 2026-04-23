@@ -21,6 +21,7 @@ import core, {
   DocumentUpdate,
   Ref,
   Space,
+  Timestamp,
   Tx,
   TxCreateDoc,
   TxCUD,
@@ -33,11 +34,13 @@ import { NotificationContent } from '@hcengineering/notification'
 import { getMetadata, IntlString } from '@hcengineering/platform'
 import serverCore, { TriggerControl } from '@hcengineering/server-core'
 import { NOTIFICATION_BODY_SIZE } from '@hcengineering/server-notification'
+import task from '@hcengineering/task'
 import { stripTags } from '@hcengineering/text-core'
 import tracker, {
   Component,
   Issue,
   IssueParentInfo,
+  IssueStatus,
   TimeSpendReport,
   trackerId,
   type Project
@@ -504,6 +507,64 @@ async function issueLinkIdProvider (issue: Issue): Promise<string> {
   return issue.identifier
 }
 
+async function handleAutomaticDates (updateTx: TxUpdateDoc<Issue>, control: TriggerControl): Promise<Tx[]> {
+  if (!Object.prototype.hasOwnProperty.call(updateTx.operations, 'status')) {
+    return []
+  }
+
+  const newStatusId = updateTx.operations.status as Ref<IssueStatus>
+  const [newStatus] = await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: newStatusId }, { limit: 1 })
+  if (newStatus === undefined || newStatus.category !== task.statusCategory.Won) {
+    return []
+  }
+
+  const [issue] = await control.findAll(control.ctx, tracker.class.Issue, { _id: updateTx.objectId }, { limit: 1 })
+  if (issue === undefined || (issue as any).completedDate != null) {
+    return []
+  }
+
+  return [
+    control.txFactory.createTxUpdateDoc(updateTx.objectClass, updateTx.objectSpace, updateTx.objectId, {
+      completedDate: updateTx.modifiedOn as Timestamp
+    })
+  ]
+}
+
+/**
+ * @public
+ * Fills startDate on issue creation (fallback) and completedDate when status reaches Won category.
+ */
+export async function OnAutomaticDates (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  const result: Tx[] = []
+
+  for (const tx of txes) {
+    if (tx._class === core.class.TxCreateDoc) {
+      const createTx = tx as TxCreateDoc<Issue>
+      if (!control.hierarchy.isDerived(createTx.objectClass, tracker.class.Issue)) {
+        continue
+      }
+      const issue = TxProcessor.createDoc2Doc(createTx)
+      if ((issue as any).startDate == null) {
+        result.push(
+          control.txFactory.createTxUpdateDoc(createTx.objectClass, createTx.objectSpace, createTx.objectId, {
+            startDate: createTx.modifiedOn as Timestamp
+          })
+        )
+      }
+    }
+
+    if (tx._class === core.class.TxUpdateDoc) {
+      const updateTx = tx as TxUpdateDoc<Issue>
+      if (!control.hierarchy.isDerived(updateTx.objectClass, tracker.class.Issue)) {
+        continue
+      }
+      result.push(...(await handleAutomaticDates(updateTx, control)))
+    }
+  }
+
+  return result
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default async () => ({
   function: {
@@ -515,6 +576,7 @@ export default async () => ({
   trigger: {
     OnIssueUpdate,
     OnComponentRemove,
-    OnProjectRemove
+    OnProjectRemove,
+    OnAutomaticDates
   }
 })

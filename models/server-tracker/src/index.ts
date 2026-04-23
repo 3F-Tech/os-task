@@ -73,6 +73,13 @@ export function createModel (builder: Builder): void {
     }
   })
 
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnAutomaticDates,
+    txMatch: {
+      objectClass: tracker.class.Issue
+    }
+  })
+
   builder.mixin(
     tracker.ids.AssigneeNotification,
     notification.class.NotificationType,

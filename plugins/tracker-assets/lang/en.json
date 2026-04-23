@@ -32,6 +32,7 @@
     "ComponentLead": "Lead",
     "ComponentMembers": "Members",
     "StartDate": "Start date",
+    "CompletedDate": "Completed date",
     "TargetDate": "Target date",
     "Planned": "Planned",
     "InProgress": "In progress",

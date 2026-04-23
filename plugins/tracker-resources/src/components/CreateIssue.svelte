@@ -489,6 +489,8 @@
         comments: 0,
         subIssues: 0,
         dueDate: object.dueDate,
+        startDate: Date.now(),
+        completedDate: null,
         parents:
           parentIssue != null
             ? [

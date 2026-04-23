@@ -32,6 +32,7 @@
     "ComponentLead": "Руководитель",
     "ComponentMembers": "Участники",
     "StartDate": "Дата начала",
+    "CompletedDate": "Дата завершения",
     "TargetDate": "Дата завершения",
     "Planned": "Запланирован",
     "InProgress": "В работе",

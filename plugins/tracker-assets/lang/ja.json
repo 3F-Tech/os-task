@@ -32,6 +32,7 @@
     "ComponentLead": "リーダー",
     "ComponentMembers": "メンバー",
     "StartDate": "開始日",
+    "CompletedDate": "完了日",
     "TargetDate": "目標日",
     "Planned": "計画済み",
     "InProgress": "進行中",

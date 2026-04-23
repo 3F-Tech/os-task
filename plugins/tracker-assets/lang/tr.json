@@ -32,6 +32,7 @@
     "ComponentLead": "Lider",
     "ComponentMembers": "Üyeler",
     "StartDate": "Başlangıç tarihi",
+    "CompletedDate": "Tamamlanma tarihi",
     "TargetDate": "Hedef tarih",
     "Planned": "Planlandı",
     "InProgress": "Devam ediyor",

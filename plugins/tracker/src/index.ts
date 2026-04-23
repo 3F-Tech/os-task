@@ -213,6 +213,9 @@ export interface Issue extends Task {
 
   childInfo: IssueChildInfo[]
 
+  startDate: Timestamp | null
+  completedDate: Timestamp | null
+
   template?: {
     // A template issue is based on
     template: Ref<IssueTemplate>
