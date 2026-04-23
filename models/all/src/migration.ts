@@ -52,6 +52,7 @@ import { activityServerOperation } from '@hcengineering/model-server-activity'
 import { settingOperation } from '@hcengineering/model-setting'
 import { surveyOperation } from '@hcengineering/model-survey'
 import { tagsOperation } from '@hcengineering/model-tags'
+import { tagSharingOperation } from '@hcengineering/model-tag-sharing'
 import { taskOperation } from '@hcengineering/model-task'
 import { telegramOperation } from '@hcengineering/model-telegram'
 import { templatesOperation } from '@hcengineering/model-templates'
@@ -82,6 +83,7 @@ export const migrateOperations: [string, MigrateOperation][] = [
   ['contact', contactOperation],
   ['guest', guestOperation],
   ['tags', tagsOperation],
+  ['tag-sharing', tagSharingOperation],
   ['setting', settingOperation],
   ['tracker', trackerOperation],
   ['documents', documentsOperation],

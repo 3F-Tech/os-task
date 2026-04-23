@@ -73,6 +73,7 @@ import { serverViewId, createModel as serverViewModel } from '@hcengineering/mod
 import setting, { settingId, createModel as settingModel } from '@hcengineering/model-setting'
 import { supportId, createModel as supportModel } from '@hcengineering/model-support'
 import { tagsId, createModel as tagsModel } from '@hcengineering/model-tags'
+import { tagSharingId, createModel as tagSharingModel } from '@hcengineering/model-tag-sharing'
 import { taskId, createModel as taskModel } from '@hcengineering/model-task'
 import telegram, { telegramId, createModel as telegramModel } from '@hcengineering/model-telegram'
 import { templatesId, createModel as templatesModel } from '@hcengineering/model-templates'
@@ -173,6 +174,7 @@ export default function buildModel (): Builder {
     [attachmentModel, attachmentId],
     [guestModel, guestId],
     [tagsModel, tagsId],
+    [tagSharingModel, tagSharingId],
     [viewModel, viewId],
     [workbenchModel, workbenchId],
     [
