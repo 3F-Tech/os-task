@@ -65,6 +65,7 @@ import { serverRecruitId, createModel as serverRecruitModel } from '@hcengineeri
 import { serverRequestId, createModel as serverRequestModel } from '@hcengineering/model-server-request'
 import { serverSettingId, createModel as serveSettingModel } from '@hcengineering/model-server-setting'
 import { serverTagsId, createModel as serverTagsModel } from '@hcengineering/model-server-tags'
+import { serverTagSharingId, createModel as serverTagSharingModel } from '@hcengineering/model-server-tag-sharing'
 import { serverTaskId, createModel as serverTaskModel } from '@hcengineering/model-server-task'
 import { serverTelegramId, createModel as serverTelegramModel } from '@hcengineering/model-server-telegram'
 import { serverTemplatesId, createModel as serverTemplatesModel } from '@hcengineering/model-server-templates'
@@ -538,6 +539,7 @@ export default function buildModel (): Builder {
     [serverInventoryModel, serverInventoryId],
     [serverLeadModel, serverLeadId],
     [serverTagsModel, serverTagsId],
+    [serverTagSharingModel, serverTagSharingId],
     [serverTaskModel, serverTaskId],
     [serverTrackerModel, serverTrackerId],
     [serverCardModel, serverCardId],
