@@ -38,7 +38,9 @@ import task from '@hcengineering/task'
 import { stripTags } from '@hcengineering/text-core'
 import tracker, {
   Component,
+  CompletionRule,
   Issue,
+  IssueCompletionConfig,
   IssueParentInfo,
   IssueStatus,
   TimeSpendReport,
@@ -565,6 +567,102 @@ export async function OnAutomaticDates (txes: Tx[], control: TriggerControl): Pr
   return result
 }
 
+/**
+ * @public
+ * Safety net: if a status is moved to Won without meeting completion rules,
+ * revert to the previous status via a compensating transaction.
+ * Primary validation happens in the frontend (StatusEditor.svelte).
+ */
+export async function OnIssueCompletionCheck (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  const result: Tx[] = []
+
+  for (const tx of txes) {
+    if (tx._class !== core.class.TxUpdateDoc) continue
+
+    const updateTx = tx as TxUpdateDoc<Issue>
+    if (!control.hierarchy.isDerived(updateTx.objectClass, tracker.class.Issue)) continue
+    if (updateTx.operations.status === undefined) continue
+
+    const newStatusId = updateTx.operations.status as Ref<IssueStatus>
+
+    // Fetch new status to check category (pre-tx state from DB)
+    const [newStatus] = await control.findAll(
+      control.ctx,
+      tracker.class.IssueStatus,
+      { _id: newStatusId },
+      { limit: 1 }
+    )
+    if (!newStatus || newStatus.category !== task.statusCategory.Won) continue
+
+    // Get current issue state (pre-tx: issue.status is still the OLD status)
+    const [issue] = await control.findAll(
+      control.ctx,
+      tracker.class.Issue,
+      { _id: updateTx.objectId },
+      { limit: 1 }
+    )
+    if (!issue) continue
+
+    const previousStatus = issue.status
+    if (previousStatus === newStatusId) continue
+
+    // Check project completion config
+    const [project] = await control.findAll(
+      control.ctx,
+      tracker.class.Project,
+      { _id: issue.space },
+      { limit: 1 }
+    )
+    if (!project || !control.hierarchy.hasMixin(project, tracker.mixin.IssueCompletionConfig)) continue
+
+    const config = control.hierarchy.as<Project, IssueCompletionConfig>(
+      project,
+      tracker.mixin.IssueCompletionConfig
+    )
+    const isSubIssue = (issue.parents?.length ?? 0) > 0
+    const rules: CompletionRule[] = (isSubIssue ? config.subIssueRules : config.issueRules) ?? []
+
+    let violated = false
+    for (const rule of rules.filter((r) => r.enabled)) {
+      if (rule.key === 'spentTime' && (!issue.reportedTime || issue.reportedTime <= 0)) {
+        violated = true
+        break
+      }
+      if (rule.key === 'estimation' && (!issue.estimation || issue.estimation <= 0)) {
+        violated = true
+        break
+      }
+      if (rule.key === 'allSubIssues' && (issue.subIssues as unknown as number) > 0) {
+        const subIssues = await control.findAll(control.ctx, tracker.class.Issue, { attachedTo: issue._id })
+        const subStatusIds = [...new Set(subIssues.map((s) => s.status))]
+        const subStatuses = await control.findAll(control.ctx, tracker.class.IssueStatus, {
+          _id: { $in: subStatusIds }
+        })
+        const statusMap = new Map(subStatuses.map((s) => [s._id, s]))
+        const hasOpen = subIssues.some((s) => statusMap.get(s.status)?.category !== task.statusCategory.Won)
+        if (hasOpen) { violated = true; break }
+      }
+      if (rule.key === 'completedDate' && !(issue as any).completedDate) {
+        violated = true
+        break
+      }
+    }
+
+    if (violated) {
+      result.push(
+        control.txFactory.createTxUpdateDoc(
+          updateTx.objectClass,
+          updateTx.objectSpace,
+          updateTx.objectId,
+          { status: previousStatus }
+        )
+      )
+    }
+  }
+
+  return result
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default async () => ({
   function: {
@@ -577,6 +675,7 @@ export default async () => ({
     OnIssueUpdate,
     OnComponentRemove,
     OnProjectRemove,
-    OnAutomaticDates
+    OnAutomaticDates,
+    OnIssueCompletionCheck
   }
 })

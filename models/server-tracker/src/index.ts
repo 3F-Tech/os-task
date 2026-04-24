@@ -80,6 +80,14 @@ export function createModel (builder: Builder): void {
     }
   })
 
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnIssueCompletionCheck,
+    txMatch: {
+      _class: core.class.TxUpdateDoc,
+      objectClass: tracker.class.Issue
+    }
+  })
+
   builder.mixin(
     tracker.ids.AssigneeNotification,
     notification.class.NotificationType,
