@@ -10,8 +10,8 @@ export function createModel (builder: Builder): void {
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverTagSharing.trigger.OnTagAssignmentChanged,
     txMatch: {
-      _class: core.class.TxUpdateDoc,
-      objectClass: tagSharing.mixin.TaggedProfile
+      _class: core.class.TxMixin,
+      mixin: tagSharing.mixin.TaggedProfile
     }
   })
 

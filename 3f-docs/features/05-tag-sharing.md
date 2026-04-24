@@ -462,6 +462,15 @@ Caso seja necessário auditoria ("por que esse usuário tem acesso?"), o sistema
 
 ---
 
+## Limitações Conhecidas
+
+| Limitação | Impacto | Plano |
+|---|---|---|
+| Se um usuário possui acesso direto a um Space e também acesso via tag, ao remover a tag ele perderá ambos os acessos. Melhoria planejada: rastrear origem do acesso. | Baixo — raramente usuários têm ambos simultaneamente | V2: campo `tagMembers` separado de `members` diretos no Space |
+| O trigger da operação de set completo (`updateMixin` com array inteiro) remove o usuário de todos os Spaces sem tag válida, mesmo que ele tenha acesso direto | Baixo em V1 | Rastreamento de origem do acesso em V2 |
+
+---
+
 ## Riscos Técnicos
 
 | Risco | Probabilidade | Impacto | Mitigação |
