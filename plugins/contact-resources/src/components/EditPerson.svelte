@@ -23,6 +23,8 @@
   import { Component, EditBox, FocusHandler, Scroller, createFocusManager } from '@hcengineering/ui'
   import { createEventDispatcher, onMount } from 'svelte'
   import contact from '../plugin'
+  import tagSharing from '@hcengineering/tag-sharing'
+  import { type Employee } from '@hcengineering/contact'
   import Avatar from './Avatar.svelte'
   import ChannelsDropdown from './ChannelsDropdown.svelte'
   import ChannelsEditor from './ChannelsEditor.svelte'
@@ -193,6 +195,13 @@
     <div class="flex-row-center mt-2">
       <Component is={ratingPlugin.component.RatingActivities} props={{ rating: personRating }} />
     </div>
+  {/if}
+  {#if h.hasMixin(object, contact.mixin.Employee) && hasResource(tagSharing.component.UserTagsEditor)}
+    <div class="separator" />
+    <Component
+      is={tagSharing.component.UserTagsEditor}
+      props={{ employee: h.as(object, contact.mixin.Employee) as Employee, readonly: !editable }}
+    />
   {/if}
 {/if}
 

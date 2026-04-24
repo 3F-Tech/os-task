@@ -65,6 +65,7 @@ import { serverRecruitId, createModel as serverRecruitModel } from '@hcengineeri
 import { serverRequestId, createModel as serverRequestModel } from '@hcengineering/model-server-request'
 import { serverSettingId, createModel as serveSettingModel } from '@hcengineering/model-server-setting'
 import { serverTagsId, createModel as serverTagsModel } from '@hcengineering/model-server-tags'
+import { serverTagSharingId, createModel as serverTagSharingModel } from '@hcengineering/model-server-tag-sharing'
 import { serverTaskId, createModel as serverTaskModel } from '@hcengineering/model-server-task'
 import { serverTelegramId, createModel as serverTelegramModel } from '@hcengineering/model-server-telegram'
 import { serverTemplatesId, createModel as serverTemplatesModel } from '@hcengineering/model-server-templates'
@@ -73,6 +74,7 @@ import { serverViewId, createModel as serverViewModel } from '@hcengineering/mod
 import setting, { settingId, createModel as settingModel } from '@hcengineering/model-setting'
 import { supportId, createModel as supportModel } from '@hcengineering/model-support'
 import { tagsId, createModel as tagsModel } from '@hcengineering/model-tags'
+import { tagSharingId, createModel as tagSharingModel } from '@hcengineering/model-tag-sharing'
 import { taskId, createModel as taskModel } from '@hcengineering/model-task'
 import telegram, { telegramId, createModel as telegramModel } from '@hcengineering/model-telegram'
 import { templatesId, createModel as templatesModel } from '@hcengineering/model-templates'
@@ -173,6 +175,7 @@ export default function buildModel (): Builder {
     [attachmentModel, attachmentId],
     [guestModel, guestId],
     [tagsModel, tagsId],
+    [tagSharingModel, tagSharingId],
     [viewModel, viewId],
     [workbenchModel, workbenchId],
     [
@@ -536,6 +539,7 @@ export default function buildModel (): Builder {
     [serverInventoryModel, serverInventoryId],
     [serverLeadModel, serverLeadId],
     [serverTagsModel, serverTagsId],
+    [serverTagSharingModel, serverTagSharingId],
     [serverTaskModel, serverTaskId],
     [serverTrackerModel, serverTrackerId],
     [serverCardModel, serverCardId],

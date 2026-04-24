@@ -1326,6 +1326,36 @@
       "shouldPublish": false
     },
     {
+      "packageName": "@hcengineering/tag-sharing",
+      "projectFolder": "plugins/tag-sharing",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/model-tag-sharing",
+      "projectFolder": "models/model-tag-sharing",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/server-tag-sharing",
+      "projectFolder": "server-plugins/tag-sharing",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/server-tag-sharing-resources",
+      "projectFolder": "server-plugins/tag-sharing-resources",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/tag-sharing-resources",
+      "projectFolder": "plugins/tag-sharing-resources",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/model-server-tag-sharing",
+      "projectFolder": "models/server-tag-sharing",
+      "shouldPublish": false
+    },
+    {
       "packageName": "@hcengineering/server-chunter",
       "projectFolder": "server-plugins/chunter",
       "shouldPublish": false
