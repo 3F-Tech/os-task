@@ -1,4 +1,4 @@
-import { type Domain, IndexKind, type Ref, type Space } from '@hcengineering/core'
+import { AccountRole, type Domain, IndexKind, type Ref, type Space } from '@hcengineering/core'
 import {
   ArrOf,
   Index,
@@ -12,6 +12,7 @@ import {
 } from '@hcengineering/model'
 import contact, { TEmployee } from '@hcengineering/model-contact'
 import core, { TDoc } from '@hcengineering/model-core'
+import setting from '@hcengineering/setting'
 import tagSharing, { type SpaceTagAccess, type TaggedProfile, type UserTag } from '@hcengineering/tag-sharing'
 
 export const DOMAIN_TAG_SHARING = 'tag-sharing' as Domain
@@ -48,6 +49,16 @@ export class TTaggedProfile extends TEmployee implements TaggedProfile {
 
 export function createModel (builder: Builder): void {
   builder.createModel(TUserTag, TSpaceTagAccess, TTaggedProfile)
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'userTags',
+    label: tagSharing.string.UserTags,
+    icon: tagSharing.icon.TagSharing,
+    component: tagSharing.component.UserTagsPanel,
+    group: 'settings-editor',
+    role: AccountRole.Maintainer,
+    order: 5100
+  })
 }
 
 export { tagSharingId } from '@hcengineering/tag-sharing'
