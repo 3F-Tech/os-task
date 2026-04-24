@@ -14,6 +14,7 @@
 -->
 <script lang="ts">
   import contact, { Employee, Person } from '@hcengineering/contact'
+  import tagSharing from '@hcengineering/tag-sharing'
   import {
     AccountRole,
     DocumentQuery,
@@ -27,13 +28,15 @@
   } from '@hcengineering/core'
   import { translateCB } from '@hcengineering/platform'
   import presentation, { getClient } from '@hcengineering/presentation'
-  import { ActionIcon, IconAdd, IconClose, Label, SearchEdit, showPopup, themeStore } from '@hcengineering/ui'
+  import { ActionIcon, Component, IconAdd, IconClose, Label, SearchEdit, showPopup, themeStore } from '@hcengineering/ui'
+  import { hasResource } from '@hcengineering/presentation'
   import AddMembersPopup from './AddMembersPopup.svelte'
   import UserInfo from './UserInfo.svelte'
   import { employeeByIdStore, employeeRefByAccountUuidStore } from '../utils'
 
   export let space: Space
   export let withAddButton: boolean = false
+  export let readonly: boolean = false
 
   const client = getClient()
   const hierarchy = client.getHierarchy()
@@ -159,6 +162,15 @@
     {/if}
   {/if}
 {/await}
+
+{#if hasResource(tagSharing.component.SpaceTagAccessEditor)}
+  <div class="mt-4">
+    <Component
+      is={tagSharing.component.SpaceTagAccessEditor}
+      props={{ space, readonly }}
+    />
+  </div>
+{/if}
 
 <style lang="scss">
   .notIn {

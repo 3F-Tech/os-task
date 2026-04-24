@@ -56,6 +56,7 @@ import sign from '@hcengineering/sign'
 import support, { supportId, supportLink, reportBugLink, docsLink, privacyPolicyLink } from '@hcengineering/support'
 import { surveyId } from '@hcengineering/survey'
 import { tagsId } from '@hcengineering/tags'
+import { tagSharingId } from '@hcengineering/tag-sharing'
 import { taskId } from '@hcengineering/task'
 import telegram, { telegramId } from '@hcengineering/telegram'
 import { templatesId } from '@hcengineering/templates'
@@ -610,6 +611,7 @@ export async function configurePlatform() {
     async () => await import(/* webpackChunkName: "notification" */ '@hcengineering/notification-resources')
   )
   addLocation(tagsId, async () => await import(/* webpackChunkName: "tags" */ '@hcengineering/tags-resources'))
+  addLocation(tagSharingId, async () => await import(/* webpackChunkName: "tag-sharing" */ '@hcengineering/tag-sharing-resources'))
   addLocation(
     calendarId,
     async () => await import(/* webpackChunkName: "calendar" */ '@hcengineering/calendar-resources')
