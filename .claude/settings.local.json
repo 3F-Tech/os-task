@@ -4,7 +4,12 @@
       "Bash(docker exec *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080)",
       "PowerShell(Stop-Process *)",
-      "PowerShell(wsl -d Ubuntu -e bash -c \"ls /home/pedro/huly-selfhost/ && cat /home/pedro/huly-selfhost/.env 2>/dev/null || cat /home/pedro/huly-selfhost/secret.env 2>/dev/null\" 2>&1)"
+      "PowerShell(wsl -d Ubuntu -e bash -c \"ls /home/pedro/huly-selfhost/ && cat /home/pedro/huly-selfhost/.env 2>/dev/null || cat /home/pedro/huly-selfhost/secret.env 2>/dev/null\" 2>&1)",
+      "PowerShell(git checkout *)",
+      "PowerShell(head *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\" | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\\\\tracker-resources\\\\src\\\\components\" | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\\\\tracker-resources\\\\src\\\\components\\\\issues\\\\edit\" | ForEach-Object { $_.Name })"
     ]
   }
 }
