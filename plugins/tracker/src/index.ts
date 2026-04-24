@@ -77,6 +77,28 @@ export interface ProjectTargetPreference extends Preference {
   props?: { key: string, value: any }[]
 }
 
+/**
+ * @public
+ */
+export type CompletionRuleKey = 'spentTime' | 'estimation' | 'allSubIssues' | 'completedDate'
+
+/**
+ * @public
+ */
+export interface CompletionRule {
+  key: CompletionRuleKey | string
+  enabled: boolean
+}
+
+/**
+ * @public
+ * Mixin applied to Project to configure per-project issue completion requirements.
+ */
+export interface IssueCompletionConfig extends Project {
+  issueRules: CompletionRule[]
+  subIssueRules: CompletionRule[]
+}
+
 export type RelatedIssueKind = 'classRule' | 'spaceRule'
 
 export interface RelatedClassRule {
@@ -384,7 +406,8 @@ const pluginState = plugin(trackerId, {
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
-    IssueTypeData: '' as Ref<Mixin<Issue>>
+    IssueTypeData: '' as Ref<Mixin<Issue>>,
+    IssueCompletionConfig: '' as Ref<Mixin<Project>>
   },
   ids: {
     NoParent: '' as Ref<Issue>,
@@ -526,7 +549,9 @@ const pluginState = plugin(trackerId, {
     NewProject: '' as IntlString,
     UnsetParentIssue: '' as IntlString,
     ForbidCreateProjectPermission: '' as IntlString,
-    ForbidCreateProjectPermissionDescription: '' as IntlString
+    ForbidCreateProjectPermissionDescription: '' as IntlString,
+    CompletionRules: '' as IntlString,
+    SubIssueCompletionRules: '' as IntlString
   },
   extensions: {
     IssueListHeader: '' as ComponentExtensionId,

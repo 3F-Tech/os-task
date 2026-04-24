@@ -274,7 +274,21 @@
     "UnsetParentIssue": "Desmarcar problema pai",
     "ForbidCreateProjectPermission": "Proibir criação de projeto",
     "ForbidCreateProjectPermissionDescription": "Proíbe os usuários de criar novos projetos",
-    "AllowCreatingIssues": "Permitir criar problemas"
+    "AllowCreatingIssues": "Permitir criar problemas",
+    "CompletionRules": "Regras de Conclusão",
+    "SubIssueCompletionRules": "Regras de Conclusão de Subtarefas",
+    "CompletionBlocked": "Não é possível concluir",
+    "CompletionBlockedTask": "Os seguintes requisitos devem ser atendidos antes de concluir esta tarefa:",
+    "CompletionBlockedSubtask": "Os seguintes requisitos devem ser atendidos antes de concluir esta subtarefa:",
+    "CompletionRuleSpentTime": "Tempo gasto deve ser lançado",
+    "CompletionRuleEstimation": "Estimativa deve ser preenchida",
+    "CompletionRuleAllSubIssues": "Todas as subtarefas devem estar concluídas",
+    "CompletionRuleCompletedDate": "Data de finalização deve estar preenchida",
+    "MissingSpentTime": "Nenhum tempo foi lançado",
+    "MissingEstimation": "Estimativa não preenchida",
+    "OpenSubtasksBlocking": "{count} subtarefa(s) não concluída(s)",
+    "MissingCompletedDate": "Data de finalização não preenchida",
+    "ConfigureCompletionRules": "Configurar regras de conclusão"
   },
   "status": {}
 }

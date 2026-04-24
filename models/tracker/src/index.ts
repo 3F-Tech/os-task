@@ -39,6 +39,7 @@ import {
   TClassicProjectTypeData,
   TComponent,
   TIssue,
+  TIssueCompletionConfig,
   TIssueStatus,
   TIssueTemplate,
   TIssueTypeData,
@@ -439,6 +440,7 @@ function defineApplication (
 export function createModel (builder: Builder): void {
   builder.createModel(
     TProject,
+    TIssueCompletionConfig,
     TComponent,
     TIssue,
     TIssueTemplate,
@@ -655,6 +657,16 @@ export function createModel (builder: Builder): void {
     group: 'settings-editor',
     role: AccountRole.Maintainer,
     order: 4000
+  })
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'completionRules',
+    label: tracker.string.CompletionRules,
+    icon: tracker.icon.Issues,
+    component: tracker.component.SettingsCompletionRules,
+    group: 'settings-editor',
+    role: AccountRole.Maintainer,
+    order: 4100
   })
 
   builder.createDoc(

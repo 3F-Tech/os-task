@@ -89,6 +89,9 @@ import RelationsPopup from './components/RelationsPopup.svelte'
 import SetDueDateActionPopup from './components/SetDueDateActionPopup.svelte'
 import SetParentIssueActionPopup from './components/SetParentIssueActionPopup.svelte'
 import SettingsRelatedTargets from './components/SettingsRelatedTargets.svelte'
+import SettingsCompletionRules from './components/SettingsCompletionRules.svelte'
+import EditCompletionRules from './components/EditCompletionRules.svelte'
+import CompletionBlockedNotification from './components/issues/CompletionBlockedNotification.svelte'
 import CreateIssueTemplate from './components/templates/CreateIssueTemplate.svelte'
 import {
   getIssueIdByIdentifier,
@@ -477,6 +480,9 @@ export default async (): Promise<Resources> => ({
     EditRelatedTargets,
     EditRelatedTargetsPopup,
     SettingsRelatedTargets,
+    SettingsCompletionRules,
+    EditCompletionRules,
+    CompletionBlockedNotification,
     TimePresenter,
     EstimationValueEditor,
     IssueStatusIcon,

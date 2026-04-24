@@ -16,8 +16,17 @@
   import { AttachedData, Ref, WithLookup } from '@hcengineering/core'
   import { getClient } from '@hcengineering/presentation'
   import { getTaskTypeStates } from '@hcengineering/task'
+  import task from '@hcengineering/task'
   import { taskTypeStore } from '@hcengineering/task-resources'
-  import { Issue, IssueDraft, IssueStatus, Project, TrackerEvents } from '@hcengineering/tracker'
+  import {
+    CompletionRule,
+    Issue,
+    IssueCompletionConfig,
+    IssueDraft,
+    IssueStatus,
+    Project,
+    TrackerEvents
+  } from '@hcengineering/tracker'
   import {
     Button,
     ButtonKind,
@@ -33,6 +42,7 @@
   import { createEventDispatcher } from 'svelte'
 
   import tracker from '../../plugin'
+  import CompletionBlockedNotification from './CompletionBlockedNotification.svelte'
   import IssueStatusIcon from './IssueStatusIcon.svelte'
   import StatusPresenter from './StatusPresenter.svelte'
 
@@ -58,9 +68,57 @@
   const client = getClient()
   const dispatch = createEventDispatcher()
 
+  type ViolationEntry = { labelId: string, params?: Record<string, any> }
+
+  async function checkCompletionRules (
+    issue: Issue,
+    newStatusId: Ref<IssueStatus>
+  ): Promise<ViolationEntry[]> {
+    const newStatusObj = statuses?.find((s) => s._id === newStatusId)
+    if (!newStatusObj || newStatusObj.category !== task.statusCategory.Won) return []
+
+    const hierarchy = client.getHierarchy()
+    const project = await client.findOne(tracker.class.Project, { _id: issue.space })
+    if (!project || !hierarchy.hasMixin(project, tracker.mixin.IssueCompletionConfig)) return []
+
+    const config = hierarchy.as<Project, IssueCompletionConfig>(project, tracker.mixin.IssueCompletionConfig)
+    const isSubIssue = (issue.parents?.length ?? 0) > 0
+    const rules: CompletionRule[] = (isSubIssue ? config.subIssueRules : config.issueRules) ?? []
+
+    const violations: ViolationEntry[] = []
+    for (const rule of rules.filter((r) => r.enabled)) {
+      if (rule.key === 'spentTime' && (!issue.reportedTime || issue.reportedTime <= 0)) {
+        violations.push({ labelId: tracker.string.MissingSpentTime })
+      } else if (rule.key === 'estimation' && (!issue.estimation || issue.estimation <= 0)) {
+        violations.push({ labelId: tracker.string.MissingEstimation })
+      } else if (rule.key === 'allSubIssues' && (issue.subIssues as unknown as number) > 0) {
+        const subIssues = await client.findAll(tracker.class.Issue, { attachedTo: issue._id as Ref<Issue> })
+        const unresolved = subIssues.filter((s) => {
+          const st = $statusStore.byId.get(s.status)
+          return !st || st.category !== task.statusCategory.Won
+        })
+        if (unresolved.length > 0) {
+          violations.push({ labelId: tracker.string.OpenSubtasksBlocking, params: { count: unresolved.length } })
+        }
+      } else if (rule.key === 'completedDate' && !(issue as any).completedDate) {
+        violations.push({ labelId: tracker.string.MissingCompletedDate })
+      }
+    }
+    return violations
+  }
+
   const changeStatus = async (newStatus: Ref<IssueStatus> | undefined, refocus: boolean = true) => {
     if (!isEditable || newStatus == null || value.status === newStatus) {
       return
+    }
+
+    if ('_class' in value) {
+      const violations = await checkCompletionRules(value as Issue, newStatus)
+      if (violations.length > 0) {
+        const isSubIssue = ((value as Issue).parents?.length ?? 0) > 0
+        showPopup(CompletionBlockedNotification, { violations, isSubIssue }, 'centered')
+        return
+      }
     }
 
     dispatch('change', newStatus)
@@ -71,7 +129,7 @@
     if ('_class' in value) {
       await client.update(value, { status: newStatus })
       Analytics.handleEvent(TrackerEvents.IssueSetStatus, {
-        issue: value.identifier,
+        issue: (value as Issue).identifier,
         status: newStatus
       })
     }
