@@ -72,7 +72,9 @@ import {
   type RelatedIssueTarget,
   type RelatedSpaceRule,
   type TimeReportDayType,
-  type TimeSpendReport
+  type TimeSpendReport,
+  type CompletionRule,
+  type IssueCompletionConfig
 } from '@hcengineering/tracker'
 import tracker from './plugin'
 import { type TaskType } from '@hcengineering/task'
@@ -139,6 +141,16 @@ export class TProject extends TTaskProject implements Project {
 /**
  * @public
  */
+
+@Mixin(tracker.mixin.IssueCompletionConfig, tracker.class.Project)
+@UX(tracker.string.CompletionRules)
+export class TIssueCompletionConfig extends TProject implements IssueCompletionConfig {
+  @Prop(ArrOf(TypeRecord()), tracker.string.CompletionRules)
+    issueRules!: CompletionRule[]
+
+  @Prop(ArrOf(TypeRecord()), tracker.string.SubIssueCompletionRules)
+    subIssueRules!: CompletionRule[]
+}
 
 @Model(tracker.class.RelatedIssueTarget, core.class.Doc, DOMAIN_TRACKER)
 @UX(tracker.string.RelatedIssues)
