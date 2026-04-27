@@ -50,7 +50,7 @@ async function hasTagAccess (
  * Bug 1 fix: objectId is the Employee _id, not the AccountUuid — must load doc and read personUuid.
  */
 async function resolveAccountUuid (
-  mixinTx: TxMixin<Employee, TaggedProfile>,
+  mixinTx: TxMixin<Employee, Employee & TaggedProfile>,
   control: TriggerControl
 ): Promise<AccountUuid | undefined> {
   const profiles = await control.findAll(control.ctx, tagSharing.mixin.TaggedProfile, {
@@ -73,7 +73,7 @@ export async function OnTagAssignmentChanged (txes: Tx[], control: TriggerContro
 
   for (const tx of txes) {
     if (tx._class !== core.class.TxMixin) continue
-    const mixinTx = tx as TxMixin<Employee, TaggedProfile>
+    const mixinTx = tx as TxMixin<Employee, Employee & TaggedProfile>
 
     // Bug 1 fix: load Employee doc to extract personUuid
     const account = await resolveAccountUuid(mixinTx, control)
@@ -162,7 +162,8 @@ export async function OnSpaceTagAccessChanged (txes: Tx[], control: TriggerContr
   for (const tx of txes) {
     if (tx._class === core.class.TxCreateDoc) {
       const createTx = tx as TxCreateDoc<SpaceTagAccess>
-      const { space: spaceId, tag } = createTx.attributes
+      const spaceId = createTx.objectSpace
+      const { tag } = createTx.attributes
 
       const spaces = await control.findAll(control.ctx, core.class.Space, { _id: spaceId })
       const space = spaces[0]

@@ -134,14 +134,12 @@
     "ComponentMembersSearchPlaceholder": "Změnit členy komponenty…",
     "MoveToProject": "Přesunout do projektu",
     "Duplicate": "Duplikovat",
-
-     "GotoIssues": "Přejít na úkoly",
+    "GotoIssues": "Přejít na úkoly",
     "GotoActive": "Přejít na aktivní úkoly",
     "GotoBacklog": "Přejít na návrhy",
     "GotoComponents": "Přejít na komponenty",
     "GotoMyIssues": "Přejít na mé úkoly",
     "GotoTrackerApplication": "Přepnout na aplikaci Přehled",
-
     "CreatedOne": "Vytvořeno",
     "MoveIssues": "Přesunout úkoly",
     "MoveIssuesDescription": "Vyberte projekt, do kterého chcete úkoly přesunout",
@@ -153,7 +151,6 @@
     "Replacement": "NÁHRADA",
     "Original": "PŮVODNÍ",
     "OriginalDescription": "Položky z této sekce budou vytvořeny v novém projektu",
-
     "Relations": "Vztahy",
     "RemoveRelation": "Odebrat vztah...",
     "AddBlockedBy": "Označit jako blokováno...",
@@ -168,7 +165,6 @@
     "Blocks": "Blokuje",
     "Related": "Související",
     "RelatedIssues": "Související úkoly",
-
     "EditIssue": "Upravit {title}",
     "EditWorkflowStatuses": "Upravit stavy úkolů",
     "EditProject": "Upravit projekt",
@@ -183,21 +179,17 @@
     "DeleteWorkflowStatus": "Smazat stav úkolu",
     "DeleteWorkflowStatusConfirm": "Chcete smazat stav \"{status}\"?",
     "DeleteWorkflowStatusErrorDescription": "Stav \"{status}\" má přiřazeno {count, plural, =1 {1 úkol} other {# úkolů}}. Vyberte stav pro přesun",
-
     "Save": "Uložit",
     "IncludeItemsThatMatch": "Zahrnout položky, které odpovídají",
     "AnyFilter": "jakémukoli filtru",
     "AllFilters": "všem filtrům",
     "NoDescription": "Žádný popis",
     "SearchIssue": "Hledat úkol...",
-
     "StatusHistory": "Historie stavů",
     "NewSubIssue": "Přidat podúkol...",
     "AddLabel": "Přidat štítek",
-
     "DeleteIssue": "Smazat {issueCount, plural, =1 {úkol} other {# úkolů}}",
     "DeleteIssueConfirm": "Chcete smazat {issueCount, plural, =1 {úkol} other {úkoly}}{subIssueCount, plural, =0 {?} =1 { a podúkol?} other { a podúkoly?}}",
-
     "Milestone": "Milník",
     "NoMilestone": "Žádný milník",
     "MoveToMilestone": "Vybrat milník",
@@ -208,13 +200,10 @@
     "ClosedMilestones": "Dokončené",
     "AddToMilestone": "Přidat do milníku",
     "MilestoneNamePlaceholder": "Název milníku",
-
     "NewMilestone": "Nový milník",
     "CreateMilestone": "Vytvořit",
-
     "MoveAndDeleteMilestone": "Přesunout úkoly do {newMilestone} a smazat {deleteMilestone}",
     "MoveAndDeleteMilestoneConfirm": "Chcete smazat milník a přesunout úkoly do jiného milníku?",
-
     "Estimation": "Odhad",
     "ReportedTime": "Strávený čas",
     "RemainingTime": "Zbývající čas",
@@ -233,11 +222,9 @@
     "CapacityValue": "z {value}d",
     "NewRelatedIssue": "Nový související úkol",
     "RelatedIssuesNotFound": "Související úkoly nenalezeny",
-
     "AddedReference": "Přidán odkaz",
     "AddedAsBlocked": "Označeno jako blokované",
     "AddedAsBlocking": "Označeno jako blokující",
-
     "IssueTemplate": "Šablona",
     "IssueTemplates": "Šablony",
     "NewProcess": "Nová šablona",
@@ -246,12 +233,10 @@
     "TemplateReplace": "Chcete použít novou šablonu?",
     "TemplateReplaceConfirm": "Všechna pole budou přepsána hodnotami nové šablony",
     "Apply": "Použít",
-
     "CurrentWorkDay": "Aktuální pracovní den",
     "PreviousWorkDay": "Předchozí pracovní den",
     "TimeReportDayTypeLabel": "Vyberte typ pracovního dne",
     "DefaultAssignee": "Výchozí přiřazení úkolů",
-
     "SevenHoursLength": "Sedm hodin",
     "EightHoursLength": "Osm hodin",
     "HourLabel": "h",
@@ -281,7 +266,29 @@
     "UnsetParentIssue": "Odebrat nadřazený úkol",
     "ForbidCreateProjectPermission": "Zakázat vytvoření projektu",
     "ForbidCreateProjectPermissionDescription": "Zakazuje uživatelům vytvářet nové projekty",
-    "AllowCreatingIssues": "Povolit vytváření úkolů"
+    "AllowCreatingIssues": "Povolit vytváření úkolů",
+    "Space": "",
+    "Document": "",
+    "DocumentIcon": "",
+    "DocumentColor": "",
+    "NewIssueDialogClose": "Do you want to close this dialog?",
+    "NewIssueDialogCloseNote": "All changes will be lost",
+    "RemoveComponentDialogClose": "Delete the component?",
+    "RemoveComponentDialogCloseNote": "Are you sure you want to delete this component? This operation cannot be undone",
+    "CompletionRules": "Completion Rules",
+    "SubIssueCompletionRules": "Subtask Completion Rules",
+    "CompletionBlocked": "Cannot mark as done",
+    "CompletionBlockedTask": "The following requirements must be met before this task can be completed:",
+    "CompletionBlockedSubtask": "The following requirements must be met before this subtask can be completed:",
+    "CompletionRuleSpentTime": "Spent time must be logged",
+    "CompletionRuleEstimation": "Estimation must be filled",
+    "CompletionRuleAllSubIssues": "All subtasks must be completed",
+    "CompletionRuleCompletedDate": "Completion date must be set",
+    "MissingSpentTime": "No time has been logged",
+    "MissingEstimation": "Estimation is not set",
+    "OpenSubtasksBlocking": "{count} subtask(s) are not completed",
+    "MissingCompletedDate": "Completion date is not set",
+    "ConfigureCompletionRules": "Configure completion rules"
   },
   "status": {}
 }

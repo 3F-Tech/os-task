@@ -106,7 +106,7 @@ export async function connect (title: string): Promise<Client | undefined> {
   let workspaceLoginInfo: WorkspaceLoginInfo | undefined
 
   while (true) {
-    const selectResult = await ctx.with('select-workspace', {}, async () => await selectWorkspace(wsUrl, null))
+    const selectResult = await ctx.with('select-workspace', {}, async () => await selectWorkspace(wsUrl))
     workspaceLoginInfo = selectResult[1] ?? undefined
     if (!selectResult[2]) {
       // Connection error happen, wait and retry

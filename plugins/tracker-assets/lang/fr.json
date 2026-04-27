@@ -274,7 +274,21 @@
     "UnsetParentIssue": "Désélectionner l'issue parent",
     "ForbidCreateProjectPermission": "Interdire la création de projet",
     "ForbidCreateProjectPermissionDescription": "Interdit aux utilisateurs de créer de nouveaux projets",
-    "AllowCreatingIssues": "Autoriser la création d'issues"
+    "AllowCreatingIssues": "Autoriser la création d'issues",
+    "CompletionRules": "Completion Rules",
+    "SubIssueCompletionRules": "Subtask Completion Rules",
+    "CompletionBlocked": "Cannot mark as done",
+    "CompletionBlockedTask": "The following requirements must be met before this task can be completed:",
+    "CompletionBlockedSubtask": "The following requirements must be met before this subtask can be completed:",
+    "CompletionRuleSpentTime": "Spent time must be logged",
+    "CompletionRuleEstimation": "Estimation must be filled",
+    "CompletionRuleAllSubIssues": "All subtasks must be completed",
+    "CompletionRuleCompletedDate": "Completion date must be set",
+    "MissingSpentTime": "No time has been logged",
+    "MissingEstimation": "Estimation is not set",
+    "OpenSubtasksBlocking": "{count} subtask(s) are not completed",
+    "MissingCompletedDate": "Completion date is not set",
+    "ConfigureCompletionRules": "Configure completion rules"
   },
   "status": {}
 }

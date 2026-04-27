@@ -44,7 +44,7 @@ const KEEP_ALIVE_HEADERS = {
  * @public
  */
 export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap, onClose?: () => void): void {
-  console.log('Starting account service with brandings: ', brandings)
+  console.log('HULY_DEBUG_BOOT_2026: Starting account service with brandings: ', brandings)
   const ACCOUNT_PORT = parseInt(process.env.ACCOUNT_PORT ?? '3000')
   const dbUrl = process.env.DB_URL
   if (dbUrl === undefined) {
@@ -232,7 +232,7 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
 
   function getCookieOptions (ctx: Koa.Context): Cookies.SetOption[] {
     const option = {
-      httpOnly: true,
+      httpOnly: false,
       secure: ctx.request.secure,
       maxAge: 1000 * 60 * 60 * 24 * 365 // 1 year
     }
@@ -304,24 +304,29 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
   })
 
   router.put('/cookie', async (ctx) => {
-    const token = extractToken(ctx.request.headers)
-    if (token === undefined) {
+    try {
+      const token = extractToken(ctx.request.headers)
+      if (token === undefined) {
+        ctx.res.writeHead(401, KEEP_ALIVE_HEADERS)
+        ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.Unauthorized, {}) }))
+        return
+      }
+
+      // Ensure we don't set the token with workspace to the cookie
+      const { account, extra } = decodeTokenVerbose(measureCtx, token)
+      const tokenWithoutWorkspace = generateToken(account, undefined, extra)
+
+      const cookieOpts = getCookieOptions(ctx)
+      for (const opt of cookieOpts) {
+        ctx.cookies.set(AUTH_TOKEN_COOKIE, tokenWithoutWorkspace, opt)
+      }
+
+      ctx.res.writeHead(204)
+      ctx.res.end()
+    } catch (err: any) {
       ctx.res.writeHead(401, KEEP_ALIVE_HEADERS)
       ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.Unauthorized, {}) }))
-      return
     }
-
-    // Ensure we don't set the token with workspace to the cookie
-    const { account, extra } = decodeTokenVerbose(measureCtx, token)
-    const tokenWithoutWorkspace = generateToken(account, undefined, extra)
-
-    const cookieOpts = getCookieOptions(ctx)
-    for (const opt of cookieOpts) {
-      ctx.cookies.set(AUTH_TOKEN_COOKIE, tokenWithoutWorkspace, opt)
-    }
-
-    ctx.res.writeHead(204)
-    ctx.res.end()
   })
 
   router.delete('/cookie', async (ctx) => {

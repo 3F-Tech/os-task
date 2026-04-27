@@ -200,7 +200,7 @@
     <div class="separator" />
     <Component
       is={tagSharing.component.UserTagsEditor}
-      props={{ employee: h.as(object, contact.mixin.Employee) as Employee, readonly: !editable }}
+      props={{ employee: h.as(object, contact.mixin.Employee), readonly: !editable }}
     />
   {/if}
 {/if}

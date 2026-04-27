@@ -37277,6 +37277,12 @@ importers:
       '@hcengineering/server-setting-resources':
         specifier: workspace:^0.7.0
         version: link:../../server-plugins/setting-resources
+      '@hcengineering/server-tag-sharing':
+        specifier: workspace:^0.7.0
+        version: link:../../server-plugins/tag-sharing
+      '@hcengineering/server-tag-sharing-resources':
+        specifier: workspace:^0.7.0
+        version: link:../../server-plugins/tag-sharing-resources
       '@hcengineering/server-tags':
         specifier: workspace:^0.7.0
         version: link:../../server-plugins/tags

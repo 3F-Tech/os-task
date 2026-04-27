@@ -14,7 +14,7 @@ export interface SpaceTagAccess extends Doc {
   tag: Ref<UserTag>
 }
 
-export interface TaggedProfile {
+export interface TaggedProfile extends Doc {
   userTags: Ref<UserTag>[]
 }
 

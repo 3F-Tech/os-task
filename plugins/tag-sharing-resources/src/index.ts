@@ -10,15 +10,13 @@ export { default as UserTagPresenter } from './components/UserTagPresenter.svelt
 export { default as UserTagsEditor } from './components/UserTagsEditor.svelte'
 export { default as SpaceTagAccessEditor } from './components/SpaceTagAccessEditor.svelte'
 
-export async function resources (): Promise<Resources> {
-  return {
-    component: {
-      UserTagsPanel,
-      EditUserTag,
-      UserTagSelector,
-      UserTagPresenter,
-      UserTagsEditor,
-      SpaceTagAccessEditor
-    }
+export default async (): Promise<Resources> => ({
+  component: {
+    UserTagsPanel,
+    EditUserTag,
+    UserTagSelector,
+    UserTagPresenter,
+    UserTagsEditor,
+    SpaceTagAccessEditor
   }
-}
+})

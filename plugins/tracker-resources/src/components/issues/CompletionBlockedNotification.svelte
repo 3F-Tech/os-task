@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import { Label, Button } from '@hcengineering/ui'
+  import type { IntlString } from '@hcengineering/platform'
   import tracker from '../../plugin'
   import { createEventDispatcher } from 'svelte'
 
@@ -11,6 +12,7 @@
   export let isSubIssue: boolean = false
 
   const dispatch = createEventDispatcher()
+  const closeLabel = 'Close' as unknown as IntlString
 
   function close (): void {
     dispatch('close')
@@ -46,7 +48,7 @@
 
   <div class="popup-footer">
     <Button label={tracker.string.ConfigureCompletionRules} kind={'ghost'} size={'medium'} on:click={close} />
-    <Button label={'Close' as any} kind={'primary'} size={'medium'} on:click={close} />
+    <Button label={closeLabel} kind={'primary'} size={'medium'} on:click={close} />
   </div>
 </div>
 

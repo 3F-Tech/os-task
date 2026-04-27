@@ -766,7 +766,12 @@ export async function selectWorkspace (
     sub = decodedToken.sub
     exp = decodedToken.exp
     nbf = decodedToken.nbf
-  } catch (e) {
+  } catch (e: any) {
+    ctx.error('Invalid token in selectWorkspace', { 
+      token: token ? (token.length > 20 ? token.substring(0, 10) + '...' + token.substring(token.length - 10) : token) : 'null/undefined', 
+      errMsg: e.message,
+      stack: e.stack 
+    })
     if (workspace?.allowReadOnlyGuest === true) {
       accountUuid = readOnlyGuestAccountUuid
     } else {

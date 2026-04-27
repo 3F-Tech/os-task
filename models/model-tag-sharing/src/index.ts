@@ -34,7 +34,7 @@ export class TUserTag extends TDoc implements UserTag {
 export class TSpaceTagAccess extends TDoc implements SpaceTagAccess {
   @Prop(TypeRef(core.class.Space), tagSharing.string.TagSharing)
   @Index(IndexKind.Indexed)
-    space!: Ref<Space>
+  declare space: Ref<Space>
 
   @Prop(TypeRef(tagSharing.class.UserTag), tagSharing.string.UserTag)
   @Index(IndexKind.Indexed)

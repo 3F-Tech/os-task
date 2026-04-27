@@ -1980,7 +1980,11 @@ export async function getLoginInfoByToken (
     if (token !== undefined) {
       // do not spam errors as this is expected when we issue request with no token
       Analytics.handleError(err)
-      ctx.error('Invalid token', { token, errMsg: err.message })
+      ctx.error('Invalid token in getLoginInfoByToken', { 
+        token: token ? (token.length > 20 ? token.substring(0, 10) + '...' + token.substring(token.length - 10) : token) : 'null/undefined', 
+        errMsg: err.message,
+        stack: err.stack 
+      })
     }
     switch (err.message) {
       case 'Token not yet active': {

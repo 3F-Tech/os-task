@@ -175,6 +175,7 @@ services:
       - 3000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
+      - ../pods/account/bundle/bundle.js:/usr/src/app/bundle.js
     environment:
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=${QUEUE_CONFIG}
@@ -318,6 +319,9 @@ services:
       - HULYLAKE_URL=http://huly.local:8096
       - EXPORT_URL=http://huly.local:4009
       - LINK_PREVIEW_URL=http://huly.local:4041
+    volumes:
+      - ../pods/front/bundle/bundle.js:/app/bundle.js
+      - ../pods/front/dist:/app/dist
     restart: unless-stopped
   transactor_cockroach:
     image: hardcoreeng/transactor
