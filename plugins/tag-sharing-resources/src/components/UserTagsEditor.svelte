@@ -9,6 +9,7 @@
   import { type TaggedProfile, type UserTag } from '@hcengineering/tag-sharing'
   import {
     Button,
+    eventToHTMLElement,
     getPlatformColorDef,
     IconAdd,
     Label,
@@ -57,7 +58,7 @@
     showPopup(
       UserTagSelector,
       { selected: [...selectedRefs] },
-      evt.target as HTMLElement,
+      eventToHTMLElement(evt),
       async (result: Ref<UserTag>[] | undefined) => {
         if (result === undefined || resolved == null) return
         await client.updateMixin(resolved._id, resolved._class, resolved.space, tagSharing.mixin.TaggedProfile, {
