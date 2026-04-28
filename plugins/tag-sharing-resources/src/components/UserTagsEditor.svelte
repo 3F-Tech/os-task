@@ -18,10 +18,8 @@
   import tagSharing from '../plugin'
   import UserTagSelector from './UserTagSelector.svelte'
 
-  export let object: Doc
+  export let object: Doc | undefined = undefined
   export let readonly: boolean = false
-
-  $: employee = object as Employee
 
   const client = getClient()
   const hierarchy = client.getHierarchy()
@@ -29,7 +27,9 @@
   let tags: UserTag[] = []
   let selectedRefs: Ref<UserTag>[] = []
 
-  $: if (hierarchy.hasMixin(employee, tagSharing.mixin.TaggedProfile)) {
+  $: employee = object as Employee | undefined
+
+  $: if (employee != null && hierarchy.hasMixin(employee, tagSharing.mixin.TaggedProfile)) {
     const mixed = hierarchy.as(employee, tagSharing.mixin.TaggedProfile) as TaggedProfile
     selectedRefs = mixed.userTags ?? []
   } else {
@@ -44,6 +44,7 @@
   )
 
   async function removeTag (tagId: Ref<UserTag>): Promise<void> {
+    if (employee == null) return
     const next = selectedRefs.filter(r => r !== tagId)
     await client.updateMixin(employee._id, employee._class, employee.space, tagSharing.mixin.TaggedProfile, {
       userTags: next
@@ -51,12 +52,13 @@
   }
 
   function openSelector (evt: MouseEvent): void {
+    if (employee == null) return
     showPopup(
       UserTagSelector,
       { selected: [...selectedRefs] },
       evt.target as HTMLElement,
       async (result: Ref<UserTag>[] | undefined) => {
-        if (result === undefined) return
+        if (result === undefined || employee == null) return
         await client.updateMixin(employee._id, employee._class, employee.space, tagSharing.mixin.TaggedProfile, {
           userTags: result
         })
