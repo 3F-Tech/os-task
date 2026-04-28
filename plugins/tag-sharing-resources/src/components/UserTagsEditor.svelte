@@ -19,6 +19,7 @@
   import UserTagSelector from './UserTagSelector.svelte'
 
   export let object: Doc | undefined = undefined
+  export let employee: Employee | undefined = undefined
   export let readonly: boolean = false
 
   const client = getClient()
@@ -27,10 +28,10 @@
   let tags: UserTag[] = []
   let selectedRefs: Ref<UserTag>[] = []
 
-  $: employee = object as Employee | undefined
+  $: resolved = employee ?? (object as Employee | undefined)
 
-  $: if (employee != null && hierarchy.hasMixin(employee, tagSharing.mixin.TaggedProfile)) {
-    const mixed = hierarchy.as(employee, tagSharing.mixin.TaggedProfile) as TaggedProfile
+  $: if (resolved != null && hierarchy.hasMixin(resolved, tagSharing.mixin.TaggedProfile)) {
+    const mixed = hierarchy.as(resolved, tagSharing.mixin.TaggedProfile) as TaggedProfile
     selectedRefs = mixed.userTags ?? []
   } else {
     selectedRefs = []
@@ -44,22 +45,22 @@
   )
 
   async function removeTag (tagId: Ref<UserTag>): Promise<void> {
-    if (employee == null) return
+    if (resolved == null) return
     const next = selectedRefs.filter(r => r !== tagId)
-    await client.updateMixin(employee._id, employee._class, employee.space, tagSharing.mixin.TaggedProfile, {
+    await client.updateMixin(resolved._id, resolved._class, resolved.space, tagSharing.mixin.TaggedProfile, {
       userTags: next
     })
   }
 
   function openSelector (evt: MouseEvent): void {
-    if (employee == null) return
+    if (resolved == null) return
     showPopup(
       UserTagSelector,
       { selected: [...selectedRefs] },
       evt.target as HTMLElement,
       async (result: Ref<UserTag>[] | undefined) => {
-        if (result === undefined || employee == null) return
-        await client.updateMixin(employee._id, employee._class, employee.space, tagSharing.mixin.TaggedProfile, {
+        if (result === undefined || resolved == null) return
+        await client.updateMixin(resolved._id, resolved._class, resolved.space, tagSharing.mixin.TaggedProfile, {
           userTags: result
         })
       }
