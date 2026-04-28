@@ -309,19 +309,6 @@ export default mergeIds(trackerId, tracker, {
     PreviousAssigned: '' as IntlString,
     EditRelatedTargets: '' as IntlString,
     RelatedIssueTargetDescription: '' as IntlString,
-
-    CompletionBlocked: '' as IntlString,
-    CompletionBlockedTask: '' as IntlString,
-    CompletionBlockedSubtask: '' as IntlString,
-    CompletionRuleSpentTime: '' as IntlString,
-    CompletionRuleEstimation: '' as IntlString,
-    CompletionRuleAllSubIssues: '' as IntlString,
-    CompletionRuleCompletedDate: '' as IntlString,
-    MissingSpentTime: '' as IntlString,
-    MissingEstimation: '' as IntlString,
-    OpenSubtasksBlocking: '' as IntlString,
-    MissingCompletedDate: '' as IntlString,
-    ConfigureCompletionRules: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,

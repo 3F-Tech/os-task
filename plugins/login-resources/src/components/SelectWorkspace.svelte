@@ -85,11 +85,12 @@
   })
 
   async function select (workspaceUrl: string): Promise<void> {
-    status = new Status(Severity.INFO, login.status.ConnectingToServer, {})
-
-    const [loginStatus, result] = await selectWorkspace(workspaceUrl)
-
-    const ws = workspaces.find((it) => it.uuid === result?.workspace)
+    const [loginStatus, result] = await selectWorkspace(workspaceUrl, undefined)
+    if (result == null) {
+      status = loginStatus
+      return
+    }
+    const ws = workspaces.find((it) => it.uuid === result.workspace)
     if (ws != null && isArchivingMode(ws?.mode) && result?.workspace !== undefined) {
       showPopup(MessageBox, {
         label: login.string.SelectWorkspace,

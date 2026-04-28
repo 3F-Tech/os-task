@@ -550,8 +550,21 @@ const pluginState = plugin(trackerId, {
     UnsetParentIssue: '' as IntlString,
     ForbidCreateProjectPermission: '' as IntlString,
     ForbidCreateProjectPermissionDescription: '' as IntlString,
+    AllProjects: '' as IntlString,
     CompletionRules: '' as IntlString,
-    SubIssueCompletionRules: '' as IntlString
+    SubIssueCompletionRules: '' as IntlString,
+    CompletionBlocked: '' as IntlString,
+    CompletionBlockedTask: '' as IntlString,
+    CompletionBlockedSubtask: '' as IntlString,
+    CompletionRuleSpentTime: '' as IntlString,
+    CompletionRuleEstimation: '' as IntlString,
+    CompletionRuleAllSubIssues: '' as IntlString,
+    CompletionRuleCompletedDate: '' as IntlString,
+    ConfigureCompletionRules: '' as IntlString,
+    MissingSpentTime: '' as IntlString,
+    MissingEstimation: '' as IntlString,
+    OpenSubtasksBlocking: '' as IntlString,
+    MissingCompletedDate: '' as IntlString
   },
   extensions: {
     IssueListHeader: '' as ComponentExtensionId,

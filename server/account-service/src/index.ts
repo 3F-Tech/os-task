@@ -185,8 +185,11 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
   const extractCookieToken = (headers: IncomingHttpHeaders): string | undefined => {
     if (headers.cookie != null) {
       const cookies = headers.cookie.split(';')
-      const tokenCookie = cookies.find((cookie) => cookie.includes(AUTH_TOKEN_COOKIE))
-      return tokenCookie?.split('=')[1]
+      const tokenCookie = cookies.find((cookie) => cookie.trim().startsWith(`${AUTH_TOKEN_COOKIE}=`))
+      if (tokenCookie !== undefined) {
+        const trimmed = tokenCookie.trim()
+        return trimmed.substring(trimmed.indexOf('=') + 1)
+      }
     }
 
     return undefined
@@ -231,10 +234,11 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
   }
 
   function getCookieOptions (ctx: Koa.Context): Cookies.SetOption[] {
-    const option = {
-      httpOnly: false,
+    const option: Cookies.SetOption = {
+      httpOnly: true,
       secure: ctx.request.secure,
-      maxAge: 1000 * 60 * 60 * 24 * 365 // 1 year
+      maxAge: 1000 * 60 * 60 * 24 * 365, // 1 year
+      sameSite: 'lax'
     }
 
     const options = []

@@ -3,8 +3,8 @@
 // Licensed under the Eclipse Public License, Version 2.0
 -->
 <script lang="ts">
-  import { type Space } from '@hcengineering/core'
-  import { getClient } from '@hcengineering/presentation'
+  import { type Ref, type Space } from '@hcengineering/core'
+  import { SpaceSelector, createQuery, getClient } from '@hcengineering/presentation'
   import { type CompletionRule, type IssueCompletionConfig, type Project } from '@hcengineering/tracker'
   import { Label, Toggle } from '@hcengineering/ui'
   import tracker from '../plugin'
@@ -32,9 +32,26 @@
   let issueEntries: RuleEntry[] = [...ISSUE_KEYS]
   let subIssueEntries: RuleEntry[] = [...SUBISSUE_KEYS]
 
-  $: if (value) {
-    if (hierarchy.hasMixin(value, tracker.mixin.IssueCompletionConfig)) {
-      const config = hierarchy.as<Space, IssueCompletionConfig>(value as Project, tracker.mixin.IssueCompletionConfig)
+  let selectedSpaceId: Ref<Space> | undefined = value?._id
+  let selectedProject: Project | undefined
+
+  // Sync parent prop into selectedSpaceId
+  $: if (value) selectedSpaceId = value._id
+
+  const projectQuery = createQuery()
+  $: if (selectedSpaceId) {
+    projectQuery.query(
+      tracker.class.Project,
+      { _id: selectedSpaceId as Ref<Project> },
+      (res) => { selectedProject = res[0] ?? undefined }
+    )
+  } else {
+    selectedProject = undefined
+  }
+
+  $: if (selectedProject) {
+    if (hierarchy.hasMixin(selectedProject, tracker.mixin.IssueCompletionConfig)) {
+      const config = hierarchy.as<Space, IssueCompletionConfig>(selectedProject, tracker.mixin.IssueCompletionConfig)
       issueEntries = ISSUE_KEYS.map((entry) => {
         const saved = config.issueRules?.find((r) => r.key === entry.key)
         return { ...entry, enabled: saved?.enabled ?? false }
@@ -47,19 +64,22 @@
       issueEntries = [...ISSUE_KEYS]
       subIssueEntries = [...SUBISSUE_KEYS]
     }
+  } else {
+    issueEntries = [...ISSUE_KEYS]
+    subIssueEntries = [...SUBISSUE_KEYS]
   }
 
   async function saveRules (
     field: 'issueRules' | 'subIssueRules',
     entries: RuleEntry[]
   ): Promise<void> {
-    if (!value) return
+    if (!selectedProject) return
     const rules: CompletionRule[] = entries.map((e) => ({ key: e.key, enabled: e.enabled }))
-    if (hierarchy.hasMixin(value, tracker.mixin.IssueCompletionConfig)) {
+    if (hierarchy.hasMixin(selectedProject, tracker.mixin.IssueCompletionConfig)) {
       await client.updateMixin(
-        value._id,
+        selectedProject._id,
         tracker.class.Project,
-        value.space,
+        selectedProject.space,
         tracker.mixin.IssueCompletionConfig,
         { [field]: rules }
       )
@@ -67,9 +87,9 @@
       const issueRules: CompletionRule[] = issueEntries.map((e) => ({ key: e.key, enabled: e.enabled }))
       const subIssueRules: CompletionRule[] = subIssueEntries.map((e) => ({ key: e.key, enabled: e.enabled }))
       await client.createMixin(
-        value._id,
+        selectedProject._id,
         tracker.class.Project,
-        value.space,
+        selectedProject.space,
         tracker.mixin.IssueCompletionConfig,
         { issueRules, subIssueRules }
       )
@@ -88,7 +108,19 @@
 </script>
 
 <div class="completion-rules">
-  {#if value}
+  {#if !value}
+    <div class="project-selector">
+      <SpaceSelector
+        _class={tracker.class.Project}
+        bind:space={selectedSpaceId}
+        label={tracker.string.Project}
+        kind={'regular'}
+        size={'medium'}
+      />
+    </div>
+  {/if}
+
+  {#if selectedProject}
     <section class="rules-section">
       <h3 class="section-title"><Label label={tracker.string.CompletionRules} /></h3>
       <div class="rules-list">
@@ -120,7 +152,7 @@
         {/each}
       </div>
     </section>
-  {:else}
+  {:else if !value}
     <p class="no-project"><Label label={tracker.string.AllProjects} /></p>
   {/if}
 </div>
@@ -132,6 +164,12 @@
     gap: 1.5rem;
     padding: 1.5rem;
     max-width: 36rem;
+  }
+
+  .project-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .rules-section {

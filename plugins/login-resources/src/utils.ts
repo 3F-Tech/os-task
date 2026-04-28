@@ -180,23 +180,33 @@ export async function createWorkspace (
   region?: string
 ): Promise<[Status, WorkspaceLoginInfo | null]> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token == null) {
-    const loc = getCurrentLocation()
-    loc.path[1] = 'login'
-    loc.path.length = 2
-    navigate(loc)
-
-    return [unknownStatus('Please login'), null]
-  }
 
   try {
-    const workspaceLoginInfo = await getAccountClient(token).createWorkspace(workspaceName, region)
+    let workspaceLoginInfo: WorkspaceLoginInfo
+    try {
+      workspaceLoginInfo = await getAccountClient(token).createWorkspace(workspaceName, region)
+    } catch (err: any) {
+      if (token != null && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        workspaceLoginInfo = await getAccountClient(null).createWorkspace(workspaceName, region)
+      } else {
+        throw err
+      }
+    }
 
     Analytics.handleEvent(LoginEvents.CreateWorkspace, { name: workspaceName, ok: true })
 
     return [OK, workspaceLoginInfo]
   } catch (err: any) {
     if (err instanceof PlatformError) {
+      if (err.status.code === platform.status.Unauthorized) {
+        const loc = getCurrentLocation()
+        loc.path[1] = 'login'
+        loc.path.length = 2
+        navigate(loc)
+        return [err.status, null]
+      }
+
       Analytics.handleEvent(LoginEvents.CreateWorkspace, { name: workspaceName, ok: false })
       await handleStatusError('Create workspace error', err.status)
 
@@ -224,19 +234,27 @@ function getWorkspaceSize (it: Pick<WorkspaceInfoWithStatus, 'backupInfo'>): num
 
 export async function getWorkspaces (): Promise<WorkspaceInfoWithStatus[]> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token == null) {
-    const loc = getCurrentLocation()
-    loc.path[1] = 'login'
-    loc.path.length = 2
-    navigate(loc)
-    return []
-  }
 
   let workspaces: WorkspaceInfoWithStatus[]
 
   try {
-    workspaces = await getAccountClient(token).getUserWorkspaces()
+    try {
+      workspaces = await getAccountClient(token).getUserWorkspaces()
+    } catch (err: any) {
+      if (token != null && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        workspaces = await getAccountClient(null).getUserWorkspaces()
+      } else {
+        throw err
+      }
+    }
   } catch (err: any) {
+    if (err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+      const loc = getCurrentLocation()
+      loc.path[1] = 'login'
+      loc.path.length = 2
+      navigate(loc)
+    }
     workspaces = []
   }
 
@@ -255,16 +273,26 @@ export async function getWorkspaces (): Promise<WorkspaceInfoWithStatus[]> {
 
 export async function getWorkspacePermissions (permission: string): Promise<WorkspaceUuid[]> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token == null) {
-    return []
-  }
+  const currentAccount = getCurrentAccount()
+  if (currentAccount == null) return []
 
   try {
-    const currentAccount = getCurrentAccount()
-    return await getAccountClient(token).getWorkspacePermissions({
-      accountId: currentAccount.uuid,
-      permission
-    })
+    try {
+      return await getAccountClient(token).getWorkspacePermissions({
+        accountId: currentAccount.uuid,
+        permission
+      })
+    } catch (err: any) {
+      if (token != null && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        return await getAccountClient(null).getWorkspacePermissions({
+          accountId: currentAccount.uuid,
+          permission
+        })
+      } else {
+        throw err
+      }
+    }
   } catch (err: any) {
     Analytics.handleError(err)
     return []
@@ -277,18 +305,27 @@ export async function performWorkspaceOperation (
   ...params: any[]
 ): Promise<boolean> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token === undefined) {
-    const loc = getCurrentLocation()
-    loc.path[1] = 'login'
-    loc.path.length = 2
-    navigate(loc)
-    return true
-  }
 
   try {
-    return (await getAccountClient(token).performWorkspaceOperation(workspace, operation, ...params)) ?? false
+    try {
+      return (await getAccountClient(token).performWorkspaceOperation(workspace, operation, ...params)) ?? false
+    } catch (err: any) {
+      if (token != null && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        return (await getAccountClient(null).performWorkspaceOperation(workspace, operation, ...params)) ?? false
+      } else {
+        throw err
+      }
+    }
   } catch (err: any) {
     if (err instanceof PlatformError) {
+      if (err.status.code === platform.status.Unauthorized) {
+        const loc = getCurrentLocation()
+        loc.path[1] = 'login'
+        loc.path.length = 2
+        navigate(loc)
+        return true
+      }
       await handleStatusError('Perform workspace operation error', err.status)
       throw err
     } else {
@@ -300,20 +337,27 @@ export async function performWorkspaceOperation (
 
 export async function getAllWorkspaces (): Promise<WorkspaceInfoWithStatus[]> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token === undefined) {
-    const loc = getCurrentLocation()
-    loc.path[1] = 'login'
-    loc.path.length = 2
-    navigate(loc)
-    return []
-  }
 
   let workspaces: WorkspaceInfoWithStatus[]
 
   try {
-    workspaces = await getAccountClient(token).listWorkspaces()
+    try {
+      workspaces = await getAccountClient(token).listWorkspaces()
+    } catch (err: any) {
+      if (token != null && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        workspaces = await getAccountClient(null).listWorkspaces()
+      } else {
+        throw err
+      }
+    }
   } catch (err: any) {
-    if (err instanceof PlatformError) {
+    if (err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+      const loc = getCurrentLocation()
+      loc.path[1] = 'login'
+      loc.path.length = 2
+      navigate(loc)
+    } else if (err instanceof PlatformError) {
       await handleStatusError('Get workspaces error', err.status)
     } else {
       Analytics.handleError(err)
@@ -340,28 +384,39 @@ export async function isReadOnlyGuestAccount (loginInfo: LoginInfo | null): Prom
 
 export async function getAccount (doNavigate: boolean = true): Promise<LoginInfo | null> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token == null) {
-    if (doNavigate) {
-      const loc = getCurrentLocation()
-      loc.path[1] = 'login'
-      loc.path.length = 2
-      navigate(loc)
-    }
-  }
 
   try {
     // even if "token" is null here it still might be supplied from the cookie
-    const result = await getAccountClient(token).getLoginInfoByToken()
+    let result: LoginInfoByToken
+    try {
+      console.log('[Huly Debug] Attempting to get login info with token:', token)
+      result = await getAccountClient(token).getLoginInfoByToken()
+    } catch (err: any) {
+      console.warn('[Huly Debug] Primary login info fetch failed:', err)
+      // Attempt recovery if unauthorized OR if token was missing
+      if (token == null || (err instanceof PlatformError && err.status.code === platform.status.Unauthorized)) {
+        console.log('[Huly Debug] Attempting silent session recovery via cookies...')
+        result = await getAccountClient(null).getLoginInfoByToken()
+        if (result != null && !isLoginInfoRequest(result)) {
+          console.log('[Huly Debug] Session recovered! Updating token.')
+          setMetadata(presentation.metadata.Token, result.token)
+        } else {
+          console.error('[Huly Debug] Silent recovery failed. Result:', result)
+          throw err
+        }
+      } else {
+        throw err
+      }
+    }
 
     if (isLoginInfoRequest(result)) {
+      console.error('[Huly Debug] result is LoginInfoRequest, redirection might be needed')
       throw new Error('Not supported')
     }
 
     return result
   } catch (err: any) {
     if (err instanceof PlatformError) {
-      await handleStatusError('Get account error', err.status)
-
       if (err.status.code === platform.status.Unauthorized) {
         setMetadata(presentation.metadata.Token, null)
         setMetadataLocalStorage(login.metadata.LoginEndpoint, null)
@@ -375,6 +430,7 @@ export async function getAccount (doNavigate: boolean = true): Promise<LoginInfo
         return null
       }
 
+      await handleStatusError('Get account error', err.status)
       return null
     } else {
       Analytics.handleError(err)
@@ -386,26 +442,34 @@ export async function getAccount (doNavigate: boolean = true): Promise<LoginInfo
 
 export async function getRegionInfo (doNavigate: boolean = true): Promise<RegionInfo[] | null> {
   const token = getMetadata(presentation.metadata.Token)
-  if (token == null) {
-    if (doNavigate) {
-      const loc = getCurrentLocation()
-      loc.path[1] = 'login'
-      loc.path.length = 2
-      navigate(loc)
-    }
-    return null
-  }
 
   try {
-    return await getAccountClient(token).getRegionInfo()
+    try {
+      return await getAccountClient(token).getRegionInfo()
+    } catch (err: any) {
+      if (token != null && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        return await getAccountClient(null).getRegionInfo()
+      } else {
+        throw err
+      }
+    }
   } catch (err: any) {
     if (err instanceof PlatformError) {
-      await handleStatusError('Get region info error', err.status)
+      if (err.status.code === platform.status.Unauthorized) {
+        if (doNavigate) {
+          const loc = getCurrentLocation()
+          loc.path[1] = 'login'
+          loc.path.length = 2
+          navigate(loc)
+        }
+        return null
+      }
 
+      await handleStatusError('Get region info error', err.status)
       return null
     } else {
       Analytics.handleError(err)
-
       return null
     }
   }
@@ -418,7 +482,17 @@ export async function selectWorkspace (
   const actualToken = token ?? getMetadata(presentation.metadata.Token) ?? undefined
 
   try {
-    const loginInfo = await getAccountClient(actualToken).selectWorkspace(workspaceUrl)
+    let loginInfo: WorkspaceLoginInfo
+    try {
+      loginInfo = await getAccountClient(actualToken).selectWorkspace(workspaceUrl)
+    } catch (err: any) {
+      if (actualToken !== undefined && err instanceof PlatformError && err.status.code === platform.status.Unauthorized) {
+        // Silent refresh
+        loginInfo = await getAccountClient(null).selectWorkspace(workspaceUrl)
+      } else {
+        throw err
+      }
+    }
 
     return [OK, loginInfo, true]
   } catch (err: any) {
@@ -1090,10 +1164,12 @@ export async function doLoginNavigate (
           if (workspaces.find((p) => p.url === workspaceUrl) !== undefined) {
             updateStatus(new Status(Severity.INFO, login.status.ConnectingToServer, {}))
 
-            const [loginStatus, selectResult] = await selectWorkspace(workspaceUrl)
-            updateStatus(loginStatus)
-            navigateToWorkspace(workspaceUrl, selectResult, navigateUrl)
-            return
+            const [loginStatus, selectResult] = await selectWorkspace(workspaceUrl, undefined)
+            if (selectResult != null) {
+              updateStatus(loginStatus)
+              navigateToWorkspace(workspaceUrl, selectResult, navigateUrl)
+              return
+            }
           }
         }
       } catch (err: any) {
