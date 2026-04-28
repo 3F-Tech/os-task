@@ -1,0 +1,22 @@
+{
+  "string": {
+    "UserTag": "User Tag",
+    "UserTags": "User Tags",
+    "TagSharing": "Tag Sharing",
+    "AddTag": "Add Tag",
+    "RemoveTag": "Remove Tag",
+    "TagTitle": "Title",
+    "TagDescription": "Description",
+    "TagColor": "Color",
+    "TagMembers": "Members",
+    "NewTag": "New Tag",
+    "EditTag": "Edit",
+    "DeleteTag": "Delete",
+    "DeleteTagConfirm": "Are you sure you want to delete this tag? This will not remove members from spaces.",
+    "NoTags": "No tags created yet",
+    "TagsWithAccess": "Tags with access",
+    "AssignTag": "Assign Tag",
+    "TagTitlePlaceholder": "Tag name...",
+    "TagDescriptionPlaceholder": "Description (optional)..."
+  }
+}

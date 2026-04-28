@@ -2,7 +2,7 @@
   Modal for creating or editing a UserTag (title, description, color).
 -->
 <script lang="ts">
-  import { type Data, generateId } from '@hcengineering/core'
+  import core, { type Data } from '@hcengineering/core'
   import { Card, getClient } from '@hcengineering/presentation'
   import { type UserTag } from '@hcengineering/tag-sharing'
   import {
@@ -31,7 +31,7 @@
 
   async function save (): Promise<void> {
     if (isNew) {
-      await client.createDoc(tagSharing.class.UserTag, (client.getHierarchy().getDomain(tagSharing.class.UserTag) as any), {
+      await client.createDoc(tagSharing.class.UserTag, core.space.Workspace, {
         title: title.trim(),
         description: description.trim() || undefined,
         color
