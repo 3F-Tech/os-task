@@ -45,11 +45,13 @@
     getColorNumberByText,
     getPlatformColorDef,
     getPlatformColorForTextDef,
+    hasResource,
     showPopup,
     themeStore
   } from '@hcengineering/ui'
   import view from '@hcengineering/view'
   import { IconPicker } from '@hcengineering/view-resources'
+  import tagSharing from '@hcengineering/tag-sharing'
   import { deepEqual } from 'fast-equals'
   import { createEventDispatcher } from 'svelte'
 
@@ -581,6 +583,14 @@
         />
       </div>
     {/each}
+    {#if !isNew && project !== undefined && hasResource(tagSharing.component.SpaceTagAccessEditor)}
+      <div class="antiGrid-row">
+        <div class="antiGrid-row__header">
+          <Label label={tagSharing.string.TagsWithAccess} />
+        </div>
+        <Component is={tagSharing.component.SpaceTagAccessEditor} props={{ space: project }} />
+      </div>
+    {/if}
   </div>
 </Card>
 

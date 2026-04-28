@@ -2,11 +2,12 @@
   Section in a Space's settings that lets owners manage which UserTags give access to this Space.
 -->
 <script lang="ts">
-  import { type Ref, type Space } from '@hcengineering/core'
+  import core, { type Ref, type Space } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { type SpaceTagAccess, type UserTag } from '@hcengineering/tag-sharing'
   import {
     Button,
+    eventToHTMLElement,
     getPlatformColorDef,
     IconAdd,
     Label,
@@ -51,13 +52,13 @@
     showPopup(
       UserTagSelector,
       { selected: [...assignedTagIds] },
-      evt.target as HTMLElement,
+      eventToHTMLElement(evt),
       async (result: Ref<UserTag>[] | undefined) => {
         if (result === undefined) return
         const toAdd = result.filter(r => !assignedTagIds.includes(r))
         const toRemove = assignedTagIds.filter(r => !result.includes(r))
         for (const tagId of toAdd) {
-          await client.createDoc(tagSharing.class.SpaceTagAccess, space._id as unknown as Ref<any>, {
+          await client.createDoc(tagSharing.class.SpaceTagAccess, core.space.Workspace, {
             space: space._id,
             tag: tagId
           })

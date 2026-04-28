@@ -17,10 +17,11 @@
   import type { Class, Ref, Space } from '@hcengineering/core'
   import core from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
-  import { EditBox, Label, Scroller, Panel, Component } from '@hcengineering/ui'
+  import { EditBox, Label, Scroller, Panel, Component, hasResource } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
   import workbench from '../../plugin'
   import contact from '@hcengineering/contact'
+  import tagSharing from '@hcengineering/tag-sharing'
 
   export let _id: Ref<Space>
   export let _class: Ref<Class<Space>>
@@ -92,6 +93,11 @@
           <span class="fs-title text-xl overflow-label mb-2"><Label label={workbench.string.Members} /></span>
           <Component is={contact.component.SpaceMembers} props={{ space }} />
         </div>
+        {#if hasResource(tagSharing.component.SpaceTagAccessEditor)}
+          <div class="flex-col mt-10">
+            <Component is={tagSharing.component.SpaceTagAccessEditor} props={{ space }} />
+          </div>
+        {/if}
       {/if}
     </div>
   </Scroller>
