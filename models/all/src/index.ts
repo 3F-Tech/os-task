@@ -175,7 +175,6 @@ export default function buildModel (): Builder {
     [attachmentModel, attachmentId],
     [guestModel, guestId],
     [tagsModel, tagsId],
-    [tagSharingModel, tagSharingId],
     [viewModel, viewId],
     [workbenchModel, workbenchId],
     [
@@ -203,6 +202,7 @@ export default function buildModel (): Builder {
         classFilter: defaultFilter
       }
     ],
+    [tagSharingModel, tagSharingId],
     [
       chunterModel,
       chunterId,
