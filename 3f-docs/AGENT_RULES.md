@@ -12,7 +12,7 @@ Guia obrigatório para qualquer agente que vá fazer alterações no repositóri
 | Upstream | https://github.com/hcengineering/platform |
 | Repositório | https://github.com/3F-Tech/huly-3f |
 | Branch principal | `develop` |
-| URL local | http://localhost:7000 |
+| URL local | http://localhost:8087 |
 | Frontend | Svelte 4.2.20 + TypeScript 5.9.3 |
 | Backend | Node.js 20+ + TypeScript |
 | Banco | CockroachDB + Elasticsearch + MinIO |
@@ -126,56 +126,52 @@ docs(3f-docs): add F02 context and test cases
 
 ## 5. Como subir mudanças no Docker para teste
 
-Execute na ordem abaixo. Todos os comandos rodam no **Git Bash** (não no cmd/PowerShell).
+Use o script `3f-build.sh` na raiz do projeto. Roda no **Git Bash** (não no cmd/PowerShell).
 
-### 5.1 — Compilar TypeScript
-```bash
-cd /c/Users/PICHAU/Desktop/platform
-rush build
-```
-> Duração: ~1–5 min dependendo do que mudou.
-
-### 5.2 — Bundlar e rebuildar imagens
-
-**Transactor** — server plugins, triggers, modelo (mude aqui se alterou: `server-plugins/`, `models/`, `server/server-pipeline/`):
-```bash
-cd pods/server
-rushx bundle
-rushx docker:build
-```
-
-**Front** — UI, componentes Svelte, workbench (mude aqui se alterou: `plugins/*-resources/`, `plugins/workbench-resources/`):
-```bash
-cd pods/front
-rushx bundle
-rushx package   # copia assets do webpack — requer Git Bash (usa rm/cp Unix)
-rushx docker:build
-```
-
-**Account** — serviço de autenticação (mude aqui se alterou: `server/account/`, `server/account-service/`):
-```bash
-cd pods/account
-rushx docker:build   # não tem bundle separado
-```
-
-### 5.3 — Reiniciar containers
+### Uso do script
 
 ```bash
-cd /c/Users/PICHAU/Desktop/platform
-docker compose -f dev/docker-compose.yaml up -d --no-deps transactor_cockroach front account
-```
-> Use `--no-deps` para não derrubar o banco (CockroachDB, Redis, etc.).
+# Build completo (o mais comum)
+./3f-build.sh
 
-### 5.4 — Verificar que os containers subiram
+# Build limpo do zero — força recompilação total e Docker sem cache
+./3f-build.sh --clean --no-cache
 
-```bash
-docker compose -f dev/docker-compose.yaml ps | grep -E "front|account|transactor"
+# Só backend mudou (server plugins, models, triggers) — pula webpack (~10 min a menos)
+./3f-build.sh --skip-webpack --pod server
+
+# Só frontend mudou (componentes Svelte, workbench)
+./3f-build.sh --pod front
+
+# Só account mudou (auth, login)
+./3f-build.sh --skip-webpack --pod account
+
+# Dois pods específicos
+./3f-build.sh --pod "server front"
+
+# Ver todas as opções
+./3f-build.sh --help
 ```
 
-### 5.5 — Acessar
-```
-http://localhost:7000
-```
+### Flags disponíveis
+
+| Flag | Efeito |
+|---|---|
+| `--clean` | `rush rebuild` em vez de `rush build` (força recompilação total) |
+| `--no-cache` | Docker build sem cache de camadas |
+| `--skip-rush` | Pula o rush build (quando só quer rebuildar o Docker) |
+| `--skip-webpack` | Pula o webpack (quando não mudou nada de UI/frontend) |
+| `--pod <nome>` | Reconstrói só o(s) pod(s) indicados: `server`, `front`, `account` |
+
+### Tempo estimado por cenário
+
+| Cenário | Tempo aprox. |
+|---|---|
+| Build completo (`./3f-build.sh`) | 20–35 min |
+| Só backend (`--skip-webpack --pod server`) | 5–10 min |
+| Só frontend (`--pod front`) | 15–25 min |
+| Sem rush (`--skip-rush --pod server`) | 2–4 min |
+| Build limpo (`--clean --no-cache`) | 30–45 min |
 
 ### Referência rápida: o que mudou → qual pod rebuildar
 
