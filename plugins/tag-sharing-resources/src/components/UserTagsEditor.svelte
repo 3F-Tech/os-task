@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
   import { type Employee } from '@hcengineering/contact'
-  import { type Ref } from '@hcengineering/core'
+  import { type Doc, type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { type TaggedProfile, type UserTag } from '@hcengineering/tag-sharing'
   import {
@@ -18,8 +18,10 @@
   import tagSharing from '../plugin'
   import UserTagSelector from './UserTagSelector.svelte'
 
-  export let employee: Employee
+  export let object: Doc
   export let readonly: boolean = false
+
+  $: employee = object as Employee
 
   const client = getClient()
   const hierarchy = client.getHierarchy()

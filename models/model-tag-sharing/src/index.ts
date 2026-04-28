@@ -12,6 +12,7 @@ import {
 } from '@hcengineering/model'
 import contact, { TEmployee } from '@hcengineering/model-contact'
 import core, { TDoc } from '@hcengineering/model-core'
+import view from '@hcengineering/model-view'
 import setting from '@hcengineering/setting'
 import tagSharing, { type SpaceTagAccess, type TaggedProfile, type UserTag } from '@hcengineering/tag-sharing'
 
@@ -58,6 +59,10 @@ export function createModel (builder: Builder): void {
     group: 'settings-editor',
     role: AccountRole.Maintainer,
     order: 5100
+  })
+
+  builder.mixin(contact.mixin.Employee, core.class.Class, view.mixin.ObjectEditorFooter, {
+    editor: tagSharing.component.UserTagsEditor
   })
 }
 
