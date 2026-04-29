@@ -62,6 +62,7 @@ import task, {
 import { jsonToMarkup } from '@hcengineering/text'
 import { markdownToMarkup } from '@hcengineering/text-markdown'
 import tracker, {
+  ClientStage,
   type Issue,
   type IssueParentInfo,
   IssuePriority,
@@ -599,7 +600,9 @@ export class WorkspaceImporter {
       reports: 0,
       childInfo: [],
       identifier,
-      kind: kind._id
+      kind: kind._id,
+      clientName: '',
+      clientStage: ClientStage.Onboarding
     }
 
     await this.client.addCollection(

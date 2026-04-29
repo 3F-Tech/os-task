@@ -15,7 +15,6 @@
 
 import { type Class, type Doc, type Hierarchy, type Ref, type PersonId } from '@hcengineering/core'
 import trackerPlugin, { type Component, type IssueStatus, type Milestone, type Project } from '@hcengineering/tracker'
-import { type AttributeModel } from '@hcengineering/view'
 import { getClient } from '@hcengineering/presentation'
 import { getName, getPersonByPersonId } from '@hcengineering/contact'
 
@@ -184,7 +183,7 @@ async function loadPersonName (personId: PersonId): Promise<string> {
  * Handles special cases for status, assignee, component, space (project), and milestone fields
  */
 export async function formatIssueValue (
-  attr: AttributeModel,
+  attr: any,
   card: Doc,
   hierarchy: Hierarchy,
   _class: Ref<Class<Doc>>,
@@ -306,6 +305,22 @@ export async function formatIssueValue (
       }
     }
     return ''
+  }
+
+  if (attr.key === 'clientName') {
+    return String(issueDoc.clientName ?? '')
+  }
+
+  if (attr.key === 'clientStage') {
+    const stage = String(issueDoc.clientStage ?? 'onboarding')
+    const options = {
+      onboarding: { label: 'Onboarding', color: '#3b82f6' },
+      expansion: { label: 'Expansão', color: '#10b981' },
+      retention: { label: 'Retenção', color: '#f59e0b' },
+      churned: { label: 'Churned', color: '#ef4444' }
+    }
+    const option = (options as Record<string, { label: string, color: string }>)[stage] ?? options.onboarding
+    return `<span style="color: white; background-color: ${option.color}; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 11px;">${option.label}</span>`
   }
 
   return undefined

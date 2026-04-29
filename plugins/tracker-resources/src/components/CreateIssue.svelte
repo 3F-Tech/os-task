@@ -61,6 +61,7 @@
     IssuePriority,
     IssueStatus,
     IssueTemplate,
+    ClientStage,
     Milestone,
     Project,
     ProjectTargetPreference,
@@ -96,6 +97,7 @@
   import EstimationEditor from './issues/timereport/EstimationEditor.svelte'
   import MilestoneSelector from './milestones/MilestoneSelector.svelte'
   import ProjectPresenter from './projects/ProjectPresenter.svelte'
+  import ClientStageSelector from './issues/ClientStageSelector.svelte'
 
   export let space: Ref<Project> | undefined
   export let status: Ref<IssueStatus> | undefined = undefined
@@ -129,7 +131,7 @@
 
   let _space = draft?.space ?? space
   // let project: Project | undefined
-  let object = getDefaultObjectFromDraft() ?? getDefaultObject(id)
+  let object: any = getDefaultObjectFromDraft() ?? getDefaultObject(id)
   let isAssigneeTouched = false
   let kind: Ref<TaskType> | undefined = undefined
 
@@ -194,8 +196,10 @@
       assignee,
       labels: [],
       parentIssue: parentIssue?._id,
-      subIssues: []
-    }
+      subIssues: [],
+      clientName: (originalIssue as any)?.clientName ?? '',
+      clientStage: (originalIssue as any)?.clientStage ?? ClientStage.Onboarding
+    } as any
     if (originalIssue !== undefined && !ignoreOriginal) {
       const res: IssueDraft = {
         ...base,
@@ -228,7 +232,7 @@
 
   let currentProject: Project | undefined
 
-  let descriptionBox: AttachmentStyledBox | undefined
+  let descriptionBox: any
 
   $: updateIssueStatusId(object, currentProject)
   $: updateAssigneeId(object, currentProject)
@@ -236,6 +240,7 @@
     descriptionBox != null &&
     getTitle(object.title ?? '').length > 0 &&
     object.status !== undefined &&
+    getTitle((object as any).clientName ?? '').length > 0 &&
     kind !== undefined &&
     currentProject !== undefined
 
@@ -272,6 +277,61 @@
     templateQuery.unsubscribe()
   }
 
+  function onProjectChanged (evt: any): void {
+    currentProject = evt.detail ?? undefined
+  }
+
+  function onStatusChanged (evt: any): void {
+    const detail = evt.detail
+    if (object.status !== detail) {
+      object.status = detail
+    }
+  }
+
+  function onPriorityChanged (evt: any): void {
+    const detail = evt.detail
+    object.priority = detail
+    manager.setFocusPos(4)
+  }
+
+  function onAssigneeChanged (evt: any): void {
+    const detail = evt.detail
+    isAssigneeTouched = true
+    object.assignee = detail
+    manager.setFocusPos(5)
+  }
+
+  function onAttachmentRemoved (result: any): void {
+    if (result.detail !== undefined) descriptionBox?.removeAttachmentById(result.detail._id)
+  }
+
+  function onTagOpened (evt: any): void {
+    addTagRef(evt.detail)
+  }
+
+  function onTagDeleted (evt: any): void {
+    object.labels = object.labels.filter((it) => it.tag !== evt.detail._id)
+  }
+
+  function onAttachClick (): void {
+    descriptionBox?.handleAttach()
+  }
+
+  function onAttachmentSaved (ev: any): void {
+    if (ev.detail.action === 'saved') {
+      object.attachments = ev.detail.value
+    }
+  }
+
+  function onAttachmentsChanged (ev: any): void {
+    if (ev.detail.size > 0) {
+      attachments = ev.detail.values
+    } else if (ev.detail.size === 0 && ev.detail.values != null) {
+      attachments.clear()
+      attachments = attachments
+    }
+  }
+
   function tagAsRef (tag: TagElement): TagReference {
     return {
       _class: tags.class.TagReference,
@@ -292,7 +352,7 @@
     if (object.template?.template === template._id) {
       return
     }
-    const { _class, _id, space, children, comments, attachments, labels, description, ...templBase } = template
+    const { labels, description, ...templBase } = template as any
 
     const allLabels = new Set<Ref<TagElement>>()
     for (const label of labels ?? []) {
@@ -510,8 +570,10 @@
         relations: relatedTo !== undefined ? [{ _id: relatedTo._id, _class: relatedTo._class }] : [],
         childInfo: [],
         kind,
-        identifier
-      }
+        identifier,
+        clientName: getTitle((object as any).clientName),
+        clientStage: (object as any).clientStage
+      } as any
 
       if (!isEmptyMarkup(object.description)) {
         const collabId = makeCollabId(tracker.class.Issue, _id, 'description')
@@ -790,9 +852,7 @@
       }}
       label={tracker.string.Project}
       bind:space={_space}
-      on:object={(evt) => {
-        currentProject = evt.detail ?? undefined
-      }}
+      on:object={onProjectChanged}
       kind={'regular'}
       size={'small'}
       component={ProjectPresenter}
@@ -882,18 +942,8 @@
         bind:content={object.description}
         placeholder={tracker.string.IssueDescriptionPlaceholder}
         on:changeSize={() => dispatch('changeContent')}
-        on:attach={(ev) => {
-          if (ev.detail.action === 'saved') {
-            object.attachments = ev.detail.value
-          }
-        }}
-        on:attachments={(ev) => {
-          if (ev.detail.size > 0) attachments = ev.detail.values
-          else if (ev.detail.size === 0 && ev.detail.values != null) {
-            attachments.clear()
-            attachments = attachments
-          }
-        }}
+        on:attach={onAttachmentSaved}
+        on:attachments={onAttachmentsChanged}
       />
     {/key}
   </div>
@@ -909,6 +959,23 @@
   {/if}
   <DocCreateExtComponent manager={docCreateManager} kind={'body'} space={currentProject} props={extraProps} />
   <svelte:fragment slot="pool">
+    <div id="client-name-editor">
+      <EditBox
+        focusIndex={2.5}
+        bind:value={object.clientName}
+        placeholder={tracker.string.ClientName}
+        kind={'regular'}
+        size={'large'}
+        short
+      />
+    </div>
+    <div id="client-stage-editor">
+      <ClientStageSelector
+        bind:value={object.clientStage}
+        kind={'regular'}
+        size={'large'}
+      />
+    </div>
     <div id="status-editor">
       {#if kind !== undefined}
         <StatusEditor
@@ -922,11 +989,7 @@
           on:refocus={() => {
             manager.setFocusPos(3)
           }}
-          on:change={({ detail }) => {
-            if (object.status !== detail) {
-              object.status = detail
-            }
-          }}
+          on:change={onStatusChanged}
         />
       {/if}
     </div>
@@ -939,10 +1002,7 @@
         kind={'regular'}
         size={'large'}
         justify="center"
-        on:change={({ detail }) => {
-          object.priority = detail
-          manager.setFocusPos(4)
-        }}
+        on:change={onPriorityChanged}
       />
     </div>
     <div id="assignee-editor">
@@ -952,11 +1012,7 @@
         kind={'regular'}
         size={'large'}
         short
-        on:change={({ detail }) => {
-          isAssigneeTouched = true
-          object.assignee = detail
-          manager.setFocusPos(5)
-        }}
+        on:change={onAssigneeChanged}
       />
     </div>
     <Component
@@ -970,12 +1026,8 @@
         kind: 'regular',
         size: 'large'
       }}
-      on:open={(evt) => {
-        addTagRef(evt.detail)
-      }}
-      on:delete={(evt) => {
-        object.labels = object.labels.filter((it) => it.tag !== evt.detail._id)
-      }}
+      on:open={onTagOpened}
+      on:delete={onTagDeleted}
     />
     <ComponentSelector
       focusIndex={7}
@@ -1030,9 +1082,7 @@
           value={attachment}
           showPreview
           removable
-          on:remove={(result) => {
-            if (result.detail !== undefined) descriptionBox?.removeAttachmentById(result.detail._id)
-          }}
+          on:remove={onAttachmentRemoved}
         />
       {/each}
     {/if}
@@ -1044,9 +1094,7 @@
       iconProps={{ fill: 'var(--theme-dark-color)' }}
       size={'large'}
       kind={'ghost'}
-      on:click={() => {
-        descriptionBox?.handleAttach()
-      }}
+      on:click={onAttachClick}
     />
     <DocCreateExtComponent manager={docCreateManager} kind={'footer'} space={currentProject} props={extraProps} />
   </svelte:fragment>

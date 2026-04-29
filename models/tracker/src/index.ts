@@ -185,6 +185,8 @@ function defineFilters (builder: Builder): void {
       'space',
       'createdBy',
       'assignee',
+      'clientName',
+      'clientStage',
       {
         _class: tracker.class.Issue,
         key: 'component',

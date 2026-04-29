@@ -75,9 +75,9 @@ import {
   type TimeReportDayType,
   type TimeSpendReport,
   type CompletionRule,
-  type IssueCompletionConfig,
-  PdcaFrequency
+  type IssueCompletionConfig
 } from '@hcengineering/tracker'
+import { PdcaFrequency, ClientStage } from '@hcengineering/tracker'
 import tracker from './plugin'
 import { type TaskType } from '@hcengineering/task'
 
@@ -291,6 +291,14 @@ export class TIssue extends TTask implements Issue {
   @Prop(TypeDate(DateRangeMode.DATETIME), tracker.string.PdcaNextCycleDate)
   @Hidden()
     pdcaNextCycleDate?: Timestamp
+
+  @Prop(TypeString(), tracker.string.ClientName)
+  @Index(IndexKind.Indexed)
+    clientName!: string
+
+  @Prop(TypeString(), tracker.string.ClientStage)
+  @Index(IndexKind.Indexed)
+    clientStage!: ClientStage
 }
 /**
  * @public

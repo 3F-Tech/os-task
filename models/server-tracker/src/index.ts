@@ -89,7 +89,7 @@ export function createModel (builder: Builder): void {
   })
 
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
-    trigger: serverTracker.trigger.OnPdcaCycleToggle,
+    trigger: (serverTracker.trigger as any).OnPdcaCycleToggle,
     txMatch: {
       _class: core.class.TxUpdateDoc,
       objectClass: tracker.class.Issue
@@ -97,7 +97,7 @@ export function createModel (builder: Builder): void {
   })
 
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
-    trigger: serverTracker.trigger.OnPdcaCycleCancel,
+    trigger: (serverTracker.trigger as any).OnPdcaCycleCancel,
     txMatch: {
       _class: core.class.TxRemoveDoc,
       objectClass: tracker.class.Issue

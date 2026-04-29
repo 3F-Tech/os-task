@@ -315,7 +315,7 @@ export default mergeIds(trackerId, tracker, {
     UnsetParent: '' as IntlString,
     PreviousAssigned: '' as IntlString,
     EditRelatedTargets: '' as IntlString,
-    RelatedIssueTargetDescription: '' as IntlString,
+    RelatedIssueTargetDescription: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,
@@ -381,7 +381,8 @@ export default mergeIds(trackerId, tracker, {
     SubIssuesSelector: '' as AnyComponent,
     IconWithEmoji: '' as Asset,
     IssueStatusIcon: '' as AnyComponent,
-    MilestoneStatusIcon: '' as AnyComponent
+    MilestoneStatusIcon: '' as AnyComponent,
+    ClientStagePresenter: '' as AnyComponent
   },
   metadata: {
     CreateIssueDraft: '' as Metadata<IssueDraft>
