@@ -21,13 +21,17 @@ export interface Config {
   PollInterval: number
   QueueRegion: string
   QueueConfig: string
+  AccountsUrl: string
+  Secret: string
 }
 
 const config: Config = {
   DbUrl: process.env.DB_URL ?? 'postgres://localhost:5432/huly',
   PollInterval: process.env.POLL_INTERVAL != null ? Number(process.env.POLL_INTERVAL) : 20000,
   QueueRegion: process.env.QUEUE_REGION ?? '',
-  QueueConfig: process.env.QUEUE_CONFIG ?? ''
+  QueueConfig: process.env.QUEUE_CONFIG ?? '',
+  AccountsUrl: process.env.ACCOUNTS_URL ?? 'http://localhost:3000',
+  Secret: process.env.SECRET ?? 'secret'
 }
 
 export default config

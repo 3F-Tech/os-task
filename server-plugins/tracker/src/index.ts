@@ -39,6 +39,8 @@ export default plugin(serverTrackerId, {
     OnComponentRemove: '' as Resource<TriggerFunc>,
     OnProjectRemove: '' as Resource<TriggerFunc>,
     OnAutomaticDates: '' as Resource<TriggerFunc>,
-    OnIssueCompletionCheck: '' as Resource<TriggerFunc>
+    OnIssueCompletionCheck: '' as Resource<TriggerFunc>,
+    OnPdcaCycleToggle: '' as Resource<TriggerFunc>,
+    OnPdcaCycleCancel: '' as Resource<TriggerFunc>
   }
 })

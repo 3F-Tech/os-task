@@ -88,6 +88,21 @@ export function createModel (builder: Builder): void {
     }
   })
 
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnPdcaCycleToggle,
+    txMatch: {
+      _class: core.class.TxUpdateDoc,
+      objectClass: tracker.class.Issue
+    }
+  })
+
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverTracker.trigger.OnPdcaCycleCancel,
+    txMatch: {
+      _class: core.class.TxRemoveDoc,
+      objectClass: tracker.class.Issue
+    }
+  })
   builder.mixin(
     tracker.ids.AssigneeNotification,
     notification.class.NotificationType,

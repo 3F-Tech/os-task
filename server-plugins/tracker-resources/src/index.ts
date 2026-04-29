@@ -32,7 +32,7 @@ import core, {
 } from '@hcengineering/core'
 import { NotificationContent } from '@hcengineering/notification'
 import { getMetadata, IntlString } from '@hcengineering/platform'
-import serverCore, { TriggerControl } from '@hcengineering/server-core'
+import serverCore, { TriggerControl, QueueTopic } from '@hcengineering/server-core'
 import { NOTIFICATION_BODY_SIZE } from '@hcengineering/server-notification'
 import task from '@hcengineering/task'
 import { stripTags } from '@hcengineering/text-core'
@@ -43,6 +43,7 @@ import tracker, {
   IssueCompletionConfig,
   IssueParentInfo,
   IssueStatus,
+  PdcaFrequency,
   TimeSpendReport,
   trackerId,
   type Project
@@ -663,6 +664,103 @@ export async function OnIssueCompletionCheck (txes: Tx[], control: TriggerContro
   return result
 }
 
+interface TimeMachineMessage {
+  type: 'schedule' | 'cancel'
+  id: string
+  targetDate?: number
+  topic?: string
+  data?: any
+}
+
+function calculateNextCycleDate (frequency: PdcaFrequency, from: number): number {
+  const date = new Date(from)
+  if (frequency === PdcaFrequency.Weekly) {
+    const daysUntilMonday = ((8 - date.getDay()) % 7) || 7
+    date.setDate(date.getDate() + daysUntilMonday)
+    date.setHours(0, 0, 0, 0)
+  } else if (frequency === PdcaFrequency.Biweekly) {
+    date.setDate(date.getDate() + 14)
+    date.setHours(0, 0, 0, 0)
+  } else {
+    date.setMonth(date.getMonth() + 1, 1)
+    date.setHours(0, 0, 0, 0)
+  }
+  return date.getTime()
+}
+
+async function schedulePdcaTimer (issue: Issue, control: TriggerControl): Promise<void> {
+  if (control.queue == null) return
+  const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
+  if (frequency == null) return
+  const nextDate = calculateNextCycleDate(frequency, Date.now())
+  const producer = control.queue.getProducer<TimeMachineMessage>(control.ctx, QueueTopic.TimeMachine)
+  await producer.send(control.ctx, control.workspace.uuid, [{
+    type: 'schedule',
+    id: `pdca_${issue._id}`,
+    targetDate: nextDate,
+    topic: QueueTopic.PdcaCycle,
+    data: { issueId: issue._id, workspaceId: control.workspace.uuid }
+  }])
+}
+
+async function cancelPdcaTimer (issueId: string, control: TriggerControl): Promise<void> {
+  if (control.queue == null) return
+  const producer = control.queue.getProducer<TimeMachineMessage>(control.ctx, QueueTopic.TimeMachine)
+  await producer.send(control.ctx, control.workspace.uuid, [{
+    type: 'cancel',
+    id: `pdca_${issueId}`
+  }])
+}
+
+/**
+ * @public
+ * Schedules or cancels the PDCA timer when pdcaCycleActive / pdcaCycleFrequency changes.
+ */
+export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  for (const tx of txes) {
+    if (tx._class === core.class.TxUpdateDoc) {
+      const updateTx = tx as TxUpdateDoc<Issue>
+      if (!control.hierarchy.isDerived(updateTx.objectClass, tracker.class.Issue)) continue
+
+      const ops = updateTx.operations as Record<string, unknown>
+      const touchesCycle =
+        Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleActive') ||
+        Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleFrequency') ||
+        Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleResetStatus')
+
+      if (!touchesCycle) continue
+
+      const [issue] = await control.findAll(control.ctx, tracker.class.Issue, { _id: updateTx.objectId }, { limit: 1 })
+      if (issue === undefined) continue
+
+      const isActive = (issue as any).pdcaCycleActive === true
+      if (isActive) {
+        await schedulePdcaTimer(issue, control)
+      } else {
+        await cancelPdcaTimer(String(issue._id), control)
+      }
+    }
+  }
+  return []
+}
+
+/**
+ * @public
+ * Cancels the PDCA timer when a PDCA-active issue is deleted.
+ */
+export async function OnPdcaCycleCancel (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  for (const tx of txes) {
+    if (tx._class === core.class.TxRemoveDoc) {
+      const removeTx = tx as TxRemoveDoc<Issue>
+      if (!control.hierarchy.isDerived(removeTx.objectClass, tracker.class.Issue)) continue
+      const removed = control.removedMap.get(removeTx.objectId)
+      if (removed == null || (removed as any).pdcaCycleActive !== true) continue
+      await cancelPdcaTimer(String(removeTx.objectId), control)
+    }
+  }
+  return []
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default async () => ({
   function: {
@@ -676,6 +774,8 @@ export default async () => ({
     OnComponentRemove,
     OnProjectRemove,
     OnAutomaticDates,
-    OnIssueCompletionCheck
+    OnIssueCompletionCheck,
+    OnPdcaCycleToggle,
+    OnPdcaCycleCancel
   }
 })

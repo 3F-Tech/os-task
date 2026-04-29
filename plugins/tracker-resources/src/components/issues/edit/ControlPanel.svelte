@@ -34,6 +34,7 @@
   import AssigneeEditor from '../AssigneeEditor.svelte'
   import CompletedDateEditor from '../CompletedDateEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
+  import PdcaCycleSection from '../PdcaCycleSection.svelte'
   import PriorityEditor from '../PriorityEditor.svelte'
   import RelationEditor from '../RelationEditor.svelte'
   import StartDateEditor from '../StartDateEditor.svelte'
@@ -68,7 +69,11 @@
     'milestone',
     'relations',
     'blockedBy',
-    'identifier'
+    'identifier',
+    'pdcaCycleActive',
+    'pdcaCycleFrequency',
+    'pdcaCycleResetStatus',
+    'pdcaNextCycleDate'
   ]
 
   let keys: KeyedAttribute[] = []
@@ -228,6 +233,9 @@
     </span>
     <CompletedDateEditor value={issue} width={'100%'} editable={!readonly} />
   {/if}
+
+  <div class="divider" />
+  <PdcaCycleSection {issue} {readonly} />
 
   {#if keys.length > 0}
     <div class="divider" />

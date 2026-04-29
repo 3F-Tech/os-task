@@ -40,6 +40,7 @@ import {
   Model,
   Prop,
   ReadOnly,
+  TypeBoolean,
   TypeCollaborativeDoc,
   TypeDate,
   TypeMarkup,
@@ -74,7 +75,8 @@ import {
   type TimeReportDayType,
   type TimeSpendReport,
   type CompletionRule,
-  type IssueCompletionConfig
+  type IssueCompletionConfig,
+  PdcaFrequency
 } from '@hcengineering/tracker'
 import tracker from './plugin'
 import { type TaskType } from '@hcengineering/task'
@@ -275,6 +277,20 @@ export class TIssue extends TTask implements Issue {
 
   @Prop(Collection(time.class.ToDo), getEmbeddedLabel('Action Items'))
     todos?: CollectionSize<ToDo>
+
+  @Prop(TypeBoolean(), tracker.string.PdcaCycleActive)
+    pdcaCycleActive?: boolean
+
+  @Prop(TypeString(), tracker.string.PdcaCycleFrequency)
+    pdcaCycleFrequency?: PdcaFrequency
+
+  @Prop(TypeRef(tracker.class.IssueStatus), tracker.string.PdcaCycleResetStatus)
+  @Index(IndexKind.Indexed)
+    pdcaCycleResetStatus?: Ref<IssueStatus>
+
+  @Prop(TypeDate(DateRangeMode.DATETIME), tracker.string.PdcaNextCycleDate)
+  @Hidden()
+    pdcaNextCycleDate?: Timestamp
 }
 /**
  * @public

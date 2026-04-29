@@ -176,6 +176,15 @@ export enum IssuesDateModificationPeriod {
 /**
  * @public
  */
+export enum PdcaFrequency {
+  Weekly = 'weekly',
+  Biweekly = 'biweekly',
+  Monthly = 'monthly'
+}
+
+/**
+ * @public
+ */
 export enum MilestoneStatus {
   Planned,
   InProgress,
@@ -246,6 +255,11 @@ export interface Issue extends Task {
   }
 
   todos?: CollectionSize<ToDo>
+
+  pdcaCycleActive?: boolean
+  pdcaCycleFrequency?: PdcaFrequency
+  pdcaCycleResetStatus?: Ref<IssueStatus>
+  pdcaNextCycleDate?: Timestamp
 }
 
 /**
