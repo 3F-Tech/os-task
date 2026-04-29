@@ -398,6 +398,23 @@ export const trackerOperation: MigrateOperation = {
         state: 'migrateDefaultTypeMixins',
         mode: 'upgrade',
         func: migrateDefaultTypeMixins
+      },
+      {
+        state: 'clientFields',
+        mode: 'upgrade',
+        func: async (client) => {
+          await client.update(
+            DOMAIN_TASK,
+            {
+              _class: tracker.class.Issue,
+              clientName: { $exists: false }
+            },
+            {
+              clientName: '',
+              clientStage: 'onboarding'
+            }
+          )
+        }
       }
     ])
   },

@@ -41937,6 +41937,12 @@ importers:
 
   ../../services/worker:
     dependencies:
+      '@hcengineering/account-client':
+        specifier: workspace:^0.7.25
+        version: link:../../foundations/core/packages/account-client
+      '@hcengineering/api-client':
+        specifier: workspace:^0.7.25
+        version: link:../../foundations/core/packages/api-client
       '@hcengineering/core':
         specifier: workspace:^0.7.26
         version: link:../../foundations/core/packages/core
@@ -41949,6 +41955,12 @@ importers:
       '@hcengineering/server-core':
         specifier: workspace:^0.7.19
         version: link:../../foundations/server/packages/core
+      '@hcengineering/server-token':
+        specifier: workspace:^0.7.18
+        version: link:../../foundations/core/packages/token
+      '@hcengineering/tracker':
+        specifier: workspace:^0.7.0
+        version: link:../../plugins/tracker
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1

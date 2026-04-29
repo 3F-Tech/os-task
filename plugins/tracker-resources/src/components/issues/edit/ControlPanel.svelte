@@ -32,6 +32,7 @@
   import ComponentEditor from '../../components/ComponentEditor.svelte'
   import MilestoneEditor from '../../milestones/MilestoneEditor.svelte'
   import AssigneeEditor from '../AssigneeEditor.svelte'
+  import ClientStageSelector from '../ClientStageSelector.svelte'
   import CompletedDateEditor from '../CompletedDateEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
   import PdcaCycleSection from '../PdcaCycleSection.svelte'
@@ -73,7 +74,9 @@
     'pdcaCycleActive',
     'pdcaCycleFrequency',
     'pdcaCycleResetStatus',
-    'pdcaNextCycleDate'
+    'pdcaNextCycleDate',
+    'clientName',
+    'clientStage'
   ]
 
   let keys: KeyedAttribute[] = []
@@ -190,6 +193,34 @@
     <Label label={tracker.string.Assignee} />
   </span>
   <AssigneeEditor object={issue} size={'medium'} avatarSize={'card'} width="100%" {readonly} />
+
+  <div class="divider" />
+
+  <span class="labelOnPanel">
+    <Label label={tracker.string.ClientName} />
+  </span>
+  <AttributeBarEditor
+    {readonly}
+    key={'clientName'}
+    identifier={issue.identifier}
+    _class={issue._class}
+    object={issue}
+    showHeader={false}
+    size={'medium'}
+  />
+
+  <span class="labelOnPanel">
+    <Label label={tracker.string.ClientStage} />
+  </span>
+  <ClientStageSelector
+    bind:value={issue.clientStage}
+    kind={'regular'}
+    size={'small'}
+    disabled={readonly}
+    on:change={({ detail }) => {
+      void client.update(issue, { clientStage: detail })
+    }}
+  />
 
   <span class="labelTop">
     <Label label={tracker.string.Labels} />

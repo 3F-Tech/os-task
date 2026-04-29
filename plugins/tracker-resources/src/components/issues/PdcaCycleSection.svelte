@@ -50,6 +50,14 @@
     await client.update(issue, { pdcaCycleResetStatus: val === '' ? undefined : val as Ref<IssueStatus> })
   }
 
+  function handleFrequencyChange (e: Event): void {
+    void setFrequency((e.currentTarget as HTMLSelectElement).value as PdcaFrequency)
+  }
+
+  function handleResetStatusChange (e: Event): void {
+    void setResetStatus((e.currentTarget as HTMLSelectElement).value as Ref<IssueStatus>)
+  }
+
   $: isActive = issue.pdcaCycleActive === true
 </script>
 
@@ -71,7 +79,7 @@
       class="antiSelect"
       disabled={readonly}
       value={issue.pdcaCycleFrequency ?? PdcaFrequency.Weekly}
-      on:change={(e) => { void setFrequency(e.currentTarget.value as PdcaFrequency) }}
+      on:change={handleFrequencyChange}
     >
       {#each frequencyOptions as opt}
         <option value={opt.value}><Label label={opt.label} /></option>
@@ -87,7 +95,7 @@
       class="antiSelect"
       disabled={readonly}
       value={issue.pdcaCycleResetStatus ?? ''}
-      on:change={(e) => { void setResetStatus(e.currentTarget.value as Ref<IssueStatus>) }}
+      on:change={handleResetStatusChange}
     >
       <option value="">—</option>
       {#each statuses as s}

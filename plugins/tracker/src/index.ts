@@ -53,6 +53,25 @@ export * from './analytics'
 /**
  * @public
  */
+export enum PdcaFrequency {
+  Weekly = 'weekly',
+  Biweekly = 'biweekly',
+  Monthly = 'monthly'
+}
+
+/**
+ * @public
+ */
+export enum ClientStage {
+  Onboarding = 'onboarding',
+  Expansion = 'expansion',
+  Retention = 'retention',
+  Churned = 'churned'
+}
+
+/**
+ * @public
+ */
 export interface IssueStatus extends Status {}
 
 /**
@@ -173,14 +192,6 @@ export enum IssuesDateModificationPeriod {
   PastMonth = 'pastMonth'
 }
 
-/**
- * @public
- */
-export enum PdcaFrequency {
-  Weekly = 'weekly',
-  Biweekly = 'biweekly',
-  Monthly = 'monthly'
-}
 
 /**
  * @public
@@ -260,6 +271,9 @@ export interface Issue extends Task {
   pdcaCycleFrequency?: PdcaFrequency
   pdcaCycleResetStatus?: Ref<IssueStatus>
   pdcaNextCycleDate?: Timestamp
+
+  clientName: string
+  clientStage: ClientStage
 }
 
 /**
@@ -277,6 +291,9 @@ export interface IssueDraft {
   space: Ref<Project>
   dueDate: Timestamp | null
   milestone?: Ref<Milestone> | null
+
+  clientName: string
+  clientStage: ClientStage
 
   // Estimation in man days
   estimation: number
@@ -578,7 +595,9 @@ const pluginState = plugin(trackerId, {
     MissingSpentTime: '' as IntlString,
     MissingEstimation: '' as IntlString,
     OpenSubtasksBlocking: '' as IntlString,
-    MissingCompletedDate: '' as IntlString
+    MissingCompletedDate: '' as IntlString,
+    ClientName: '' as IntlString,
+    ClientStage: '' as IntlString
   },
   extensions: {
     IssueListHeader: '' as ComponentExtensionId,

@@ -752,7 +752,7 @@ export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): P
           updateTx.objectClass,
           updateTx.objectSpace,
           updateTx.objectId,
-          { pdcaNextCycleDate: null }
+          { pdcaNextCycleDate: undefined }
         ))
       }
     }
