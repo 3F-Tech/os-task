@@ -27,3 +27,4 @@ Documentação das features customizadas desenvolvidas no fork do Huly para uso 
 | F06 | Sistema de BUs e Controle de Acesso | `feature/bu-access-control` | 🔲 A desenvolver |
 | F07 | Custom Fields na List View | `feature/custom-fields-list-view` | 🔲 A desenvolver |
 | F08 | Home Dashboard | `feature/home-dashboard` | 🔲 A desenvolver |
+| F09 | Campos de Cliente (Nome do Cliente + Etapa) | `feature/client-fields` | 🔲 A desenvolver |
