@@ -28,7 +28,7 @@
 
   let statuses: IssueStatus[] = []
 
-  $: query.query(tracker.class.IssueStatus, { space: issue.space }, (res) => {
+  $: query.query(tracker.class.IssueStatus, { attachedTo: issue.space }, (res) => {
     statuses = res
   })
 
@@ -39,39 +39,15 @@
   ]
 
   async function toggleActive (val: boolean): Promise<void> {
-    await client.updateCollection(
-      issue._class,
-      issue.space,
-      issue._id,
-      issue.attachedTo,
-      issue.attachedToClass,
-      issue.collection,
-      { pdcaCycleActive: val }
-    )
+    await client.update(issue, { pdcaCycleActive: val })
   }
 
   async function setFrequency (val: PdcaFrequency): Promise<void> {
-    await client.updateCollection(
-      issue._class,
-      issue.space,
-      issue._id,
-      issue.attachedTo,
-      issue.attachedToClass,
-      issue.collection,
-      { pdcaCycleFrequency: val }
-    )
+    await client.update(issue, { pdcaCycleFrequency: val })
   }
 
   async function setResetStatus (val: Ref<IssueStatus>): Promise<void> {
-    await client.updateCollection(
-      issue._class,
-      issue.space,
-      issue._id,
-      issue.attachedTo,
-      issue.attachedToClass,
-      issue.collection,
-      { pdcaCycleResetStatus: val }
-    )
+    await client.update(issue, { pdcaCycleResetStatus: val === '' ? undefined : val as Ref<IssueStatus> })
   }
 
   $: isActive = issue.pdcaCycleActive === true
