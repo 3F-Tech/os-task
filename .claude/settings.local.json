@@ -9,7 +9,24 @@
       "PowerShell(head *)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\" | ForEach-Object { $_.Name })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\\\\tracker-resources\\\\src\\\\components\" | ForEach-Object { $_.Name })",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\\\\tracker-resources\\\\src\\\\components\\\\issues\\\\edit\" | ForEach-Object { $_.Name })"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\\\\plugins\\\\tracker-resources\\\\src\\\\components\\\\issues\\\\edit\" | ForEach-Object { $_.Name })",
+      "Bash(rush validate *)",
+      "Bash(rushx bundle *)",
+      "Bash(rushx package *)",
+      "Bash(rushx docker:build)",
+      "Bash(docker compose *)",
+      "Bash(xargs grep *)",
+      "Bash(rushx build *)",
+      "Bash(tasklist)",
+      "Bash(rush build *)",
+      "Bash(npx tsc *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(xargs cat *)",
+      "Bash(rush install *)",
+      "Bash(rush update *)",
+      "Bash(grep -E \"\\\\.\\(svelte|ts\\)$\")",
+      "Bash(node_modules/.bin/webpack --stats-error-details)"
     ]
   }
 }

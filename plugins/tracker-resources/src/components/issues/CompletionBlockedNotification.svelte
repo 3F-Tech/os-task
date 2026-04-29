@@ -60,6 +60,9 @@
     max-width: 28rem;
     padding: 1rem 1.25rem;
     gap: 0.75rem;
+    background-color: var(--theme-popup-color);
+    border-radius: 0.75rem;
+    box-shadow: var(--popup-shadow);
   }
 
   .popup-header {

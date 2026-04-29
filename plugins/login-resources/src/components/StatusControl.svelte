@@ -16,14 +16,14 @@
   import type { Status } from '@hcengineering/platform'
   import { Severity } from '@hcengineering/platform'
 
-  import { Status as StatusControl } from '@hcengineering/ui'
+  import { Status as StatusPresenter } from '@hcengineering/ui'
 
   export let status: Status
 </script>
 
 {#if status.severity !== Severity.OK}
   <div class="flex-row-center container" class:error={status.severity === Severity.ERROR}>
-    <StatusControl {status} overflow={false} />
+    <StatusPresenter {status} overflow={false} />
   </div>
 {/if}
 

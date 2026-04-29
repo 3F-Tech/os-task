@@ -688,7 +688,7 @@ function calculateNextCycleDate (frequency: PdcaFrequency, from: number): number
   return date.getTime()
 }
 
-async function schedulePdcaTimer (issue: Issue, control: TriggerControl): Promise<void> {
+async function schedulePdcaTimer (issue: Issue, control: TriggerControl): Promise<number | undefined> {
   if (control.queue == null) return
   const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
   if (frequency == null) return
@@ -701,6 +701,7 @@ async function schedulePdcaTimer (issue: Issue, control: TriggerControl): Promis
     topic: QueueTopic.PdcaCycle,
     data: { issueId: issue._id, workspaceId: control.workspace.uuid }
   }])
+  return nextDate
 }
 
 async function cancelPdcaTimer (issueId: string, control: TriggerControl): Promise<void> {
@@ -717,6 +718,7 @@ async function cancelPdcaTimer (issueId: string, control: TriggerControl): Promi
  * Schedules or cancels the PDCA timer when pdcaCycleActive / pdcaCycleFrequency changes.
  */
 export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  const result: Tx[] = []
   for (const tx of txes) {
     if (tx._class === core.class.TxUpdateDoc) {
       const updateTx = tx as TxUpdateDoc<Issue>
@@ -735,13 +737,27 @@ export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): P
 
       const isActive = (issue as any).pdcaCycleActive === true
       if (isActive) {
-        await schedulePdcaTimer(issue, control)
+        const nextDate = await schedulePdcaTimer(issue, control)
+        if (nextDate !== undefined) {
+          result.push(control.txFactory.createTxUpdateDoc(
+            updateTx.objectClass,
+            updateTx.objectSpace,
+            updateTx.objectId,
+            { pdcaNextCycleDate: nextDate }
+          ))
+        }
       } else {
         await cancelPdcaTimer(String(issue._id), control)
+        result.push(control.txFactory.createTxUpdateDoc(
+          updateTx.objectClass,
+          updateTx.objectSpace,
+          updateTx.objectId,
+          { pdcaNextCycleDate: null }
+        ))
       }
     }
   }
-  return []
+  return result
 }
 
 /**
