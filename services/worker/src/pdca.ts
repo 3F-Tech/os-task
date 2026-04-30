@@ -54,6 +54,46 @@ function calculateNextCycleDate (frequency: PdcaFrequency, from: number): number
   return date.getTime()
 }
 
+function calculateDueDate (frequency: PdcaFrequency, dueDays: number[] | undefined): number | null {
+  if (dueDays == null || dueDays.length === 0) return null
+  const now = new Date()
+
+  if (frequency === 'weekly') {
+    const targetWeekday = dueDays[0] // 0=Sun, 1=Mon, ..., 6=Sat
+    const currentDay = now.getDay()
+    let daysUntil = (targetWeekday - currentDay + 7) % 7
+    if (daysUntil === 0) daysUntil = 7
+    const due = new Date(now)
+    due.setDate(now.getDate() + daysUntil)
+    due.setHours(23, 59, 0, 0)
+    return due.getTime()
+  }
+
+  if (frequency === 'monthly') {
+    const targetDay = dueDays[0]
+    const due = new Date(now.getFullYear(), now.getMonth(), targetDay, 23, 59, 0, 0)
+    if (due.getTime() <= now.getTime()) {
+      due.setMonth(due.getMonth() + 1)
+    }
+    return due.getTime()
+  }
+
+  if (frequency === 'biweekly') {
+    const sorted = [...dueDays].sort((a, b) => a - b)
+    const todayDay = now.getDate()
+    const nextDay = sorted.find((d) => d > todayDay)
+    if (nextDay != null) {
+      const due = new Date(now.getFullYear(), now.getMonth(), nextDay, 23, 59, 0, 0)
+      return due.getTime()
+    }
+    // wrap to next month, first of the sorted days
+    const due = new Date(now.getFullYear(), now.getMonth() + 1, sorted[0], 23, 59, 0, 0)
+    return due.getTime()
+  }
+
+  return null
+}
+
 async function createWorkspaceClient (workspaceUuid: WorkspaceUuid): Promise<TxOperations> {
   const token = generateToken(systemAccountUuid, workspaceUuid, { service: SERVICE_NAME })
   const accountClient = getAccountClient(config.AccountsUrl, token)
@@ -84,30 +124,77 @@ export async function processPdcaCycleEvent (
     const isActive = (issue as any).pdcaCycleActive === true
     const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
     const resetStatus = (issue as any).pdcaCycleResetStatus as Ref<IssueStatus> | undefined
+    const dueDays = (issue as any).pdcaCycleDueDays as number[] | undefined
+    const shouldDuplicate = (issue as any).pdcaCycleDuplicate === true
 
     if (!isActive || frequency == null || resetStatus == null) {
       ctx.info('PDCA cycle: skipping — cycle not fully configured or inactive', { issueId })
       return
     }
 
-    if (issue.status === resetStatus) {
-      ctx.info('PDCA cycle: status already matches reset status, skipping update', { issueId })
-    } else {
-      await client.update(issue, { status: resetStatus })
-      ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
-    }
+    const dueDate = calculateDueDate(frequency, dueDays)
 
     const nextDate = calculateNextCycleDate(frequency, Date.now())
-    await client.update(issue, { pdcaNextCycleDate: nextDate } as any)
+    let scheduleIssueId: Ref<Issue> = issueId
+
+    if (shouldDuplicate) {
+      // Create new issue as copy; the cycle continues on the new issue
+      const wonStatuses = await client.findAll(tracker.class.IssueStatus, {})
+      const wonStatus = wonStatuses.find((s: any) => s.category === 'task:category:Won')
+
+      const newIssueData: Record<string, any> = {
+        title: issue.title,
+        status: resetStatus,
+        kind: issue.kind,
+        assignee: issue.assignee,
+        priority: issue.priority,
+        component: issue.component,
+        milestone: issue.milestone,
+        estimation: issue.estimation,
+        reportedTime: 0,
+        dueDate: dueDate ?? null,
+        pdcaCycleActive: true,
+        pdcaCycleFrequency: frequency,
+        pdcaCycleResetStatus: resetStatus,
+        pdcaCycleDueDays: dueDays,
+        pdcaCycleDuplicate: true,
+        pdcaNextCycleDate: nextDate,
+        clientName: (issue as any).clientName,
+        clientStage: (issue as any).clientStage
+      }
+
+      const newId = await client.addCollection(
+        tracker.class.Issue,
+        issue.space,
+        issue.attachedTo ?? issue.space,
+        (issue.attachedToClass ?? tracker.class.Project) as any,
+        'issues',
+        newIssueData as any
+      )
+      scheduleIssueId = newId as Ref<Issue>
+      ctx.info('PDCA cycle: new issue created as duplicate', { issueId, newIssueId: newId })
+
+      // Mark original as done and deactivate its PDCA
+      if (wonStatus != null) {
+        await client.update(issue, { status: wonStatus._id, pdcaCycleActive: false } as any)
+      }
+      ctx.info('PDCA cycle: original issue marked as done', { issueId })
+    } else {
+      // Standard mode: reset status + clear spent time
+      const update: Record<string, any> = { status: resetStatus, reportedTime: 0, pdcaNextCycleDate: nextDate }
+      if (dueDate != null) update.dueDate = dueDate
+      await client.update(issue, update as any)
+      ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
+    }
 
     const queue = getPlatformQueue(SERVICE_NAME, config.QueueRegion)
     const producer = queue.getProducer<TimeMachineMessage>(ctx, QueueTopic.TimeMachine)
     await producer.send(ctx, workspaceId, [{
       type: 'schedule',
-      id: `pdca_${issueId}`,
+      id: `pdca_${scheduleIssueId}`,
       targetDate: nextDate,
       topic: QueueTopic.PdcaCycle,
-      data: { issueId, workspaceId }
+      data: { issueId: scheduleIssueId, workspaceId }
     }])
   } catch (err: any) {
     ctx.error('PDCA cycle processing error', { issueId, workspaceId, err: err.message })

@@ -292,6 +292,13 @@ export class TIssue extends TTask implements Issue {
   @Hidden()
     pdcaNextCycleDate?: Timestamp
 
+  @Prop(ArrOf(TypeNumber()), tracker.string.PdcaDueWeekday)
+  @Hidden()
+    pdcaCycleDueDays?: number[]
+
+  @Prop(TypeBoolean(), tracker.string.PdcaDuplicate)
+    pdcaCycleDuplicate?: boolean
+
   @Prop(TypeString(), tracker.string.ClientName)
   @Index(IndexKind.Indexed)
     clientName!: string

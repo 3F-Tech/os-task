@@ -271,6 +271,8 @@ export interface Issue extends Task {
   pdcaCycleFrequency?: PdcaFrequency
   pdcaCycleResetStatus?: Ref<IssueStatus>
   pdcaNextCycleDate?: Timestamp
+  pdcaCycleDueDays?: number[]
+  pdcaCycleDuplicate?: boolean
 
   clientName: string
   clientStage: ClientStage
@@ -597,7 +599,18 @@ const pluginState = plugin(trackerId, {
     OpenSubtasksBlocking: '' as IntlString,
     MissingCompletedDate: '' as IntlString,
     ClientName: '' as IntlString,
-    ClientStage: '' as IntlString
+    ClientStage: '' as IntlString,
+    PdcaDueWeekday: '' as IntlString,
+    PdcaDueMonthDay: '' as IntlString,
+    PdcaDueMonthDays: '' as IntlString,
+    PdcaDuplicate: '' as IntlString,
+    PdcaWeekdayMon: '' as IntlString,
+    PdcaWeekdayTue: '' as IntlString,
+    PdcaWeekdayWed: '' as IntlString,
+    PdcaWeekdayThu: '' as IntlString,
+    PdcaWeekdayFri: '' as IntlString,
+    PdcaWeekdaySat: '' as IntlString,
+    PdcaWeekdaySun: '' as IntlString
   },
   extensions: {
     IssueListHeader: '' as ComponentExtensionId,
