@@ -70,11 +70,13 @@
 
   async function onMenuClick (ev: MouseEvent): Promise<void> {
     ev.stopPropagation()
+    ev.preventDefault()
     // Read actual popup actions on open as visibility might have been changed
     pressed = true
     popupMenuActions = await actions().then((res) => res.filter((action) => action.inline !== true))
-    showPopup(Menu, { actions: popupMenuActions, ctx: _id }, ev.target as HTMLElement, () => {
-      pressed = false
+    showPopup(Menu, { actions: popupMenuActions, ctx: _id }, ev.currentTarget as HTMLElement, () => {
+      // Keep tools visible briefly so the user can re-click without needing to re-hover
+      setTimeout(() => { pressed = false }, 200)
     })
   }
 
