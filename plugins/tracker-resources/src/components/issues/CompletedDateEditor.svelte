@@ -17,6 +17,7 @@
   import { getClient } from '@hcengineering/presentation'
   import { Issue } from '@hcengineering/tracker'
   import { DueDatePresenter } from '@hcengineering/ui'
+  import tracker from '../../plugin'
 
   export let value: WithLookup<Issue>
   export let width: string | undefined = undefined
@@ -49,5 +50,6 @@
     {editable}
     onChange={(e) => handleCompletedDateChanged(e)}
     shouldIgnoreOverdue={true}
+    labelNull={tracker.string.CompletedDate}
   />
 {/if}

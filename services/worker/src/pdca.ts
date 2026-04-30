@@ -15,7 +15,7 @@
 
 import { getClient as getAccountClient } from '@hcengineering/account-client'
 import { createRestTxOperations } from '@hcengineering/api-client'
-import { MeasureMetricsContext, systemAccountUuid, TxOperations, type Ref, type WorkspaceUuid } from '@hcengineering/core'
+import { MeasureMetricsContext, systemAccountUuid, TxOperations, type Class, type Doc, type Markup, type Ref, type WorkspaceUuid } from '@hcengineering/core'
 import { getPlatformQueue } from '@hcengineering/kafka'
 import { generateToken } from '@hcengineering/server-token'
 import { QueueTopic } from '@hcengineering/server-core'
@@ -94,6 +94,56 @@ function calculateDueDate (frequency: PdcaFrequency, dueDays: number[] | undefin
   return null
 }
 
+// Stable class ID — avoids pulling @hcengineering/chunter (UI deps) into the worker
+const CHAT_MESSAGE_CLASS = 'chunter:class:ChatMessage' as unknown as Ref<Class<Doc>>
+
+function formatHours (hours: number): string {
+  if (hours <= 0) return '0h'
+  const h = Math.floor(hours)
+  const m = Math.round((hours - h) * 60)
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
+
+function formatTs (ts: number | null | undefined): string {
+  if (ts == null) return '—'
+  return new Date(ts).toLocaleDateString('pt-BR')
+}
+
+function buildMarkup (lines: string[]): Markup {
+  const content = lines.map((text) => ({
+    type: 'paragraph',
+    content: text !== '' ? [{ type: 'text', text }] : []
+  }))
+  return JSON.stringify({ type: 'doc', content }) as Markup
+}
+
+async function addCycleComment (
+  client: TxOperations,
+  issue: Issue,
+  statusName: string,
+  reportedTime: number,
+  dueDate: number | null | undefined,
+  completedDate: number | null | undefined
+): Promise<void> {
+  const markup = buildMarkup([
+    '🔄 Ciclo PDCA reiniciado',
+    `Status anterior: ${statusName}`,
+    `Tempo registrado: ${formatHours(reportedTime)}`,
+    `Vencimento anterior: ${formatTs(dueDate)}`,
+    `Data de conclusão: ${formatTs(completedDate)}`
+  ])
+  await client.addCollection(
+    CHAT_MESSAGE_CLASS as any,
+    issue.space,
+    issue._id,
+    issue._class,
+    'comments',
+    { message: markup } as any
+  )
+}
+
 async function createWorkspaceClient (workspaceUuid: WorkspaceUuid): Promise<TxOperations> {
   const token = generateToken(systemAccountUuid, workspaceUuid, { service: SERVICE_NAME })
   const accountClient = getAccountClient(config.AccountsUrl, token)
@@ -133,8 +183,15 @@ export async function processPdcaCycleEvent (
     }
 
     const dueDate = calculateDueDate(frequency, dueDays)
-
     const nextDate = calculateNextCycleDate(frequency, Date.now())
+
+    // Capture snapshot before any mutation
+    const prevStatusDoc = await client.findOne(tracker.class.IssueStatus, { _id: issue.status })
+    const prevStatusName = prevStatusDoc?.name ?? '—'
+    const prevReportedTime = issue.reportedTime ?? 0
+    const prevDueDate = issue.dueDate
+    const prevCompletedDate = issue.completedDate
+
     let scheduleIssueId: Ref<Issue> = issueId
 
     if (shouldDuplicate) {
@@ -179,12 +236,14 @@ export async function processPdcaCycleEvent (
         await client.update(issue, { status: wonStatus._id, pdcaCycleActive: false } as any)
       }
       ctx.info('PDCA cycle: original issue marked as done', { issueId })
+      await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
     } else {
-      // Standard mode: reset status + clear spent time
-      const update: Record<string, any> = { status: resetStatus, reportedTime: 0, pdcaNextCycleDate: nextDate }
+      // Standard mode: reset status + clear spent time + clear completed date
+      const update: Record<string, any> = { status: resetStatus, reportedTime: 0, completedDate: null, pdcaNextCycleDate: nextDate }
       if (dueDate != null) update.dueDate = dueDate
       await client.update(issue, update as any)
       ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
+      await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
     }
 
     const queue = getPlatformQueue(SERVICE_NAME, config.QueueRegion)

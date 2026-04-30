@@ -29,6 +29,7 @@
   export let shouldIgnoreOverdue: boolean = false
   export let size: ButtonSize = 'medium'
   export let width: string | undefined = 'auto'
+  export let labelNull: any = ui.string.DueDate
 
   const today = new Date(new Date(Date.now()).setHours(0, 0, 0, 0))
   $: isOverdue = value !== null && value < today.getTime()
@@ -68,7 +69,7 @@
       : undefined}
   >
     <DatePresenter
-      labelNull={ui.string.DueDate}
+      {labelNull}
       {value}
       {editable}
       {iconModifier}

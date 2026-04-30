@@ -198,16 +198,13 @@
 
   <div class="divider" />
 
-  <span class="labelOnPanel">
-    <Label label={tracker.string.ClientName} />
-  </span>
   <AttributeBarEditor
     {readonly}
     key={'clientName'}
     identifier={issue.identifier}
     _class={issue._class}
     object={issue}
-    showHeader={false}
+    showHeader={true}
     size={'medium'}
   />
 
