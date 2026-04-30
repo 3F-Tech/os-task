@@ -297,6 +297,7 @@ export class TIssue extends TTask implements Issue {
     pdcaCycleDueDays?: number[]
 
   @Prop(TypeBoolean(), tracker.string.PdcaDuplicate)
+  @Hidden()
     pdcaCycleDuplicate?: boolean
 
   @Prop(TypeString(), tracker.string.ClientName)

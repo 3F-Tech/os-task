@@ -75,6 +75,8 @@
     'pdcaCycleFrequency',
     'pdcaCycleResetStatus',
     'pdcaNextCycleDate',
+    'pdcaCycleDueDays',
+    'pdcaCycleDuplicate',
     'clientName',
     'clientStage'
   ]
@@ -242,14 +244,12 @@
   </span>
   <MilestoneEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} />
 
-  {#if issue.dueDate !== null}
-    <div class="divider" />
+  <div class="divider" />
 
-    <span class="labelOnPanel">
-      <Label label={tracker.string.DueDate} />
-    </span>
-    <DueDateEditor value={issue} width={'100%'} editable={!readonly} />
-  {/if}
+  <span class="labelOnPanel">
+    <Label label={tracker.string.DueDate} />
+  </span>
+  <DueDateEditor value={issue} width={'100%'} editable={!readonly} />
 
   <div class="divider" />
 
@@ -258,12 +258,10 @@
   </span>
   <StartDateEditor value={issue} width={'100%'} editable={!readonly} />
 
-  {#if issue.completedDate !== null}
-    <span class="labelOnPanel">
-      <Label label={tracker.string.CompletedDate} />
-    </span>
-    <CompletedDateEditor value={issue} width={'100%'} editable={!readonly} />
-  {/if}
+  <span class="labelOnPanel">
+    <Label label={tracker.string.CompletedDate} />
+  </span>
+  <CompletedDateEditor value={issue} width={'100%'} editable={!readonly} />
 
   <div class="divider" />
   <PdcaCycleSection {issue} {readonly} />
