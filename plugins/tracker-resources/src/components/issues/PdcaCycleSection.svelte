@@ -14,7 +14,9 @@
 -->
 <script lang="ts">
   import { type Ref } from '@hcengineering/core'
-  import { getClient, createQuery } from '@hcengineering/presentation'
+  import { getClient } from '@hcengineering/presentation'
+  import { getTaskTypeStates } from '@hcengineering/task'
+  import { taskTypeStore } from '@hcengineering/task-resources'
   import { type Issue, type IssueStatus, PdcaFrequency } from '@hcengineering/tracker'
   import {
     Toggle,
@@ -29,6 +31,7 @@
     DropdownLabelsIntl,
     type DropdownIntlItem
   } from '@hcengineering/ui'
+  import { statusStore } from '@hcengineering/view-resources'
 
   import tracker from '../../plugin'
 
@@ -36,13 +39,8 @@
   export let readonly = false
 
   const client = getClient()
-  const query = createQuery()
 
-  let statuses: IssueStatus[] = []
-
-  $: query.query(tracker.class.IssueStatus, { attachedTo: issue.space }, (res) => {
-    statuses = res
-  })
+  $: statuses = getTaskTypeStates(issue.kind, $taskTypeStore, $statusStore.byId)
 
   const frequencyItems: DropdownIntlItem[] = [
     { id: PdcaFrequency.Weekly, label: tracker.string.PdcaCycleWeekly },
