@@ -389,19 +389,14 @@ export async function getAccount (doNavigate: boolean = true): Promise<LoginInfo
     // even if "token" is null here it still might be supplied from the cookie
     let result: LoginInfoByToken
     try {
-      console.log('[Huly Debug] Attempting to get login info with token:', token)
       result = await getAccountClient(token).getLoginInfoByToken()
     } catch (err: any) {
-      console.warn('[Huly Debug] Primary login info fetch failed:', err)
-      // Attempt recovery if unauthorized OR if token was missing
+      // Attempt recovery if unauthorized OR if token was missing (cookie-based silent refresh)
       if (token == null || (err instanceof PlatformError && err.status.code === platform.status.Unauthorized)) {
-        console.log('[Huly Debug] Attempting silent session recovery via cookies...')
         result = await getAccountClient(null).getLoginInfoByToken()
         if (result != null && !isLoginInfoRequest(result)) {
-          console.log('[Huly Debug] Session recovered! Updating token.')
           setMetadata(presentation.metadata.Token, result.token)
         } else {
-          console.error('[Huly Debug] Silent recovery failed. Result:', result)
           throw err
         }
       } else {
@@ -410,7 +405,6 @@ export async function getAccount (doNavigate: boolean = true): Promise<LoginInfo
     }
 
     if (isLoginInfoRequest(result)) {
-      console.error('[Huly Debug] result is LoginInfoRequest, redirection might be needed')
       throw new Error('Not supported')
     }
 

@@ -106,27 +106,18 @@ export async function connect (title: string): Promise<Client | undefined> {
   let workspaceLoginInfo: WorkspaceLoginInfo | undefined
 
   while (true) {
-    const selectResult = await ctx.with('select-workspace', {}, async () => {
-      console.log('[Huly Debug] workbench connect: selecting workspace:', wsUrl)
-      return await selectWorkspace(wsUrl, undefined)
-    })
+    const selectResult = await ctx.with('select-workspace', {}, async () => await selectWorkspace(wsUrl, undefined))
     workspaceLoginInfo = selectResult[1] ?? undefined
     if (!selectResult[2]) {
-      console.warn('[Huly Debug] workbench connect: Connection failed, retrying in 1s...')
       // Connection error happen, wait and retry
       await new Promise((resolve) => setTimeout(resolve, 1000))
       continue
     }
 
-    // OK but unauthorized - we need to login
+    // OK but unauthorized - selectWorkspace already redirected to login
     if (workspaceLoginInfo == null) {
-      console.error(
-        `[Huly Debug] Error selecting workspace ${wsUrl}. STOPPING REDIRECT FOR DEBUG.`,
-        'LoginStatus:', selectResult[0]
-      )
-      // await logOut()
-      // navigate({ path: [loginId] })
-      return // Para aqui para não dar erro nas linhas abaixo, mas não redireciona
+      await logOut()
+      return
     }
     break
   }

@@ -257,6 +257,7 @@ export function start (
     storageAdapter: StorageAdapter
     accountsUrl: string
     accountsUrlInternal?: string
+    accountsUrlClient?: string
     uploadUrl: string
     filesUrl: string
     modelVersion: string
@@ -335,7 +336,7 @@ export function start (
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   app.get('/config.json', async (req, res) => {
     const data = {
-      ACCOUNTS_URL: config.accountsUrl,
+      ACCOUNTS_URL: config.accountsUrlClient ?? config.accountsUrl,
       UPLOAD_URL: config.uploadUrl,
       FILES_URL: config.filesUrl,
       MODEL_VERSION: config.modelVersion,

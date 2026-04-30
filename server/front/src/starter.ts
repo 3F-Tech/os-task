@@ -32,6 +32,11 @@ export function startFront (ctx: MeasureContext, extraConfig?: Record<string, st
 
   const accountsUrlInternal = process.env.ACCOUNTS_URL_INTERNAL
 
+  // URL used by the browser to reach the account service.
+  // Must resolve from the user's machine (not Docker-internal).
+  // When set, avoids cross-site cookie restrictions (SameSite: lax).
+  const accountsUrlClient = process.env.ACCOUNTS_URL_CLIENT
+
   const uploadUrl = process.env.UPLOAD_URL
   if (uploadUrl === undefined) {
     console.error('please provide upload url')
@@ -135,6 +140,7 @@ export function startFront (ctx: MeasureContext, extraConfig?: Record<string, st
     storageAdapter,
     accountsUrl,
     accountsUrlInternal,
+    accountsUrlClient,
     uploadUrl,
     filesUrl,
     modelVersion,

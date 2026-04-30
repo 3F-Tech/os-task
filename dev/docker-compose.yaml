@@ -289,6 +289,7 @@ services:
       - SERVER_PORT=8080
       - SERVER_SECRET=secret
       - ACCOUNTS_URL=http://huly.local:3000
+      - ACCOUNTS_URL_CLIENT=http://localhost:3000
       - STATS_URL=http://huly.local:4900
       - FILES_URL=http://huly.local:4030/blob/:workspace/:blobId/:filename
       - UPLOAD_URL=/files
