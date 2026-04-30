@@ -382,7 +382,8 @@ export default mergeIds(trackerId, tracker, {
     IconWithEmoji: '' as Asset,
     IssueStatusIcon: '' as AnyComponent,
     MilestoneStatusIcon: '' as AnyComponent,
-    ClientStagePresenter: '' as AnyComponent
+    ClientStagePresenter: '' as AnyComponent,
+    ClientNamePresenter: '' as AnyComponent
   },
   metadata: {
     CreateIssueDraft: '' as Metadata<IssueDraft>

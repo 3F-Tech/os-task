@@ -40,6 +40,8 @@
     "PdcaCycleWeekly": "Weekly",
     "PdcaCycleBiweekly": "Biweekly",
     "PdcaCycleMonthly": "Monthly",
+    "ClientName": "Nome do Cliente",
+    "ClientStage": "Etapa",
     "TargetDate": "目标日期",
     "Planned": "已计划",
     "InProgress": "进行中",

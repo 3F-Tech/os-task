@@ -15,7 +15,21 @@
 </script>
 
 {#if option}
-  <span style="color: white; background-color: {option.color}; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 11px;">
+  <span class="stage-badge" style:background-color={option.color}>
     {option.label}
   </span>
 {/if}
+
+<style lang="scss">
+  .stage-badge {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+</style>

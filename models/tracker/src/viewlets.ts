@@ -128,6 +128,18 @@ export function issueConfig (
       presenter: tracker.component.SubIssuesSelector,
       props: {}
     },
+    {
+      key: '',
+      label: tracker.string.ClientName,
+      presenter: tracker.component.ClientNamePresenter,
+      displayProps: { key: key + 'clientName', compression: true }
+    },
+    {
+      key: '',
+      label: tracker.string.ClientStage,
+      presenter: tracker.component.ClientStagePresenter,
+      displayProps: { key: key + 'clientStage', compression: true }
+    },
     { key: 'comments', displayProps: { key: key + 'comments', suffix: true } },
     { key: 'attachments', displayProps: { key: key + 'attachments', suffix: true } },
     { key: '', displayProps: { grow: true } },

@@ -63,6 +63,7 @@ import Issues from './components/issues/Issues.svelte'
 import IssueSearchIcon from './components/issues/IssueSearchIcon.svelte'
 import IssueStatusPresenter from './components/issues/IssueStatusPresenter.svelte'
 import ClientStagePresenter from './components/issues/ClientStagePresenter.svelte'
+import ClientNamePresenter from './components/issues/ClientNamePresenter.svelte'
 import IssuesView from './components/issues/IssuesView.svelte'
 import KanbanView from './components/issues/KanbanView.svelte'
 import ModificationDatePresenter from './components/issues/ModificationDatePresenter.svelte'
@@ -494,7 +495,8 @@ export default async (): Promise<Resources> => ({
     IssueExtra,
     IssueStatusPresenter,
     LabelsView,
-    ClientStagePresenter
+    ClientStagePresenter,
+    ClientNamePresenter
   },
   completion: {
     IssueQuery: async (client: Client, query: string, filter?: { in?: RelatedDocument[], nin?: RelatedDocument[] }) =>

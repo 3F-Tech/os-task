@@ -1,55 +1,65 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import { ClientStage } from '@hcengineering/tracker'
+  import { Button, SelectPopup, eventToHTMLElement, showPopup, ButtonKind, ButtonSize } from '@hcengineering/ui'
 
   export let value: ClientStage
-  export let kind: 'regular' | 'large' = 'regular'
-  export let size: 'small' | 'large' = 'large'
+  export let kind: ButtonKind = 'link-bordered'
+  export let size: ButtonSize = 'medium'
   export let disabled: boolean = false
 
   const dispatch = createEventDispatcher()
 
   const options = [
-    { id: ClientStage.Onboarding, label: 'Onboarding', color: '#3b82f6' }, // Blue
-    { id: ClientStage.Expansion, label: 'Expansão', color: '#10b981' },   // Green
-    { id: ClientStage.Retention, label: 'Retenção', color: '#f59e0b' },   // Yellow
-    { id: ClientStage.Churned, label: 'Churned', color: '#ef4444' }       // Red
+    { id: ClientStage.Onboarding, label: 'Onboarding', color: '#3b82f6' },
+    { id: ClientStage.Expansion, label: 'Expansão', color: '#10b981' },
+    { id: ClientStage.Retention, label: 'Retenção', color: '#f59e0b' },
+    { id: ClientStage.Churned, label: 'Churned', color: '#ef4444' }
   ]
+
+  $: current = options.find((o) => o.id === value) ?? options[0]
+
+  function openPopup (event: MouseEvent): void {
+    if (disabled) return
+    const items = options.map((o) => ({
+      id: o.id,
+      label: o.label,
+      isSelected: o.id === value,
+      color: o.color
+    }))
+    showPopup(SelectPopup, { value: items }, eventToHTMLElement(event), (selected: ClientStage | undefined) => {
+      if (selected !== undefined && selected !== value) {
+        value = selected
+        dispatch('change', selected)
+      }
+    })
+  }
 </script>
 
-<div class="client-stage-selector">
-  <select
-    {disabled}
-    bind:value
-    on:change={() => dispatch('change', value)}
-    class="stage-select {kind} {size}"
-    style="--stage-color: {options.find(o => o.id === value)?.color}"
-  >
-    {#each options as option}
-      <option value={option.id}>{option.label}</option>
-    {/each}
-  </select>
-</div>
+<Button
+  {kind}
+  {size}
+  disabled={disabled}
+  width={'100%'}
+  justify={'left'}
+  on:click={openPopup}
+>
+  <svelte:fragment slot="content">
+    <span class="stage-badge" style:background-color={current.color}>
+      {current.label}
+    </span>
+  </svelte:fragment>
+</Button>
 
 <style lang="scss">
-  .stage-select {
-    appearance: none;
-    background: var(--theme-box-background);
-    border: 1px solid var(--theme-border-color);
-    border-radius: var(--theme-border-radius);
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    color: var(--stage-color);
+  .stage-badge {
+    display: inline-flex;
+    align-items: center;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
     font-weight: 600;
-    width: 100%;
-
-    &.large {
-        padding: 0.75rem 1.25rem;
-    }
-
-    &:focus {
-        outline: none;
-        border-color: var(--stage-color);
-    }
+    font-size: 11px;
+    white-space: nowrap;
   }
 </style>
