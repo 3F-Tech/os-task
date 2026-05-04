@@ -615,6 +615,8 @@ services:
       - DB_URL=${DB_CR_URL}
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - QUEUE_REGION=cockroach
+      - ACCOUNTS_URL=http://huly.local:3000
+      - SECRET=secret
     restart: unless-stopped
   #  translate:
   #    image: hardcoreeng/translate

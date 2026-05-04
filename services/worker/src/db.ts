@@ -101,6 +101,13 @@ export class TimeMachineDB {
     })
   }
 
+  async getActiveWorkspaces (): Promise<WorkspaceUuid[]> {
+    const res = await this.client`
+      SELECT uuid FROM global_account.workspace
+    `
+    return res.map((r: any) => r.uuid as WorkspaceUuid)
+  }
+
   async close (): Promise<void> {
     await this.client.end()
   }

@@ -278,21 +278,18 @@ export function startPdcaConsumer (ctx: MeasureMetricsContext): void {
 }
 
 export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: TimeMachineDB): Promise<void> {
-  const sysToken = generateToken(systemAccountUuid, undefined, { service: SERVICE_NAME })
-  const accountClient = getAccountClient(config.AccountsUrl, sysToken)
-
-  let workspaces: Awaited<ReturnType<typeof accountClient.listWorkspaces>>
+  let workspaceIds: WorkspaceUuid[]
   try {
-    workspaces = await accountClient.listWorkspaces()
+    workspaceIds = await db.getActiveWorkspaces()
   } catch (err: any) {
     ctx.warn('PDCA bootstrap: failed to list workspaces', { err: err.message })
     return
   }
 
-  for (const ws of workspaces) {
+  for (const workspaceId of workspaceIds) {
     let client: TxOperations | undefined
     try {
-      client = await createWorkspaceClient(ws.uuid)
+      client = await createWorkspaceClient(workspaceId)
       const issues = await client.findAll(tracker.class.Issue, { pdcaCycleActive: true } as any)
 
       for (const issue of issues) {
@@ -309,16 +306,16 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
 
         await db.upsertEvent({
           id: `pdca_${issue._id}`,
-          workspace: ws.uuid,
+          workspace: workspaceId,
           target_date: targetDate,
           topic: QueueTopic.PdcaCycle,
-          data: { issueId: issue._id, workspaceId: ws.uuid }
+          data: { issueId: issue._id, workspaceId }
         })
 
-        ctx.info('PDCA bootstrap: scheduled', { issueId: issue._id, targetDate: new Date(targetDate).toISOString(), workspace: ws.uuid })
+        ctx.info('PDCA bootstrap: scheduled', { issueId: issue._id, targetDate: new Date(targetDate).toISOString(), workspace: workspaceId })
       }
     } catch (err: any) {
-      ctx.warn('PDCA bootstrap: error for workspace', { workspace: ws.uuid, err: err.message })
+      ctx.warn('PDCA bootstrap: error for workspace', { workspace: workspaceId, err: err.message })
     } finally {
       await client?.close()
     }
