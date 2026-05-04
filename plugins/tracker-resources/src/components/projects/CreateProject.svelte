@@ -32,7 +32,7 @@
     setWorkspaceGuestAutoJoinRoles
   } from '@hcengineering/core'
   import { Asset } from '@hcengineering/platform'
-  import presentation, { IconWithEmoji, Card, createQuery, getClient } from '@hcengineering/presentation'
+  import presentation, { IconWithEmoji, Card, createQuery, getClient, hasResource } from '@hcengineering/presentation'
   import task, { ProjectType, TaskType } from '@hcengineering/task'
   import { taskTypeStore, typeStore } from '@hcengineering/task-resources'
   import { IssueStatus, Project, TimeReportDayType, TrackerEvents } from '@hcengineering/tracker'
@@ -45,7 +45,6 @@
     getColorNumberByText,
     getPlatformColorDef,
     getPlatformColorForTextDef,
-    hasResource,
     showPopup,
     themeStore
   } from '@hcengineering/ui'
