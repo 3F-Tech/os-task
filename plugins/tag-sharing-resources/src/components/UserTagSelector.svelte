@@ -1,4 +1,4 @@
-<!--
++<!--
   Popup for selecting one or multiple UserTags from the full list.
   Emits 'close' with the selected Ref<UserTag>[].
 -->
@@ -84,29 +84,41 @@
     display: flex;
     flex-direction: column;
     min-width: 16rem;
-    max-height: 20rem;
+    max-height: 24rem;
+    background-color: var(--theme-panel-background-color);
+    border: 1px solid var(--theme-divider-color);
+    border-radius: 0.5rem;
+    box-shadow: var(--theme-shadow-large);
+    overflow: hidden;
   }
 
   .tag-list {
     overflow-y: auto;
     flex: 1;
+    padding: 0.25rem 0;
   }
 
   .tag-item {
     display: flex;
     align-items: center;
-    padding: 0.375rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     cursor: pointer;
-    border-radius: 0.25rem;
-    margin: 0.125rem 0.25rem;
-    gap: 0.5rem;
+    border-radius: 0.375rem;
+    margin: 0.125rem 0.5rem;
+    gap: 0.75rem;
+    transition: background-color 0.15s ease, transform 0.1s ease;
 
     &:hover {
       background-color: var(--theme-button-hovered);
+      transform: translateX(2px);
     }
 
     &.selected {
       background-color: var(--theme-button-pressed);
+      .tag-title {
+        font-weight: 600;
+        color: var(--theme-content-accent-color);
+      }
     }
   }
 
@@ -115,20 +127,23 @@
     height: 0.75rem;
     border-radius: 50%;
     flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--theme-divider-color);
   }
 
   .tag-title {
     flex: 1;
     font-size: 0.875rem;
+    color: var(--theme-content-primary-color);
   }
 
   .checkmark {
     color: var(--theme-content-accent-color);
-    font-size: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: bold;
   }
 
   .empty-state {
-    padding: 1rem;
+    padding: 2rem 1rem;
     text-align: center;
     color: var(--theme-dark-color);
     font-size: 0.875rem;
@@ -138,5 +153,6 @@
     border-top: 1px solid var(--theme-divider-color);
     display: flex;
     justify-content: flex-end;
+    background-color: var(--theme-background-secondary-color);
   }
 </style>

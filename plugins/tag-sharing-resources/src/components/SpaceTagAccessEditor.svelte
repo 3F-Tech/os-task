@@ -58,8 +58,7 @@
         const toAdd = result.filter(r => !assignedTagIds.includes(r))
         const toRemove = assignedTagIds.filter(r => !result.includes(r))
         for (const tagId of toAdd) {
-          await client.createDoc(tagSharing.class.SpaceTagAccess, core.space.Workspace, {
-            space: space._id,
+          await client.createDoc(tagSharing.class.SpaceTagAccess, space._id, {
             tag: tagId
           })
         }

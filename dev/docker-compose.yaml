@@ -727,6 +727,26 @@ services:
       - BADGER_DIRECTORY_VALUE=/badger/data
       - BADGER_DIRECTORY_KEY=/badger/key
     restart: unless-stopped
+  calendar:
+    image: hardcoreeng/calendar
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    depends_on:
+      account:
+        condition: service_started
+      hulykvs:
+        condition: service_started
+    ports:
+      - 8095:8095
+    environment:
+      - PORT=8095
+      - ACCOUNTS_URL=http://huly.local:3000
+      - SECRET=secret
+      - KVS_URL=http://hulykvs:8094
+      - WATCH_URL=http://huly.local:8095
+      - SERVICE_ID=calendar-service
+      - Credentials=COLE_AQUI_O_JSON_DO_GOOGLE_EM_UMA_LINHA_SÓ
+    restart: unless-stopped
 volumes:
   db:
   dbpg:
