@@ -156,7 +156,7 @@ services:
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=https://3ftasks.3fventure.tech
       - LAST_NAME_FIRST=true
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - BRANDING_PATH=/var/cfg/branding.json
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - MAILBOX_DOMAINS=huly.dev.local
@@ -182,7 +182,7 @@ services:
     environment:
       - SECRET=secret
       - PORT=3040
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - FRONT_URL=https://3ftasks.3fventure.tech
       - USE_SANDBOX=true
       - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN}
@@ -211,7 +211,7 @@ services:
       - DB_URL=${DB_CR_URL}
       - STATS_URL=http://huly.local:4900
       - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - ACCOUNTS_DB_URL=${DB_CR_URL}
       - BRANDING_PATH=/var/cfg/branding.json
       - BACKUP_STORAGE=${BACKUP_STORAGE_CONFIG}
@@ -232,7 +232,7 @@ services:
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - STATS_URL=http://huly.local:4900
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
@@ -249,7 +249,7 @@ services:
     environment:
       - SERVER_PORT=8080
       - SERVER_SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - ACCOUNTS_URL_CLIENT=https://3ftasks.3fventure.tech:3010
       - STATS_URL=http://huly.local:4900
       - FILES_URL=http://huly.local:4031/blob/:workspace/:blobId/:filename
@@ -313,7 +313,7 @@ services:
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=https://3ftasks.3fventure.tech
       - MAIL_URL=''
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - LAST_NAME_FIRST=true
       - BRANDING_PATH=/var/cfg/branding.json
       - AI_BOT_URL=http://huly.local:4010
@@ -360,7 +360,7 @@ services:
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - STATS_URL=http://huly.local:4900
       - REKONI_URL=http://huly.local:4004
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - HULYLAKE_URL=http://huly.local:8096
       - COMMUNICATION_API_ENABLED=true
@@ -377,7 +377,7 @@ services:
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - STATS_URL=http://huly.local:4900
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - FRONT_URL=https://3ftasks.3fventure.tech
   sign:
@@ -396,7 +396,7 @@ services:
       - REGION=cockroach
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - CERTIFICATE_PATH=/var/cfg/certificate.p12
       - SERVICE_ID=sign-service
       - BRANDING_PATH=/var/cfg/branding.json
@@ -413,7 +413,7 @@ services:
       - SECRET=secret
       - PORT=4017
       - SERVICE_ID=analytics-collector-service
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - STATS_URL=http://huly.local:4900
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   export:
@@ -432,7 +432,7 @@ services:
       - DB_URL=${DB_CR_URL}
       - STATS_URL=http://huly.local:4900
       - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   datalake:
@@ -453,7 +453,7 @@ services:
     environment:
       - PORT=4030
       - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - STATS_URL=http://huly.local:4900
       - DB_URL=${DB_CR_URL}
       - BUCKETS=blobs,eu|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin
@@ -506,7 +506,7 @@ services:
       - HULY_LOG=debug
       - HULY_KAFKA_BOOTSTRAP=redpanda:9092
       - HULY_TOKEN_SECRET=secret
-      - HULY_ACCOUNT_SERVICE=http://huly.local:3010
+      - HULY_ACCOUNT_SERVICE=http://huly.local:13010
     restart: unless-stopped
   hulypulse:
     image: hardcoreeng/hulypulse
@@ -530,7 +530,7 @@ services:
         condition: service_started
     environment:
       - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - QUEUE_REGION=cockroach
     restart: unless-stopped
@@ -549,7 +549,7 @@ services:
       - DB_URL=${DB_CR_URL}
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - QUEUE_REGION=cockroach
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - SECRET=secret
     restart: unless-stopped
   backup-cockroach:
@@ -567,7 +567,7 @@ services:
         condition: service_started
     environment:
       - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - ACCOUNTS_DB_URL=${DB_CR_URL}
       - STATS_URL=http://huly.local:4900
       - DB_URL=${DB_CR_URL}
@@ -596,7 +596,7 @@ services:
     environment:
       - PORT=4039
       - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - STATS_URL=http://huly.local:4900
       - BUCKET_NAME=backups
       - STORAGE=minio|minio?accessKey=minioadmin&secretKey=minioadmin
@@ -621,7 +621,7 @@ services:
       - STATS_URL=http://huly.local:4900
       - DB_URL=${DB_CR_URL}
       - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - COMMUNICATION_TIME_LOGGING_ENABLED=true
       - COMMUNICATION_API_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
@@ -656,7 +656,7 @@ services:
       - 8095:8095
     environment:
       - PORT=8095
-      - ACCOUNTS_URL=http://huly.local:3010
+      - ACCOUNTS_URL=http://huly.local:13010
       - SECRET=secret
       - KVS_URL=http://hulykvs:8094
       - WATCH_URL=http://huly.local:8095
