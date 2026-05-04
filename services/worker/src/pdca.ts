@@ -185,6 +185,7 @@ export async function processPdcaCycleEvent (
 
     const dueDate = calculateDueDate(frequency, dueDays)
     const nextDate = calculateNextCycleDate(frequency, Date.now())
+    ctx.info('PDCA cycle: calculated dates', { issueId, frequency, dueDays, dueDate, nextDate })
 
     // Capture snapshot before any mutation
     const prevStatusDoc = await client.findOne(tracker.class.IssueStatus, { _id: issue.status })
@@ -253,8 +254,7 @@ export async function processPdcaCycleEvent (
       }
       if (dueDate != null) update.dueDate = dueDate
       await client.update(issue, update as any)
-      // Clear completedDate separately — transactor rejects null in bulk updates
-      await client.update(issue, { completedDate: undefined } as any)
+      await client.update(issue, { completedDate: null } as any)
       ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
       try {
         await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
