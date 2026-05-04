@@ -64,11 +64,15 @@ export async function runWorker (): Promise<void> {
     }
   }
 
-  void poll()
-
   startPdcaConsumer(ctx)
 
   void bootstrapPdcaSchedules(ctx, db)
+
+  // Delay first poll so Kafka consumers finish joining (~23s) before
+  // any expired events are fired via SendTimeEvent
+  setTimeout(() => {
+    void poll()
+  }, 30000)
 
   ctx.info('Time Machine worker started')
 }
