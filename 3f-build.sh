@@ -11,6 +11,7 @@
 #   ./3f-build.sh --pod server       # reconstrói só o transactor
 #   ./3f-build.sh --pod front        # reconstrói só o front
 #   ./3f-build.sh --pod account      # reconstrói só o account
+#   ./3f-build.sh --pod worker       # reconstrói só o time-machine/worker
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
 # =============================================================================
@@ -137,6 +138,12 @@ if [[ "$PODS" == *"server"* ]]; then
   rushx bundle || fail "bundle transactor"
 fi
 
+if [[ "$PODS" == *"worker"* ]]; then
+  info "Bundlando worker (time-machine)..."
+  cd "$ROOT_DIR/services/worker"
+  rushx bundle || fail "bundle worker"
+fi
+
 if [[ "$PODS" == *"front"* ]]; then
   info "Bundlando front..."
   cd "$ROOT_DIR/pods/front"
@@ -160,6 +167,12 @@ if [[ "$PODS" == *"server"* ]]; then
   info "Buildando imagem: hardcoreeng/transactor"
   cd "$ROOT_DIR/pods/server"
   bash ../../common/scripts/docker_build.sh hardcoreeng/transactor || fail "docker build transactor"
+fi
+
+if [[ "$PODS" == *"worker"* ]]; then
+  info "Buildando imagem: hardcoreeng/worker"
+  cd "$ROOT_DIR/services/worker"
+  bash ../../common/scripts/docker_build.sh hardcoreeng/worker || fail "docker build worker"
 fi
 
 if [[ "$PODS" == *"front"* ]]; then
@@ -186,13 +199,14 @@ SERVICES=""
 [[ "$PODS" == *"server"* ]] && SERVICES="$SERVICES transactor_cockroach"
 [[ "$PODS" == *"front"*   ]] && SERVICES="$SERVICES front"
 [[ "$PODS" == *"account"* ]] && SERVICES="$SERVICES account"
+[[ "$PODS" == *"worker"*  ]] && SERVICES="$SERVICES time-machine"
 
 info "Serviços: $SERVICES"
 docker compose -f dev/docker-compose.yaml up -d --no-deps $SERVICES || fail "docker compose up"
 
 info "Status dos containers:"
 docker compose -f dev/docker-compose.yaml ps --format "table {{.Name}}\t{{.Status}}" \
-  | grep -E "Name|front|account|transactor"
+  | grep -E "Name|front|account|transactor|time-machine"
 
 done_step $T
 
