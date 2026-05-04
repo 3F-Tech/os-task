@@ -237,14 +237,26 @@ export async function processPdcaCycleEvent (
         await client.update(issue, { status: wonStatus._id, pdcaCycleActive: false } as any)
       }
       ctx.info('PDCA cycle: original issue marked as done', { issueId })
-      await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
+      try {
+        await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
+      } catch (commentErr: any) {
+        ctx.warn('PDCA cycle: failed to add snapshot comment', { issueId, err: commentErr.message })
+      }
     } else {
       // Standard mode: reset status + clear spent time + clear completed date
-      const update: Record<string, any> = { status: resetStatus, reportedTime: 0, completedDate: null, pdcaNextCycleDate: nextDate }
+      const update: Record<string, any> = { status: resetStatus, reportedTime: 0, pdcaNextCycleDate: nextDate }
       if (dueDate != null) update.dueDate = dueDate
       await client.update(issue, update as any)
+      // Clear completedDate separately — some transactor versions reject null in bulk updates
+      if (issue.completedDate != null) {
+        await client.update(issue, { completedDate: undefined } as any)
+      }
       ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
-      await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
+      try {
+        await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
+      } catch (commentErr: any) {
+        ctx.warn('PDCA cycle: failed to add snapshot comment', { issueId, err: commentErr.message })
+      }
     }
 
     const queue = getPlatformQueue(SERVICE_NAME, config.QueueRegion)
