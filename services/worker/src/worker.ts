@@ -19,7 +19,7 @@ import { QueueTopic } from '@hcengineering/server-core'
 import { TimeMachineMessage } from '@hcengineering/server-process'
 import { TimeMachineDB } from './db'
 import { SendTimeEvent } from './activities'
-import { startPdcaConsumer } from './pdca'
+import { startPdcaConsumer, bootstrapPdcaSchedules } from './pdca'
 import config from './config'
 
 export async function runWorker (): Promise<void> {
@@ -67,6 +67,8 @@ export async function runWorker (): Promise<void> {
   void poll()
 
   startPdcaConsumer(ctx)
+
+  void bootstrapPdcaSchedules(ctx, db)
 
   ctx.info('Time Machine worker started')
 }

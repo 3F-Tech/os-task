@@ -18,6 +18,22 @@
   import { getTaskTypeStates } from '@hcengineering/task'
   import { taskTypeStore } from '@hcengineering/task-resources'
   import { type Issue, type IssueStatus, PdcaFrequency } from '@hcengineering/tracker'
+
+  function calcNextCycleDate (frequency: PdcaFrequency, from: number): number {
+    const date = new Date(from)
+    if (frequency === PdcaFrequency.Weekly) {
+      const daysUntilMonday = ((8 - date.getDay()) % 7) || 7
+      date.setDate(date.getDate() + daysUntilMonday)
+      date.setHours(0, 0, 0, 0)
+    } else if (frequency === PdcaFrequency.Biweekly) {
+      date.setDate(date.getDate() + 14)
+      date.setHours(0, 0, 0, 0)
+    } else {
+      date.setMonth(date.getMonth() + 1, 1)
+      date.setHours(0, 0, 0, 0)
+    }
+    return date.getTime()
+  }
   import {
     Toggle,
     Label,
@@ -61,7 +77,12 @@
   ]
 
   async function toggleActive (val: boolean): Promise<void> {
-    await client.update(issue, { pdcaCycleActive: val })
+    if (val && issue.pdcaCycleFrequency != null && issue.pdcaCycleResetStatus != null) {
+      const nextDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency, Date.now())
+      await client.update(issue, { pdcaCycleActive: true, pdcaNextCycleDate: nextDate } as any)
+    } else {
+      await client.update(issue, { pdcaCycleActive: val })
+    }
   }
 
   async function setFrequency (val: PdcaFrequency): Promise<void> {

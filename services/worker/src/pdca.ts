@@ -21,6 +21,7 @@ import { generateToken } from '@hcengineering/server-token'
 import { QueueTopic } from '@hcengineering/server-core'
 import type { Issue, IssueStatus, PdcaFrequency } from '@hcengineering/tracker'
 import tracker from '@hcengineering/tracker'
+import type { TimeMachineDB } from './db'
 import config from './config'
 
 const SERVICE_NAME = 'pdca-worker'
@@ -274,4 +275,52 @@ export function startPdcaConsumer (ctx: MeasureMetricsContext): void {
       await processPdcaCycleEvent(ctx as MeasureMetricsContext, msg.value)
     }
   )
+}
+
+export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: TimeMachineDB): Promise<void> {
+  const sysToken = generateToken(systemAccountUuid, undefined, { service: SERVICE_NAME })
+  const accountClient = getAccountClient(config.AccountsUrl, sysToken)
+
+  let workspaces: Awaited<ReturnType<typeof accountClient.listWorkspaces>>
+  try {
+    workspaces = await accountClient.listWorkspaces()
+  } catch (err: any) {
+    ctx.warn('PDCA bootstrap: failed to list workspaces', { err: err.message })
+    return
+  }
+
+  for (const ws of workspaces) {
+    let client: TxOperations | undefined
+    try {
+      client = await createWorkspaceClient(ws.uuid)
+      const issues = await client.findAll(tracker.class.Issue, { pdcaCycleActive: true } as any)
+
+      for (const issue of issues) {
+        const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
+        const resetStatus = (issue as any).pdcaCycleResetStatus
+        if (frequency == null || resetStatus == null) continue
+
+        const existingDate = (issue as any).pdcaNextCycleDate as number | undefined
+        const targetDate = existingDate ?? calculateNextCycleDate(frequency, Date.now())
+
+        if (existingDate == null) {
+          await client.update(issue, { pdcaNextCycleDate: targetDate } as any)
+        }
+
+        await db.upsertEvent({
+          id: `pdca_${issue._id}`,
+          workspace: ws.uuid,
+          target_date: targetDate,
+          topic: QueueTopic.PdcaCycle,
+          data: { issueId: issue._id, workspaceId: ws.uuid }
+        })
+
+        ctx.info('PDCA bootstrap: scheduled', { issueId: issue._id, targetDate: new Date(targetDate).toISOString(), workspace: ws.uuid })
+      }
+    } catch (err: any) {
+      ctx.warn('PDCA bootstrap: error for workspace', { workspace: ws.uuid, err: err.message })
+    } finally {
+      await client?.close()
+    }
+  }
 }
