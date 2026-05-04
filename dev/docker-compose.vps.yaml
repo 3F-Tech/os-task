@@ -138,7 +138,7 @@ services:
     links:
       - stats
     ports:
-      - 3010:3000
+      - 13010:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
       - ../pods/account/bundle/bundle.js:/usr/src/app/bundle.js
@@ -228,7 +228,7 @@ services:
       - transactor_cockroach
       - stats
     ports:
-      - 3078:3078
+      - 13078:3078
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=secret
@@ -296,7 +296,7 @@ services:
       redpanda:
         condition: service_started
     ports:
-      - 3332:3332
+      - 13332:3332
     volumes:
       - ./branding.json:/var/cfg/branding.json
     environment:
@@ -514,7 +514,7 @@ services:
       redis:
         condition: service_started
     ports:
-      - 8099:8099
+      - 18099:8099
     environment:
       - HULY_REDIS_URLS=redis://redis:6379
       - HULY_BIND_PORT=8099
