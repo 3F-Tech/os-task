@@ -210,6 +210,7 @@ export async function processPdcaCycleEvent (
         milestone: issue.milestone,
         estimation: issue.estimation,
         reportedTime: 0,
+        startDate: Date.now(),
         dueDate: dueDate ?? null,
         pdcaCycleActive: true,
         pdcaCycleFrequency: frequency,
@@ -243,14 +244,17 @@ export async function processPdcaCycleEvent (
         ctx.warn('PDCA cycle: failed to add snapshot comment', { issueId, err: commentErr.message })
       }
     } else {
-      // Standard mode: reset status + clear spent time + clear completed date
-      const update: Record<string, any> = { status: resetStatus, reportedTime: 0, pdcaNextCycleDate: nextDate }
+      // Standard mode: reset status, spent time, dates
+      const update: Record<string, any> = {
+        status: resetStatus,
+        reportedTime: 0,
+        startDate: Date.now(),
+        pdcaNextCycleDate: nextDate
+      }
       if (dueDate != null) update.dueDate = dueDate
       await client.update(issue, update as any)
-      // Clear completedDate separately — some transactor versions reject null in bulk updates
-      if (issue.completedDate != null) {
-        await client.update(issue, { completedDate: undefined } as any)
-      }
+      // Clear completedDate separately — transactor rejects null in bulk updates
+      await client.update(issue, { completedDate: undefined } as any)
       ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
       try {
         await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
