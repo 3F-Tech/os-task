@@ -8,12 +8,14 @@
 #   ./3f-build.sh --clean            # rush rebuild (força recompilação total)
 #   ./3f-build.sh --skip-rush        # pula rush build (só bundle + docker)
 #   ./3f-build.sh --skip-webpack     # pula webpack (quando só backend mudou)
+#   ./3f-build.sh --vps              # usa docker-compose.vps.yaml (para VPS)
 #   ./3f-build.sh --pod server       # reconstrói só o transactor
 #   ./3f-build.sh --pod front        # reconstrói só o front
 #   ./3f-build.sh --pod account      # reconstrói só o account
 #   ./3f-build.sh --pod worker       # reconstrói só o time-machine/worker
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
+#   ./3f-build.sh --vps --clean --no-cache  # rebuild completo na VPS
 # =============================================================================
 set -euo pipefail
 
@@ -31,6 +33,7 @@ NO_CACHE=false
 SKIP_RUSH=false
 SKIP_WEBPACK=false
 CLEAN=false
+VPS=false
 PODS="server front account"
 
 # ── Parse de argumentos ───────────────────────────────────────────────────────
@@ -40,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --skip-rush)     SKIP_RUSH=true ;;
     --skip-webpack)  SKIP_WEBPACK=true ;;
     --clean)         CLEAN=true ;;
+    --vps)           VPS=true ;;
     --pod)           PODS="$2"; shift ;;
     --help|-h)
       sed -n '/^# Uso/,/^# ====/p' "$0" | grep -v "^# ===="
@@ -93,8 +97,21 @@ echo -e "${NC}"
 [[ "$NO_CACHE"     == true ]] && echo -e "  ${YELLOW}⚑ Docker: sem cache (--no-cache)${NC}"
 [[ "$SKIP_RUSH"    == true ]] && echo -e "  ${YELLOW}⚑ Rush build: pulado (--skip-rush)${NC}"
 [[ "$SKIP_WEBPACK" == true ]] && echo -e "  ${YELLOW}⚑ Webpack: pulado (--skip-webpack)${NC}"
+[[ "$VPS"          == true ]] && echo -e "  ${YELLOW}⚑ Modo VPS: docker-compose.vps.yaml${NC}"
 echo -e "  ${GRAY}Pods: $PODS${NC}"
 echo ""
+
+# ── Detectar docker compose vs docker-compose ─────────────────────────────────
+if [[ "$VPS" == true ]]; then
+  COMPOSE_CMD="docker-compose"
+  COMPOSE_FILE="dev/docker-compose.vps.yaml"
+elif docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD="docker compose"
+  COMPOSE_FILE="dev/docker-compose.yaml"
+else
+  COMPOSE_CMD="docker-compose"
+  COMPOSE_FILE="dev/docker-compose.yaml"
+fi
 
 # ── Passo 1: Rush build ───────────────────────────────────────────────────────
 step "1/5 — Rush build (TypeScript)"
@@ -202,11 +219,10 @@ SERVICES=""
 [[ "$PODS" == *"worker"*  ]] && SERVICES="$SERVICES time-machine"
 
 info "Serviços: $SERVICES"
-docker compose -f dev/docker-compose.yaml up -d --no-deps $SERVICES || fail "docker compose up"
+$COMPOSE_CMD -f $COMPOSE_FILE up -d --no-deps $SERVICES || fail "docker compose up"
 
 info "Status dos containers:"
-docker compose -f dev/docker-compose.yaml ps --format "table {{.Name}}\t{{.Status}}" \
-  | grep -E "Name|front|account|transactor|time-machine"
+$COMPOSE_CMD -f $COMPOSE_FILE ps
 
 done_step $T
 
@@ -214,5 +230,9 @@ done_step $T
 TOTAL=$(( $(date +%s) - TOTAL_START ))
 echo -e "\n${BOLD}${GREEN}╔══════════════════════════════════════════╗"
 echo -e "║  ✓ Build concluído em ${TOTAL}s"
-printf  "║  %-42s\n" "Acesse: http://localhost:8087"
+if [[ "$VPS" == true ]]; then
+  printf  "║  %-42s\n" "Acesse: https://3ftasks.3fventure.tech"
+else
+  printf  "║  %-42s\n" "Acesse: http://localhost:8087"
+fi
 echo -e "╚══════════════════════════════════════════╝${NC}\n"
