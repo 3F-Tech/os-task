@@ -102,14 +102,15 @@ echo -e "  ${GRAY}Pods: $PODS${NC}"
 echo ""
 
 # ── Detectar docker compose vs docker-compose ─────────────────────────────────
-if [[ "$VPS" == true ]]; then
-  COMPOSE_CMD="docker-compose"
-  COMPOSE_FILE="dev/docker-compose.vps.yaml"
-elif docker compose version >/dev/null 2>&1; then
+if docker compose version >/dev/null 2>&1; then
   COMPOSE_CMD="docker compose"
-  COMPOSE_FILE="dev/docker-compose.yaml"
 else
   COMPOSE_CMD="docker-compose"
+fi
+
+if [[ "$VPS" == true ]]; then
+  COMPOSE_FILE="dev/docker-compose.vps.yaml"
+else
   COMPOSE_FILE="dev/docker-compose.yaml"
 fi
 
