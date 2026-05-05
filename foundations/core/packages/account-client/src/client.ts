@@ -1405,10 +1405,14 @@ function withRetry<T, F extends (...args: any[]) => Promise<T>> (
 }
 
 function withRetryUntilTimeout<T, F extends (...args: any[]) => Promise<T>> (f: F, timeoutMs: number = 5000): F {
-  const timeout = Date.now() + timeoutMs
-  const shouldFail = (err: any): boolean => !isNetworkError(err) || timeout < Date.now()
-
-  return withRetry(f, shouldFail)
+  // Timeout window must be calculated per-call, not at construction time.
+  // The original code captured Date.now() once at construction, meaning any network
+  // error after 5s from startup would be immediately re-thrown without retry.
+  return async function (...params: any[]): Promise<T> {
+    const timeout = Date.now() + timeoutMs
+    const shouldFail = (err: any): boolean => !isNetworkError(err) || timeout < Date.now()
+    return await withRetry(f, shouldFail)(...params)
+  } as F
 }
 
 function withRetryUntilMaxAttempts<T, F extends (...args: any[]) => Promise<T>> (f: F, maxAttempts: number = 5): F {

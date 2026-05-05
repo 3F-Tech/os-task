@@ -13,6 +13,7 @@
 #   ./3f-build.sh --pod front        # reconstrói só o front
 #   ./3f-build.sh --pod account      # reconstrói só o account
 #   ./3f-build.sh --pod worker       # reconstrói só o time-machine/worker
+#   ./3f-build.sh --pod workspace    # reconstrói só o workspace_cockroach
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
 #   ./3f-build.sh --vps --clean --no-cache  # rebuild completo na VPS
@@ -34,7 +35,7 @@ SKIP_RUSH=false
 SKIP_WEBPACK=false
 CLEAN=false
 VPS=false
-PODS="server front account"
+PODS="server front account workspace"
 
 # ── Parse de argumentos ───────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -173,6 +174,12 @@ if [[ "$PODS" == *"front"* ]]; then
   rm -f ./dist/config.json
 fi
 
+if [[ "$PODS" == *"workspace"* ]]; then
+  info "Bundlando workspace..."
+  cd "$ROOT_DIR/pods/workspace"
+  rushx bundle || fail "bundle workspace"
+fi
+
 done_step $T
 
 # ── Passo 4: Docker build ─────────────────────────────────────────────────────
@@ -205,6 +212,12 @@ if [[ "$PODS" == *"account"* ]]; then
   bash ../../common/scripts/docker_build.sh hardcoreeng/account || fail "docker build account"
 fi
 
+if [[ "$PODS" == *"workspace"* ]]; then
+  info "Buildando imagem: hardcoreeng/workspace"
+  cd "$ROOT_DIR/pods/workspace"
+  bash ../../common/scripts/docker_build.sh hardcoreeng/workspace || fail "docker build workspace"
+fi
+
 done_step $T
 
 # ── Passo 5: Restart dos containers ──────────────────────────────────────────
@@ -214,10 +227,11 @@ T=$(date +%s)
 cd "$ROOT_DIR"
 
 SERVICES=""
-[[ "$PODS" == *"server"* ]] && SERVICES="$SERVICES transactor_cockroach"
-[[ "$PODS" == *"front"*   ]] && SERVICES="$SERVICES front"
-[[ "$PODS" == *"account"* ]] && SERVICES="$SERVICES account"
-[[ "$PODS" == *"worker"*  ]] && SERVICES="$SERVICES time-machine"
+[[ "$PODS" == *"server"*    ]] && SERVICES="$SERVICES transactor_cockroach"
+[[ "$PODS" == *"front"*    ]] && SERVICES="$SERVICES front"
+[[ "$PODS" == *"account"*  ]] && SERVICES="$SERVICES account"
+[[ "$PODS" == *"worker"*   ]] && SERVICES="$SERVICES time-machine"
+[[ "$PODS" == *"workspace"* ]] && SERVICES="$SERVICES workspace_cockroach"
 
 info "Serviços: $SERVICES"
 $COMPOSE_CMD -f $COMPOSE_FILE up -d --no-deps $SERVICES || fail "docker compose up"
