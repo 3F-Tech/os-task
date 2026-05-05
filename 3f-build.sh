@@ -234,6 +234,14 @@ SERVICES=""
 [[ "$PODS" == *"workspace"* ]] && SERVICES="$SERVICES workspace_cockroach"
 
 info "Serviços: $SERVICES"
+
+# docker-compose v1 tem bug KeyError:'ContainerConfig' ao recriar containers
+# builados com Docker moderno — precisa remover antes de subir
+if [[ "$COMPOSE_CMD" == "docker-compose" ]]; then
+  info "docker-compose v1 detectado: removendo containers antes de recriar..."
+  $COMPOSE_CMD -f $COMPOSE_FILE rm -f $SERVICES 2>/dev/null || true
+fi
+
 $COMPOSE_CMD -f $COMPOSE_FILE up -d --no-deps $SERVICES || fail "docker compose up"
 
 info "Status dos containers:"
