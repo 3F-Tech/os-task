@@ -147,23 +147,7 @@ services:
       - SERVER_SECRET=secret
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
-  payment:
-    image: hardcoreeng/payment
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    ports:
-      - 3040:3040
-    environment:
-      - SECRET=secret
-      - PORT=3040
-      - ACCOUNTS_URL=http://account:3000
-      - FRONT_URL=https://3ftasks.3fventure.tech
-      - USE_SANDBOX=true
-      - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN}
-      - POLAR_WEBHOOK_SECRET=${POLAR_WEBHOOK_SECRET}
-      - POLAR_SUBSCRIPTION_PLANS=${POLAR_SUBSCRIPTION_PLANS}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-    restart: unless-stopped
+  # payment: disabled — hardcoreeng/payment not yet published to Docker Hub
   workspace_cockroach:
     image: hardcoreeng/workspace
     extra_hosts:
@@ -433,6 +417,7 @@ services:
       - BUCKETS=blobs,eu|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin
       - REGION=cockroach
       - QUEUE_CONFIG=redpanda:9092
+      - STREAM_URL=http://stream:1080
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   # hulylake: disabled — hardcoreeng/hulylake (Rust) not yet published to Docker Hub
