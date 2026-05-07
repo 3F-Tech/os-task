@@ -26,7 +26,11 @@
       "Bash(rush install *)",
       "Bash(rush update *)",
       "Bash(grep -E \"\\\\.\\(svelte|ts\\)$\")",
-      "Bash(node_modules/.bin/webpack --stats-error-details)"
+      "Bash(node_modules/.bin/webpack --stats-error-details)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\PICHAU\\\\Desktop\\\\platform\" -Filter \"*.example\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(docker pull *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('version', 'unknown'\\)\\)\")"
     ]
   }
 }
