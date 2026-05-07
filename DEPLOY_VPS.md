@@ -133,6 +133,19 @@ EOF
 
 > `huly.local` continua funcionando dentro dos containers pois o docker-compose usa `extra_hosts: huly.local:host-gateway` — ele resolve para o IP do host automaticamente.
 
+### Credenciais secretas (Google Calendar)
+
+Crie também o arquivo `.env.secrets` com as credenciais do Google. **Este arquivo nunca vai para o git.**
+
+```bash
+cat > /opt/3fhub/dev/.env.secrets << 'EOF'
+Credentials=COLE_AQUI_O_JSON_DO_GOOGLE_EM_UMA_LINHA_SÓ
+EOF
+```
+
+> O JSON completo (em uma linha só) vem do Google Cloud Console → Credenciais → OAuth 2.0.  
+> Veja `dev/.env.secrets.example` para instruções de como gerar.
+
 ---
 
 ## ETAPA 5 — Ajustar URLs Públicas no docker-compose.yaml
@@ -292,6 +305,7 @@ Configure o firewall para liberar:
 | 3078 | Collaborator (WebSocket) | Sim |
 | 4030 | Datalake (arquivos) | Sim |
 | 4040 | Preview service | Sim |
+| 8095 | Calendar Service (OAuth + push Google) | Sim |
 | 8096 | HulyLake | Sim |
 | 8099 | HulyPulse (WebSocket) | Sim |
 
@@ -305,6 +319,7 @@ ufw allow 3078
 ufw allow 4030
 ufw allow 4040
 ufw allow 8087
+ufw allow 8095
 ufw allow 8096
 ufw allow 8099
 ufw enable

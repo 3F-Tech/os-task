@@ -480,15 +480,16 @@ services:
       account:
         condition: service_started
     ports:
-      - 8095:8095
+      - 18095:8095
+    env_file:
+      - .env.secrets
     environment:
       - PORT=8095
       - ACCOUNTS_URL=http://account:3000
       - SECRET=secret
       - KVS_URL=http://hulykvs:8094
-      - WATCH_URL=http://calendar:8095
+      - WATCH_URL=https://3ftasks.3fventure.tech:8095
       - SERVICE_ID=calendar-service
-      - Credentials=COLE_AQUI_O_JSON_DO_GOOGLE_EM_UMA_LINHA_SÓ
     restart: unless-stopped
 volumes:
   db:
