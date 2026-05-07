@@ -214,7 +214,7 @@ services:
       - UPLOAD_URL=/files
       - PREVIEW_URL=http://preview:4040
       - GMAIL_URL=http://huly.local:8093
-      - CALENDAR_URL=http://calendar:8095
+      - CALENDAR_URL=https://3ftasks.3fventure.tech:8095
       - TELEGRAM_URL=http://huly.local:8086
       - REKONI_URL=http://rekoni:4004
       - COLLABORATOR_URL=wss://3ftasks.3fventure.tech:3078
