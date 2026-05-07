@@ -473,7 +473,9 @@ services:
       - BADGER_DIRECTORY_KEY=/badger/key
     restart: unless-stopped
   calendar:
-    image: hardcoreeng/calendar
+    image: hardcoreeng/base-slim:v20250916
+    working_dir: /usr/src/app
+    command: node bundle.js
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:
@@ -481,6 +483,8 @@ services:
         condition: service_started
     ports:
       - 18095:8095
+    volumes:
+      - ../services/calendar/pod-calendar/bundle/bundle.js:/usr/src/app/bundle.js
     env_file:
       - .env.secrets
     environment:
