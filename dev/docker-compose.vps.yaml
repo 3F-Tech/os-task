@@ -17,29 +17,8 @@ services:
     ports:
       - 1080:1080
     restart: unless-stopped
-  preview:
-    image: 'hardcoreeng/preview'
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    container_name: preview
-    environment:
-      - SECRET=secret
-      - STORAGE_CONFIG=datalake|http://datalake:4030
-      - CACHE_PATH=/data/cache
-    ports:
-      - 4040:4040
-    restart: unless-stopped
-  link-preview:
-    image: 'hardcoreeng/link-preview'
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    container_name: link-preview
-    environment:
-      - SECRET=secret
-      - PORT=4041
-    ports:
-      - 4041:4041
-    restart: unless-stopped
+  # preview: disabled — hardcoreeng/preview not yet published to Docker Hub
+  # link-preview: disabled — hardcoreeng/link-preview not yet published to Docker Hub
   cockroach:
     image: cockroachdb/cockroach:latest-v24.3
     extra_hosts:
@@ -133,7 +112,7 @@ services:
     links:
       - stats
     ports:
-      - 13010:3000
+      - 3000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
       - ../pods/account/bundle/bundle.js:/usr/src/app/bundle.js
@@ -223,7 +202,7 @@ services:
       - transactor_cockroach
       - stats
     ports:
-      - 13078:3078
+      - 3078:3078
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=secret
@@ -245,7 +224,7 @@ services:
       - SERVER_PORT=8080
       - SERVER_SECRET=secret
       - ACCOUNTS_URL=http://account:3000
-      - ACCOUNTS_URL_CLIENT=https://3ftasks.3fventure.tech:3010
+      - ACCOUNTS_URL_CLIENT=https://3ftasks.3fventure.tech:3000
       - STATS_URL=http://stats:4900
       - FILES_URL=http://datalake:4030/blob/:workspace/:blobId/:filename
       - UPLOAD_URL=/files
@@ -291,7 +270,7 @@ services:
       redpanda:
         condition: service_started
     ports:
-      - 13332:3332
+      - 3332:3332
     volumes:
       - ./branding.json:/var/cfg/branding.json
     environment:
@@ -456,97 +435,12 @@ services:
       - QUEUE_CONFIG=redpanda:9092
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
-  hulylake:
-    image: hardcoreeng/hulylake
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    depends_on:
-      minio:
-        condition: service_healthy
-      cockroach:
-        condition: service_started
-    ports:
-      - 8096:8096
-    environment:
-      - HULY_TOKEN_SECRET=secret
-      - HULY_DB_CONNECTION=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
-      - AWS_ENDPOINT_URL=http://minio:9000
-      - AWS_REGION=local
-      - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin
-    restart: unless-stopped
-  hulykvs:
-    image: hardcoreeng/hulykvs
-    depends_on:
-      cockroach:
-        condition: service_started
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    ports:
-      - 8094:8094
-    environment:
-      - HULY_DB_CONNECTION=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
-      - HULY_TOKEN_SECRET=secret
-    restart: unless-stopped
-  hulygun:
-    image: hardcoreeng/hulygun
-    depends_on:
-      redpanda:
-        condition: service_started
-      account:
-        condition: service_started
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    environment:
-      - HULY_LOG=debug
-      - HULY_KAFKA_BOOTSTRAP=redpanda:9092
-      - HULY_TOKEN_SECRET=secret
-      - HULY_ACCOUNT_SERVICE=http://account:3000
-    restart: unless-stopped
-  hulypulse:
-    image: hardcoreeng/hulypulse
-    depends_on:
-      redis:
-        condition: service_started
-    ports:
-      - 18099:8099
-    environment:
-      - HULY_REDIS_URLS=redis://redis:6379
-      - HULY_BIND_PORT=8099
-    restart: unless-stopped
-  process-service:
-    image: hardcoreeng/process
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    depends_on:
-      redpanda:
-        condition: service_started
-      account:
-        condition: service_started
-    environment:
-      - SECRET=secret
-      - ACCOUNTS_URL=http://account:3000
-      - QUEUE_CONFIG=redpanda:9092
-      - QUEUE_REGION=cockroach
-    restart: unless-stopped
-  time-machine:
-    image: hardcoreeng/worker
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    depends_on:
-      redpanda:
-        condition: service_started
-      account:
-        condition: service_started
-      cockroach:
-        condition: service_started
-    environment:
-      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
-      - QUEUE_CONFIG=redpanda:9092
-      - QUEUE_REGION=cockroach
-      - ACCOUNTS_URL=http://account:3000
-      - SECRET=secret
-    restart: unless-stopped
+  # hulylake: disabled — hardcoreeng/hulylake (Rust) not yet published to Docker Hub
+  # hulykvs: disabled — hardcoreeng/hulykvs not yet published to Docker Hub
+  # hulygun: disabled — hardcoreeng/hulygun not yet published to Docker Hub
+  # hulypulse: disabled — hardcoreeng/hulypulse not yet published to Docker Hub
+  # process-service: disabled — hardcoreeng/process not yet published to Docker Hub
+  # time-machine: disabled — hardcoreeng/worker not yet published; rebuild from local with: ./3f-build.sh --pod worker
   backup-cockroach:
     image: hardcoreeng/backup
     extra_hosts:
@@ -575,53 +469,8 @@ services:
       - QUEUE_CONFIG=redpanda:9092
       - TEMPORAL_ADDRESS=localhost:7233
     restart: unless-stopped
-  backup-api:
-    image: hardcoreeng/backup-api
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    depends_on:
-      minio:
-        condition: service_healthy
-      stats:
-        condition: service_started
-      account:
-        condition: service_started
-    ports:
-      - 4039:4039
-    environment:
-      - PORT=4039
-      - SECRET=secret
-      - ACCOUNTS_URL=http://account:3000
-      - STATS_URL=http://stats:4900
-      - BUCKET_NAME=backups
-      - STORAGE=minio|minio?accessKey=minioadmin&secretKey=minioadmin
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-    restart: unless-stopped
-  rating_cockroach:
-    image: hardcoreeng/rating
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    links:
-      - cockroach
-      - minio
-      - account
-      - stats
-    depends_on:
-      redpanda:
-        condition: service_started
-    environment:
-      - QUEUE_CONFIG=redpanda:9092
-      - REGION=cockroach
-      - SERVER_SECRET=secret
-      - STATS_URL=http://stats:4900
-      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
-      - STORAGE_CONFIG=datalake|http://datalake:4030
-      - ACCOUNTS_URL=http://account:3000
-      - COMMUNICATION_TIME_LOGGING_ENABLED=true
-      - COMMUNICATION_API_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-      - HYLYLAKE_URL=http://hulylake:8096
-    restart: unless-stopped
+  # backup-api: disabled — hardcoreeng/backup-api not yet published to Docker Hub
+  # rating_cockroach: disabled — hardcoreeng/rating not yet published to Docker Hub
   jaeger:
     image: jaegertracing/all-in-one:latest
     extra_hosts:
@@ -644,8 +493,6 @@ services:
       - 'huly.local:host-gateway'
     depends_on:
       account:
-        condition: service_started
-      hulykvs:
         condition: service_started
     ports:
       - 8095:8095
