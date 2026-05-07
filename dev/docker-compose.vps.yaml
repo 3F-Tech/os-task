@@ -472,6 +472,15 @@ services:
       - BADGER_DIRECTORY_VALUE=/badger/data
       - BADGER_DIRECTORY_KEY=/badger/key
     restart: unless-stopped
+  hulykvs:
+    image: node:20-slim
+    command: node /app/server.js
+    volumes:
+      - ../services/hulykvs/server.js:/app/server.js
+    environment:
+      - PORT=8094
+    restart: unless-stopped
+
   calendar:
     image: hardcoreeng/base-slim:v20250916
     working_dir: /usr/src/app
@@ -480,6 +489,8 @@ services:
       - 'huly.local:host-gateway'
     depends_on:
       account:
+        condition: service_started
+      hulykvs:
         condition: service_started
     ports:
       - 18095:8095
