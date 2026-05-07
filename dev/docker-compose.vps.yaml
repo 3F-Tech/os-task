@@ -214,7 +214,7 @@ services:
       - UPLOAD_URL=/files
       - PREVIEW_URL=http://preview:4040
       - GMAIL_URL=http://huly.local:8093
-      - CALENDAR_URL=https://3ftasks.3fventure.tech:8095
+      - CALENDAR_URL=https://3ftasks.3fventure.tech/_calendar
       - TELEGRAM_URL=http://huly.local:8086
       - REKONI_URL=http://rekoni:4004
       - COLLABORATOR_URL=wss://3ftasks.3fventure.tech:3078
@@ -482,9 +482,7 @@ services:
     restart: unless-stopped
 
   calendar:
-    image: hardcoreeng/base-slim:v20250916
-    working_dir: /usr/src/app
-    command: node bundle.js
+    image: hardcoreeng/calendar:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:
@@ -494,8 +492,6 @@ services:
         condition: service_started
     ports:
       - 18095:8095
-    volumes:
-      - ../services/calendar/pod-calendar/bundle/bundle.js:/usr/src/app/bundle.js
     env_file:
       - .env.secrets
     environment:
@@ -503,7 +499,7 @@ services:
       - ACCOUNTS_URL=http://account:3000
       - SECRET=secret
       - KVS_URL=http://hulykvs:8094
-      - WATCH_URL=https://3ftasks.3fventure.tech:8095
+      - WATCH_URL=https://3ftasks.3fventure.tech/_calendar
       - SERVICE_ID=calendar-service
     restart: unless-stopped
 volumes:
