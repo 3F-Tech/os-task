@@ -863,10 +863,8 @@ export class PostgresAccountDB implements AccountDB {
 
   async getWorkspaceRole (accountUuid: AccountUuid, workspaceUuid: WorkspaceUuid): Promise<AccountRole | null> {
     return await this.withRetry(async (rTx) => {
-      process.stderr.write(`[DBG-GWR] table=${this.getWsMembersTableName()} wsUuid=${String(workspaceUuid)} accUuid=${String(accountUuid)}\n`)
       const res =
         await rTx`SELECT role FROM ${this.client(this.getWsMembersTableName())} WHERE workspace_uuid = ${workspaceUuid} AND account_uuid = ${accountUuid}`
-      process.stderr.write(`[DBG-GWR] res.length=${res.length} role=${String(res[0]?.role)}\n`)
       return res[0]?.role ?? null
     })
   }

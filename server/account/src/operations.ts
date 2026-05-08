@@ -1918,10 +1918,13 @@ export async function getWorkspaceInfo (
   const isAdmin = extra?.admin === 'true'
   const skipAssignmentCheck = isGuest || account === systemAccountUuid
 
-  process.stderr.write(`[DBG-WS-INFO] account=${String(account)} wsUuid=${String(workspaceUuid)} skip=${String(skipAssignmentCheck)}\n`)
+  if (account == null && !isGuest) {
+    ctx.warn('Token missing account field', { workspaceUuid })
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+  }
+
   if (!skipAssignmentCheck) {
     let role = await db.getWorkspaceRole(account, workspaceUuid)
-    process.stderr.write(`[DBG-WS-INFO] role=${String(role)}\n`)
     if (role === null && isAdmin) {
       role = AccountRole.Admin
     }
