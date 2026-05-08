@@ -239,9 +239,6 @@ services:
       - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
       - LINK_PREVIEW_URL=http://link-preview:4041
-    volumes:
-      - ../pods/front/bundle/bundle.js:/app/bundle.js
-      - ../pods/front/dist:/app/dist
     restart: unless-stopped
   transactor_cockroach:
     image: hardcoreeng/transactor:v0.7.413
