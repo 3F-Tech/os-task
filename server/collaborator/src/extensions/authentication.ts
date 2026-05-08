@@ -59,6 +59,7 @@ export class AuthenticationExtension implements Extension {
         const ids = await getWorkspaceIds(data.token)
 
         // verify workspace uuid in the document matches the token
+        ctx.info('authenticate ids check', { idsUuid: ids.uuid, workspaceId, match: ids.uuid === workspaceId })
         if (ids.uuid !== workspaceId) {
           throw new Error('documentName must include workspace id')
         }
