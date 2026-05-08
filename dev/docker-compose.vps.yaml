@@ -1,6 +1,6 @@
 services:
   stream:
-    image: 'hardcoreeng/stream'
+    image: 'hardcoreeng/stream:v0.7.413'
     extra_hosts:
       - 'huly.local:host-gateway'
     container_name: stream
@@ -106,7 +106,7 @@ services:
     restart: unless-stopped
 
   account:
-    image: hardcoreeng/account
+    image: hardcoreeng/account:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -137,7 +137,7 @@ services:
       - MAILBOX_MAX_COUNT_PER_ACCOUNT=2
     restart: unless-stopped
   stats:
-    image: hardcoreeng/stats
+    image: hardcoreeng/stats:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     ports:
@@ -149,7 +149,7 @@ services:
     restart: unless-stopped
   # payment: disabled — hardcoreeng/payment not yet published to Docker Hub
   workspace_cockroach:
-    image: hardcoreeng/workspace
+    image: hardcoreeng/workspace:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -178,7 +178,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   collaborator:
-    image: hardcoreeng/collaborator
+    image: hardcoreeng/collaborator:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -198,7 +198,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   front:
-    image: hardcoreeng/front
+    image: hardcoreeng/front:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -244,7 +244,7 @@ services:
       - ../pods/front/dist:/app/dist
     restart: unless-stopped
   transactor_cockroach:
-    image: hardcoreeng/transactor
+    image: hardcoreeng/transactor:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -286,7 +286,7 @@ services:
       - HYLYLAKE_URL=http://hulylake:8096
     restart: unless-stopped
   rekoni:
-    image: hardcoreeng/rekoni-service
+    image: hardcoreeng/rekoni-service:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     restart: unless-stopped
@@ -296,7 +296,7 @@ services:
       - STATS_URL=http://stats:4900
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   fulltext_cockroach:
-    image: hardcoreeng/fulltext
+    image: hardcoreeng/fulltext:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:
@@ -325,7 +325,7 @@ services:
       - HULYLAKE_URL=http://hulylake:8096
       - COMMUNICATION_API_ENABLED=true
   print:
-    image: hardcoreeng/print
+    image: hardcoreeng/print:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     restart: unless-stopped
@@ -341,7 +341,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - FRONT_URL=https://3ftasks.3fventure.tech
   sign:
-    image: hardcoreeng/sign
+    image: hardcoreeng/sign:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     restart: unless-stopped
@@ -363,7 +363,7 @@ services:
       - STATS_URL=http://stats:4900
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   analytics:
-    image: hardcoreeng/analytics-collector
+    image: hardcoreeng/analytics-collector:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     restart: unless-stopped
@@ -377,7 +377,7 @@ services:
       - STATS_URL=http://stats:4900
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   export:
-    image: hardcoreeng/export
+    image: hardcoreeng/export:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -396,7 +396,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   datalake:
-    image: hardcoreeng/datalake
+    image: hardcoreeng/datalake:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:
@@ -429,7 +429,7 @@ services:
   # process-service: disabled — hardcoreeng/process not yet published to Docker Hub
   # time-machine: disabled — hardcoreeng/worker not yet published; rebuild from local with: ./3f-build.sh --pod worker
   backup-cockroach:
-    image: hardcoreeng/backup
+    image: hardcoreeng/backup:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:
