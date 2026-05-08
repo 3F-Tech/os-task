@@ -56,14 +56,7 @@ export class AuthenticationExtension implements Extension {
         }
 
         // verify workspace can be accessed with the token
-        let ids: Awaited<ReturnType<typeof getWorkspaceIds>>
-        try {
-          ids = await getWorkspaceIds(data.token)
-          ctx.info('authenticate ids check', { idsUuid: ids.uuid, workspaceId, match: ids.uuid === workspaceId })
-        } catch (err: any) {
-          ctx.error('getWorkspaceIds failed', { error: err?.message, stack: err?.stack, workspaceId })
-          throw err
-        }
+        const ids = await getWorkspaceIds(data.token)
 
         // verify workspace uuid in the document matches the token
         if (ids.uuid !== workspaceId) {
