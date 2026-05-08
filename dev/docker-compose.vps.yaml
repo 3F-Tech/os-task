@@ -209,8 +209,7 @@ services:
     environment:
       - SERVER_PORT=8080
       - SERVER_SECRET=secret
-      - ACCOUNTS_URL=http://account:3000
-      - ACCOUNTS_URL_CLIENT=https://3ftasks.3fventure.tech:3000
+      - ACCOUNTS_URL=https://3ftasks.3fventure.tech:3000
       - STATS_URL=http://stats:4900
       - FILES_URL=http://datalake:4030/blob/:workspace/:blobId/:filename
       - UPLOAD_URL=/files
