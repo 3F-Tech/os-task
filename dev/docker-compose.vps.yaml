@@ -187,6 +187,8 @@ services:
       - stats
     ports:
       - 13078:3078
+    volumes:
+      - ../pods/collaborator/bundle/bundle.js:/usr/src/app/bundle.js
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=secret
