@@ -69,7 +69,7 @@ services:
       - 9002:9000
       - 9003:9001
     volumes:
-      - files:/data
+      - /opt/apps/os-tasks/data/minio:/data
     healthcheck:
       test: ['CMD', 'mc', 'ready', 'local']
       interval: 5s
@@ -234,7 +234,7 @@ services:
       - BACKUP_URL=http://backup-api:4039/api/backup,
       - EXCLUDED_APPLICATIONS_FOR_ANONYMOUS=[]
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-      - PULSE_URL=wss://3ftasks.3fventure.tech:8099/ws
+      # PULSE_URL: hulypulse not yet available
       - DATALAKE_URL=http://datalake:4030
       - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
@@ -507,7 +507,6 @@ services:
 volumes:
   db:
   dbpg:
-  files:
   elastic:
   cockroach_db:
   redpanda:
