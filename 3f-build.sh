@@ -9,11 +9,12 @@
 #   ./3f-build.sh --skip-rush        # pula rush build (só bundle + docker)
 #   ./3f-build.sh --skip-webpack     # pula webpack (quando só backend mudou)
 #   ./3f-build.sh --vps              # usa docker-compose.vps.yaml (para VPS)
-#   ./3f-build.sh --pod server       # reconstrói só o transactor
-#   ./3f-build.sh --pod front        # reconstrói só o front
-#   ./3f-build.sh --pod account      # reconstrói só o account
-#   ./3f-build.sh --pod worker       # reconstrói só o time-machine/worker
-#   ./3f-build.sh --pod workspace    # reconstrói só o workspace_cockroach
+#   ./3f-build.sh --pod server        # reconstrói só o transactor
+#   ./3f-build.sh --pod front         # reconstrói só o front
+#   ./3f-build.sh --pod account       # reconstrói só o account
+#   ./3f-build.sh --pod collaborator  # reconstrói só o collaborator
+#   ./3f-build.sh --pod worker        # reconstrói só o time-machine/worker
+#   ./3f-build.sh --pod workspace     # reconstrói só o workspace_cockroach
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
 #   ./3f-build.sh --vps --clean --no-cache  # rebuild completo na VPS
@@ -35,7 +36,7 @@ SKIP_RUSH=false
 SKIP_WEBPACK=false
 CLEAN=false
 VPS=false
-PODS="server front account workspace"
+PODS="server front account collaborator workspace"
 
 # ── Parse de argumentos ───────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -174,6 +175,12 @@ if [[ "$PODS" == *"front"* ]]; then
   rm -f ./dist/config.json
 fi
 
+if [[ "$PODS" == *"collaborator"* ]]; then
+  info "Bundlando collaborator..."
+  cd "$ROOT_DIR/pods/collaborator"
+  rushx bundle || fail "bundle collaborator"
+fi
+
 if [[ "$PODS" == *"workspace"* ]]; then
   info "Bundlando workspace..."
   cd "$ROOT_DIR/pods/workspace"
@@ -212,6 +219,10 @@ if [[ "$PODS" == *"account"* ]]; then
   bash ../../common/scripts/docker_build.sh hardcoreeng/account || fail "docker build account"
 fi
 
+if [[ "$PODS" == *"collaborator"* ]]; then
+  info "Collaborator: usa imagem oficial com bundle local — sem docker build"
+fi
+
 if [[ "$PODS" == *"workspace"* ]]; then
   info "Buildando imagem: hardcoreeng/workspace"
   cd "$ROOT_DIR/pods/workspace"
@@ -227,11 +238,12 @@ T=$(date +%s)
 cd "$ROOT_DIR"
 
 SERVICES=""
-[[ "$PODS" == *"server"*    ]] && SERVICES="$SERVICES transactor_cockroach"
-[[ "$PODS" == *"front"*    ]] && SERVICES="$SERVICES front"
-[[ "$PODS" == *"account"*  ]] && SERVICES="$SERVICES account"
-[[ "$PODS" == *"worker"*   ]] && SERVICES="$SERVICES time-machine"
-[[ "$PODS" == *"workspace"* ]] && SERVICES="$SERVICES workspace_cockroach"
+[[ "$PODS" == *"server"*       ]] && SERVICES="$SERVICES transactor_cockroach"
+[[ "$PODS" == *"front"*        ]] && SERVICES="$SERVICES front"
+[[ "$PODS" == *"account"*      ]] && SERVICES="$SERVICES account"
+[[ "$PODS" == *"collaborator"* ]] && SERVICES="$SERVICES collaborator"
+[[ "$PODS" == *"worker"*       ]] && SERVICES="$SERVICES time-machine"
+[[ "$PODS" == *"workspace"*    ]] && SERVICES="$SERVICES workspace_cockroach"
 
 info "Serviços: $SERVICES"
 
