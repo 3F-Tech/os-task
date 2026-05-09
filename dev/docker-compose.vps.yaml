@@ -196,6 +196,7 @@ services:
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - STATS_URL=http://stats:4900
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+    stop_grace_period: 60s
     restart: unless-stopped
   front:
     image: hardcoreeng/front:v0.7.413

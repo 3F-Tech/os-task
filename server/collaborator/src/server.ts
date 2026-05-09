@@ -69,11 +69,11 @@ export async function start (ctx: MeasureContext, config: Config, storageAdapter
      * Debounces the call of the `onStoreDocument` hook for the given amount of time in ms.
      * Otherwise every single update would be persisted.
      */
-    debounce: 10000,
+    debounce: 2000,
     /**
      * Makes sure to call `onStoreDocument` at least in the given amount of time (ms).
      */
-    maxDebounce: 60000,
+    maxDebounce: 10000,
     /**
      * options to pass to the ydoc document
      */
@@ -229,6 +229,7 @@ export async function start (ctx: MeasureContext, config: Config, storageAdapter
   ctx.info('Running collaborator server', { port })
 
   return async () => {
+    await hocuspocus.destroy()
     server.close()
   }
 }
