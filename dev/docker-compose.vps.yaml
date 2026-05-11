@@ -106,7 +106,7 @@ services:
     restart: unless-stopped
 
   account:
-    image: hardcoreeng/account:v0.7.413
+    image: hardcoreeng/account:3f-local
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -115,7 +115,6 @@ services:
       - 13000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
-      - ../pods/account/bundle/bundle.js:/usr/src/app/bundle.js
     environment:
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=redpanda:9092
@@ -178,7 +177,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   collaborator:
-    image: hardcoreeng/collaborator:v0.7.413
+    image: hardcoreeng/collaborator:3f-local
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -187,8 +186,6 @@ services:
       - stats
     ports:
       - 13078:3078
-    volumes:
-      - ../pods/collaborator/bundle/bundle.js:/usr/src/app/bundle.js
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=secret
@@ -199,7 +196,7 @@ services:
     stop_grace_period: 60s
     restart: unless-stopped
   front:
-    image: hardcoreeng/front:v0.7.413
+    image: hardcoreeng/front:3f-local
     extra_hosts:
       - 'huly.local:host-gateway'
     links:
@@ -239,9 +236,6 @@ services:
       - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
       - LINK_PREVIEW_URL=http://link-preview:4041
-    volumes:
-      - ../pods/front/bundle/bundle.js:/app/bundle.js
-      - ../pods/front/dist:/app/dist
     restart: unless-stopped
   transactor_cockroach:
     image: hardcoreeng/transactor:v0.7.413

@@ -208,19 +208,21 @@ if [[ "$PODS" == *"worker"* ]]; then
 fi
 
 if [[ "$PODS" == *"front"* ]]; then
-  info "Buildando imagem: hardcoreeng/front"
+  info "Buildando imagem: hardcoreeng/front:3f-local"
   cd "$ROOT_DIR/pods/front"
-  bash ../../common/scripts/docker_build.sh hardcoreeng/front || fail "docker build front"
+  DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/front || fail "docker build front"
 fi
 
 if [[ "$PODS" == *"account"* ]]; then
-  info "Buildando imagem: hardcoreeng/account"
+  info "Buildando imagem: hardcoreeng/account:3f-local"
   cd "$ROOT_DIR/pods/account"
-  bash ../../common/scripts/docker_build.sh hardcoreeng/account || fail "docker build account"
+  DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/account || fail "docker build account"
 fi
 
 if [[ "$PODS" == *"collaborator"* ]]; then
-  info "Collaborator: usa imagem oficial com bundle local — sem docker build"
+  info "Buildando imagem: hardcoreeng/collaborator:3f-local"
+  cd "$ROOT_DIR/pods/collaborator"
+  DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/collaborator || fail "docker build collaborator"
 fi
 
 if [[ "$PODS" == *"workspace"* ]]; then
