@@ -17,14 +17,14 @@ const fs = require('fs')
 const path = require('path')
 const exec = require('child_process').exec
 
-// version.txt takes precedence — works in forks without git tags
+// tag.txt takes precedence — works in forks without git tags
 try {
-  const versionFilePath = path.resolve(__dirname, 'version.txt')
-  const version = fs.readFileSync(versionFilePath, 'utf8').trim()
+  const tagFilePath = path.resolve(__dirname, 'tag.txt')
+  const version = fs.readFileSync(tagFilePath, 'utf8').trim()
   console.log(version)
   process.exit(0)
 } catch (e) {
-  // no version.txt — fall through to git
+  // no tag.txt — fall through to git
 }
 
 exec('git describe --tags --abbrev=0', (err, stdout, stderr) => {

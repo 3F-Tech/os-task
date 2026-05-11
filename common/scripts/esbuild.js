@@ -95,7 +95,7 @@ async function main() {
 
   const env = {
     MODEL_VERSION: define['MODEL_VERSION'] ? getVersionFromScript('./show_version.js') : undefined,
-    VERSION: getVersionFromScript('./show_version.js'),
+    VERSION: getVersionFromScript('./show_tag.js'),
     GIT_REVISION: define['GIT_REVISION'] ? getGitRevision() : undefined
   }
 
