@@ -118,16 +118,17 @@ services:
       - ELASTICSEARCH_PORT_NUMBER=9200
       - BITNAMI_DEBUG=true
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms256m -Xmx450m
+      - ES_JAVA_OPTS=-Xms512m -Xmx768m
     healthcheck:
-      interval: 20s
+      interval: 30s
+      timeout: 15s
       retries: 10
       test: curl -s http://localhost:9200/_cluster/health | grep -vq '"status":"red"'
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 1024m
+          memory: 1536m
   redis:
     image: redis:8.0.2-alpine3.21
     ports:
