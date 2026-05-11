@@ -13,11 +13,24 @@
 // limitations under the License.
 //
 
+const fs = require('fs')
+const path = require('path')
 const exec = require('child_process').exec
+
+// version.txt takes precedence — works in forks without git tags
+try {
+  const versionFilePath = path.resolve(__dirname, 'version.txt')
+  const version = fs.readFileSync(versionFilePath, 'utf8').trim()
+  console.log(version)
+  process.exit(0)
+} catch (e) {
+  // no version.txt — fall through to git
+}
 
 exec('git describe --tags --abbrev=0', (err, stdout, stderr) => {
   if (err !== null) {
     console.log('"0.6.0"')
+    return
   }
   const rawVersion = stdout.trim().replace('v', '').replace('s', '').split('.')
   if (rawVersion.length === 3) {
