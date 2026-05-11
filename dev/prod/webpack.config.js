@@ -283,7 +283,7 @@ module.exports = [
     },
     optimization: prod
       ? {
-          minimize: true,
+          minimize: process.env.WEBPACK_MINIMIZE !== 'false',
           minimizer: [
             new (require('terser-webpack-plugin'))({
               parallel: false

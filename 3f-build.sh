@@ -144,7 +144,7 @@ else
   info "Compilando com webpack... (pode levar 5–15 min, terminal fica quieto)"
   cd "$ROOT_DIR/dev/prod"
   node -e "try{require('fs').rmSync('./dist',{recursive:true,force:true})}catch(e){}"
-  NODE_OPTIONS="--max-old-space-size=3072" ./node_modules/.bin/cross-env NODE_ENV=production ./node_modules/.bin/webpack --progress --stats-error-details || fail "webpack"
+  WEBPACK_MINIMIZE="${WEBPACK_MINIMIZE:-false}" NODE_OPTIONS="--max-old-space-size=4096" ./node_modules/.bin/cross-env NODE_ENV=production ./node_modules/.bin/webpack --progress --stats-error-details || fail "webpack"
   done_step $T
 fi
 
