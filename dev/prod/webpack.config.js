@@ -469,9 +469,10 @@ module.exports = [
       // new MiniCssExtractPlugin({
       //   filename: '[name].[id][contenthash].css'
       // }),
-      new Dotenv({ path: prod ? '.env-prod' : '.env' }),
+      new Dotenv({ path: prod ? '.env-prod' : '.env', systemvars: true }),
       new DefinePlugin({
-        'process.env.CLIENT_TYPE': JSON.stringify(process.env.CLIENT_TYPE)
+        'process.env.CLIENT_TYPE': JSON.stringify(process.env.CLIENT_TYPE),
+        'process.env.MODEL_VERSION': JSON.stringify(process.env.MODEL_VERSION ?? '0.7.413')
       }),
       ...(doValidate ? [new ForkTsCheckerWebpackPlugin()] : [])
     ],
