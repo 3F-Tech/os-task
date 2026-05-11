@@ -17,17 +17,7 @@ services:
     ports:
       - 1080:1080
     restart: unless-stopped
-  media:
-    image: 'hardcoreeng/media'
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    container_name: media
-    environment:
-      - ACCOUNTS_URL=http://huly.local:3000
-      - SECRET=secret
-      - REGION=cockroach
-      - QUEUE_CONFIG=${QUEUE_CONFIG}
-    restart: unless-stopped
+  # media: disabled — hardcoreeng/media not yet published to Docker Hub
   # preview: disabled — hardcoreeng/preview not yet published to Docker Hub
   # link-preview: disabled — hardcoreeng/link-preview not yet published to Docker Hub
   cockroach:
@@ -190,23 +180,7 @@ services:
       - SERVER_SECRET=secret
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
-  payment:
-    image: hardcoreeng/payment
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    ports:
-      - 3040:3040
-    environment:
-      - SECRET=secret
-      - PORT=3040
-      - ACCOUNTS_URL=http://huly.local:3000
-      - FRONT_URL=http://huly.local:8087
-      - USE_SANDBOX=true
-      - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN}
-      - POLAR_WEBHOOK_SECRET=${POLAR_WEBHOOK_SECRET}
-      - POLAR_SUBSCRIPTION_PLANS=${POLAR_SUBSCRIPTION_PLANS}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-    restart: unless-stopped
+  # payment: disabled — requires Polar API credentials
   workspace_cockroach:
     image: hardcoreeng/workspace
     extra_hosts:
@@ -389,44 +363,8 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - HULYLAKE_URL=http://huly.local:8096
       - COMMUNICATION_API_ENABLED=true
-  print:
-    image: hardcoreeng/print
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    restart: unless-stopped
-    ports:
-      - 4005:4005
-    environment:
-      - SECRET=secret
-      - REGION=cockroach
-      - QUEUE_CONFIG=${QUEUE_CONFIG}
-      - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - STATS_URL=http://huly.local:4900
-      - ACCOUNTS_URL=http://huly.local:3000
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-      - FRONT_URL=http://huly.local:8087
-  sign:
-    image: hardcoreeng/sign
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    restart: unless-stopped
-    ports:
-      - 4006:4006
-    volumes:
-      - ../services/sign/pod-sign/debug/certificate.p12:/var/cfg/certificate.p12
-      - ../services/sign/pod-sign/debug/branding.json:/var/cfg/branding.json
-    environment:
-      - SECRET=secret
-      - MINIO_ENDPOINT=minio
-      - REGION=cockroach
-      - QUEUE_CONFIG=${QUEUE_CONFIG}
-      - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - ACCOUNTS_URL=http://huly.local:3000
-      - CERTIFICATE_PATH=/var/cfg/certificate.p12
-      - SERVICE_ID=sign-service
-      - BRANDING_PATH=/var/cfg/branding.json
-      - STATS_URL=http://huly.local:4900
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+  # print: disabled — not available for local dev
+  # sign: disabled — requires certificate.p12 and not needed for local dev
   # aiBot:
   #   image: hardcoreeng/ai-bot
   #   ports:
@@ -647,28 +585,7 @@ services:
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - TEMPORAL_ADDRESS=localhost:7233
     restart: unless-stopped
-  backup-api:
-    image: hardcoreeng/backup-api
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    depends_on:
-      minio:
-        condition: service_healthy
-      stats:
-        condition: service_started
-      account:
-        condition: service_started
-    ports:
-      - 4039:4039
-    environment:
-      - PORT=4039
-      - SECRET=secret
-      - ACCOUNTS_URL=http://huly.local:3000
-      - STATS_URL=http://huly.local:4900
-      - BUCKET_NAME=backups
-      - STORAGE=minio|minio?accessKey=minioadmin&secretKey=minioadmin
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-    restart: unless-stopped
+  # backup-api: disabled — hardcoreeng/backup-api not published to Docker Hub
 
   rating_cockroach:
     image: hardcoreeng/rating
@@ -711,26 +628,7 @@ services:
       - BADGER_DIRECTORY_VALUE=/badger/data
       - BADGER_DIRECTORY_KEY=/badger/key
     restart: unless-stopped
-  calendar:
-    image: hardcoreeng/calendar
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    depends_on:
-      account:
-        condition: service_started
-      hulykvs:
-        condition: service_started
-    ports:
-      - 8095:8095
-    environment:
-      - PORT=8095
-      - ACCOUNTS_URL=http://huly.local:3000
-      - SECRET=secret
-      - KVS_URL=http://hulykvs:8094
-      - WATCH_URL=http://huly.local:8095
-      - SERVICE_ID=calendar-service
-      - Credentials=COLE_AQUI_O_JSON_DO_GOOGLE_EM_UMA_LINHA_SÓ
-    restart: unless-stopped
+  # calendar: disabled — requires Google OAuth credentials
 volumes:
   db:
   dbpg:
