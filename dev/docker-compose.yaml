@@ -144,7 +144,7 @@ services:
       - 3000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
-      - ../pods/account/bundle/bundle.js:/usr/src/app/bundle.js
+      - ../pods/account/bundle:/usr/src/app
     environment:
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=${QUEUE_CONFIG}
@@ -194,7 +194,7 @@ services:
         condition: service_started
     volumes:
       - ./branding.json:/var/cfg/branding.json
-      - ../pods/workspace/bundle/bundle.js:/usr/src/app/bundle.js
+      - ../pods/workspace/bundle:/usr/src/app
     environment:
       - WS_OPERATION=all+backup
       - REGION=cockroach
@@ -223,7 +223,7 @@ services:
     ports:
       - 3078:3078
     volumes:
-      - ../pods/collaborator/bundle/bundle.js:/usr/src/app/bundle.js
+      - ../pods/collaborator/bundle:/usr/src/app
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=secret
@@ -277,7 +277,7 @@ services:
       - EXPORT_URL=http://huly.local:4009
       - LINK_PREVIEW_URL=http://huly.local:4041
     volumes:
-      - ../pods/front/bundle/bundle.js:/app/bundle.js
+      - ../pods/front/bundle:/app
       - ../pods/front/dist:/app/dist
     restart: unless-stopped
   transactor_cockroach:
@@ -296,8 +296,7 @@ services:
       - 3332:3332
     volumes:
       - ./branding.json:/var/cfg/branding.json
-      - ../pods/server/bundle/bundle.js:/usr/src/app/bundle.js
-      - ../pods/server/bundle/model.json:/usr/src/app/model.json
+      - ../pods/server/bundle:/usr/src/app
     environment:
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - SERVER_PORT=3332
