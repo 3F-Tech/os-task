@@ -28,7 +28,7 @@ services:
       - '8089:8080'
     command: start-single-node --insecure
     volumes:
-      - cockroach_db:/cockroach/cockroach-data
+      - /opt/apps/os-tasks/data/cockroach:/cockroach/cockroach-data
     restart: unless-stopped
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
@@ -50,7 +50,7 @@ services:
       - --memory 512M
     container_name: redpanda
     volumes:
-      - redpanda:/var/lib/redpanda/data
+      - /opt/apps/os-tasks/data/redpanda:/var/lib/redpanda/data
     ports:
       - 18081:18081
       - 18082:18082
@@ -82,7 +82,7 @@ services:
     extra_hosts:
       - 'huly.local:host-gateway'
     volumes:
-      - elastic:/usr/share/elasticsearch/data
+      - /opt/apps/os-tasks/data/elastic:/usr/share/elasticsearch/data
     ports:
       - 9200:9200
     environment:
@@ -504,7 +504,4 @@ services:
 volumes:
   db:
   dbpg:
-  elastic:
-  cockroach_db:
-  redpanda:
   telemetry:
