@@ -226,9 +226,9 @@ if [[ "$PODS" == *"collaborator"* ]]; then
 fi
 
 if [[ "$PODS" == *"workspace"* ]]; then
-  info "Buildando imagem: hardcoreeng/workspace"
+  info "Buildando imagem: hardcoreeng/workspace:3f-local"
   cd "$ROOT_DIR/pods/workspace"
-  bash ../../common/scripts/docker_build.sh hardcoreeng/workspace || fail "docker build workspace"
+  DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/workspace || fail "docker build workspace"
 fi
 
 done_step $T
