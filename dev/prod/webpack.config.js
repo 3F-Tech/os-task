@@ -284,6 +284,11 @@ module.exports = [
     optimization: prod
       ? {
           minimize: true,
+          minimizer: [
+            new (require('terser-webpack-plugin'))({
+              parallel: false
+            })
+          ],
           splitChunks: {
             chunks: 'all'
           }
