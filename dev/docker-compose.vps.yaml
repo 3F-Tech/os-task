@@ -209,7 +209,7 @@ services:
       - SERVER_SECRET=secret
       - ACCOUNTS_URL=https://3ftasks.3fventure.tech:3000
       - STATS_URL=http://stats:4900
-      - FILES_URL=http://datalake:4030/blob/:workspace/:blobId/:filename
+      - FILES_URL=https://3ftasks.3fventure.tech/files/blob/:workspace/:blobId/:filename
       - UPLOAD_URL=/files
       - PREVIEW_URL=http://preview:4040
       - GMAIL_URL=http://huly.local:8093
@@ -232,7 +232,7 @@ services:
       - EXCLUDED_APPLICATIONS_FOR_ANONYMOUS=[]
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       # PULSE_URL: hulypulse not yet available
-      - DATALAKE_URL=http://datalake:4030
+      - DATALAKE_URL=https://3ftasks.3fventure.tech/files
       - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
       - LINK_PREVIEW_URL=http://link-preview:4041
@@ -274,7 +274,7 @@ services:
       - COMMUNICATION_TIME_LOGGING_ENABLED=true
       - RATE_LIMIT_MAX=250
       - RATE_LIMIT_WINDOW=30000
-      - FILES_URL=http://datalake:4030/blob/:workspace/:blobId/:filename
+      - FILES_URL=https://3ftasks.3fventure.tech/files/blob/:workspace/:blobId/:filename
       - COMMUNICATION_API_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - HYLYLAKE_URL=http://hulylake:8096
