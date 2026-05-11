@@ -238,7 +238,7 @@ services:
       - LINK_PREVIEW_URL=http://link-preview:4041
     restart: unless-stopped
   transactor_cockroach:
-    image: hardcoreeng/transactor:v0.7.413
+    image: hardcoreeng/transactor:3f-local
     extra_hosts:
       - 'huly.local:host-gateway'
     links:

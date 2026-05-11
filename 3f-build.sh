@@ -196,9 +196,9 @@ T=$(date +%s)
 [[ "$NO_CACHE" == true ]] && export DOCKER_EXTRA="--no-cache" || export DOCKER_EXTRA=""
 
 if [[ "$PODS" == *"server"* ]]; then
-  info "Buildando imagem: hardcoreeng/transactor"
+  info "Buildando imagem: hardcoreeng/transactor:3f-local"
   cd "$ROOT_DIR/pods/server"
-  bash ../../common/scripts/docker_build.sh hardcoreeng/transactor || fail "docker build transactor"
+  DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/transactor || fail "docker build transactor"
 fi
 
 if [[ "$PODS" == *"worker"* ]]; then
