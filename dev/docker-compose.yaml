@@ -28,29 +28,8 @@ services:
       - REGION=cockroach
       - QUEUE_CONFIG=${QUEUE_CONFIG}
     restart: unless-stopped
-  preview:
-    image: 'hardcoreeng/preview'
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    container_name: preview
-    environment:
-      - SECRET=secret
-      - STORAGE_CONFIG=${STORAGE_CONFIG}
-      - CACHE_PATH=/data/cache
-    ports:
-      - 4040:4040
-    restart: unless-stopped
-  link-preview:
-    image: 'hardcoreeng/link-preview'
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    container_name: link-preview
-    environment:
-      - SECRET=secret
-      - PORT=4041
-    ports:
-      - 4041:4041
-    restart: unless-stopped
+  # preview: disabled — hardcoreeng/preview not yet published to Docker Hub
+  # link-preview: disabled — hardcoreeng/link-preview not yet published to Docker Hub
   cockroach:
     image: cockroachdb/cockroach:latest-v24.3
     extra_hosts:
