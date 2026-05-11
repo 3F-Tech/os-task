@@ -380,7 +380,7 @@ services:
   # #      - LOVE_ENDPOINT=http://huly.local:8096
   # #      - OPENAI_API_KEY=token
   analytics:
-    image: hardcoreeng/analytics-collector
+    image: hardcoreeng/analytics-collector:v0.7.413
     extra_hosts:
       - 'huly.local:host-gateway'
     restart: unless-stopped
@@ -439,6 +439,7 @@ services:
       - BUCKETS=blobs,eu|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin
       - REGION=cockroach
       - QUEUE_CONFIG=${QUEUE_CONFIG}
+      - STREAM_URL=http://huly.local:1080
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   # hulylake: disabled — hardcoreeng/hulylake not published to Docker Hub
