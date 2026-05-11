@@ -116,3 +116,6 @@ dev/tool/history.json
 .tmp
 ws-tests/docker-compose.override.yml
 .cursor/*
+
+# VPS data directories (Docker bind mounts — never commit runtime data)
+data/
