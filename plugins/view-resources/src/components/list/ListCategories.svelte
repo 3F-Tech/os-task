@@ -148,6 +148,41 @@
   $: void getHeader(_class, groupByKey)
 
   let configurationsVersion = 0
+
+  // 3F — Normalização do modelo para alinhamento e separadores consistentes.
+  // 1) Custom fields → compression-bar (fixed: 'left'), curando preferências antigas
+  //    que vinham com optional: true (sem migration).
+  // 2) Toda coluna de metadados (compression ou fixed sem grow) ganha dividerBefore: true.
+  //    Isso garante separador visual entre todas as colunas mesmo que a preferência
+  //    salva no banco seja anterior à introdução do divisor.
+  function normalizeCustomFields (model: AttributeModel[]): void {
+    for (const m of model) {
+      const existing = (m.displayProps ?? {}) as Record<string, any>
+      const isCustom =
+        m.attribute?.isCustom === true || (typeof m.key === 'string' && m.key.startsWith('custom'))
+
+      if (isCustom) {
+        const { optional: _o, suffix: _s, ...rest } = existing
+        m.displayProps = {
+          ...rest,
+          key: existing.key ?? m.key,
+          compression: true,
+          fixed: 'left',
+          dividerBefore: true
+        } as any
+        continue
+      }
+
+      // Para colunas não-custom: força dividerBefore em qualquer coluna de
+      // metadados (compression ou fixed), respeitando `grow` que é o spacer.
+      const isMetadataCell =
+        existing.compression === true || (existing.fixed !== undefined && existing.grow !== true)
+      if (isMetadataCell && existing.dividerBefore !== true) {
+        m.displayProps = { ...existing, dividerBefore: true } as any
+      }
+    }
+  }
+
   const buildModels = reduceCalls(async function (
     _class: Ref<Class<Doc>>,
     config: Array<string | BuildModelKey>,
@@ -158,11 +193,13 @@
     for (const [k, v] of entries) {
       const _cl = k as Ref<Class<Doc>>
       const res = await buildModel({ client, _class: _cl, keys: v, lookup })
+      normalizeCustomFields(res)
       newItemModels.set(_cl, res)
     }
 
     if (!newItemModels.has(_class)) {
       const res = await buildModel({ client, _class, keys: config, lookup })
+      normalizeCustomFields(res)
       newItemModels.set(_class, res)
     }
 

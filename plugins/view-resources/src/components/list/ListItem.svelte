@@ -152,6 +152,7 @@
                 value={getObjectValue(attrModel.key, docObject)}
                 onChange={getOnChange(docObject, attrModel)}
                 {readonly}
+                hideDivider={index === 0}
                 on:resize={(e) => {
                   if (e.detail == null) return
                   sizes.set(index, e.detail)

@@ -417,7 +417,7 @@
               }}
             >
               <div class="antiTable-cells">
-                {#if attribute.label}
+                {#if attribute.label && attribute.displayProps?.hideLabel !== true}
                   <Label label={attribute.label} />
                 {/if}
                 {#if attribute.sortingKey === _sortKey}

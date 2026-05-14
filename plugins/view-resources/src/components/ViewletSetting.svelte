@@ -137,7 +137,7 @@
           result.push(assocConfig)
         } else {
           if (!canResolveAttribute(hierarchy, viewlet.attachTo, param, lookup)) continue
-          const paramValue = param.startsWith('custom') ? { key: param, displayProps: { optional: true } } : param
+          const paramValue = param.startsWith('custom') ? { key: param, displayProps: { key: param, compression: true, fixed: 'left' as 'left', dividerBefore: true } } : param
           const attrCfg: AttributeConfig = {
             type: 'attribute',
             value: paramValue,
@@ -229,8 +229,10 @@
         result.push(newValue)
       }
     } else {
-      const isCustomAttribute = attribute.name.startsWith('custom')
-      const attributeValue = isCustomAttribute ? { key: value, displayProps: { optional: true } } : value
+      const isCustomAttribute = attribute.isCustom === true || attribute.name.startsWith('custom')
+      const attributeValue = isCustomAttribute
+        ? { key: value, displayProps: { key: value, compression: true, fixed: 'left' as 'left', dividerBefore: true } }
+        : value
 
       const newValue: AttributeConfig = {
         type: 'attribute',
@@ -391,8 +393,14 @@
     )
     const config = configValues.map((p) => {
       const value = p.value as string | BuildModelKey
-      if (typeof value === 'string' && value.startsWith('custom')) {
-        return { key: value, displayProps: { optional: true } }
+      const key = typeof value === 'string' ? value : value.key
+      if (key?.startsWith('custom')) {
+        const currentDisplayProps = typeof value === 'string' ? {} : (value.displayProps ?? {})
+        const { optional: _, ...rest } = currentDisplayProps as any
+        return {
+          ...(typeof value === 'string' ? { key: value } : value),
+          displayProps: { ...rest, key, compression: true, fixed: 'left' as 'left', dividerBefore: true }
+        }
       }
       return value
     })
@@ -419,7 +427,18 @@
   function setStatus (result: Config[], preference: ViewletPreference): Config[] {
     for (const key of result) {
       if (!isAttribute(key)) continue
-      const index = preference.config.findIndex((p) => deepEqual(p, key.value))
+      // Try exact match first
+      let index = preference.config.findIndex((p) => deepEqual(p, key.value))
+      // Fallback: match by key string for custom fields whose displayProps format may have changed
+      if (index === -1) {
+        const keyStr = getKey(key.value)
+        if (keyStr !== undefined && keyStr.length > 0) {
+          index = preference.config.findIndex((p) => {
+            const pKey = typeof p === 'string' ? p : p.key
+            return pKey === keyStr
+          })
+        }
+      }
       key.enabled = index !== -1
       key.order = index !== -1 ? index : undefined
     }

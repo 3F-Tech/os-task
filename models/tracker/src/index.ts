@@ -518,7 +518,7 @@ export function createModel (builder: Builder): void {
   })
 
   builder.mixin(tracker.class.Issue, core.class.Class, view.mixin.ListHeaderExtra, {
-    presenters: [tracker.component.IssueStatistics]
+    presenters: [tracker.component.IssueStatistics, tracker.component.IssueColumnHeader]
   })
 
   defineSortAndGrouping(builder)

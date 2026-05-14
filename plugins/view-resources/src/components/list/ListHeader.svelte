@@ -181,7 +181,7 @@
           <span class="antiSection-header__counter ml-2">{itemsProj.length}</span>
         {/if}
         <div class="flex-row-center flex-reverse flex-grow mr-2 gap-2 reverse">
-          {#each extraHeaders ?? [] as extra}
+          {#each (extraHeaders ?? []).filter((h) => typeof h !== 'string' || !h.endsWith('ColumnHeader')) as extra}
             <Component is={extra} props={{ ...props, value: category, category: groupByKey, docs: items }} />
           {/each}
         </div>

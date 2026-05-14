@@ -71,6 +71,7 @@
     if (permissionsStore === undefined) return true
     return canChangeAttribute(attr, object.space as Ref<TypedSpace>, permissionsStore, object._class)
   }
+
 </script>
 
 {#if dp?.dividerBefore === true && !hideDivider}

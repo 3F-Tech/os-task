@@ -154,6 +154,11 @@
 
   function processAttribute (attribute: AnyAttribute, result: Config[], useMixinProxy = false): void {
     if (attribute.hidden === true || attribute.label === undefined) return
+
+    if (attribute.isCustom && attribute.space && viewlet.space && viewlet.space !== core.space.Model && attribute.space !== viewlet.space && attribute.space !== core.space.Model) {
+      return
+    }
+
     if (viewlet.configOptions?.hiddenKeys?.includes(attribute.name)) return
     if (hierarchy.isDerived(attribute.type._class, core.class.Collection)) return
     const { attrClass, category } = getAttributePresenterClass(hierarchy, attribute.type)
@@ -177,6 +182,14 @@
     )?.presenter
     if (presenter === undefined) return
     const clazz = hierarchy.getClass(attribute.attributeOf)
+
+    // Auto-configure custom attributes: if viewlet has customFieldsGoRight flag,
+    // wrap compression/fixed inside displayProps so the rendering pipeline
+    // (ListItem compression-bar + IssueColumnHeader) can recognize them.
+    const customDisplayProps = ((viewlet.configOptions as any)?.customFieldsGoRight === true && attribute.isCustom)
+      ? { key: value, compression: true, fixed: 'left' as 'left' }
+      : undefined
+
     const extraProps = viewlet.configOptions?.extraProps
     if (useMixinProxy) {
       const newValue: AttributeConfig = {
@@ -191,9 +204,19 @@
         result.push(newValue)
       }
     } else {
+      let builtValue: string | BuildModelKey
+      if (extraProps || customDisplayProps) {
+        builtValue = {
+          ...(extraProps ?? {}),
+          key: value,
+          ...(customDisplayProps ? { displayProps: customDisplayProps } : {})
+        }
+      } else {
+        builtValue = value
+      }
       const newValue: AttributeConfig = {
         type: 'attribute',
-        value: extraProps ? { ...extraProps, key: value } : value,
+        value: builtValue,
         label: attribute.label,
         enabled: false,
         _class: attribute.attributeOf,

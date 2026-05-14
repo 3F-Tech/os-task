@@ -14,13 +14,21 @@
   $: option = options[stage]
 </script>
 
-{#if option}
-  <span class="stage-badge" style:background-color={option.color}>
-    {option.label}
-  </span>
-{/if}
+<div class="stage-container">
+  {#if option}
+    <span class="stage-badge" style:background-color={option.color}>
+      {option.label}
+    </span>
+  {/if}
+</div>
 
 <style lang="scss">
+  .stage-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+
   .stage-badge {
     flex-shrink: 0;
     display: inline-flex;

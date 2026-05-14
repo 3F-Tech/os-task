@@ -33,6 +33,7 @@
   import ui, {
     AnyComponent,
     AnySvelteComponent,
+    Component,
     ExpandCollapse,
     mouseAttractor,
     Loading,
@@ -523,6 +524,13 @@
       {:else if itemModels != null && itemModels.size > 0 && (!collapsed || wasLoaded || dragItemIndex !== undefined)}
         {@const HLimited = lastLevel ? limited.length : itemProj.length}
         {#if limited}
+          {#if extraHeaders && !collapsed}
+            {#each extraHeaders as header}
+              {#if typeof header === 'string' && header.endsWith('ColumnHeader')}
+                <Component is={header} props={{ ...props, value: category, _class, category: groupByKey, docs: limited, itemModels }} />
+              {/if}
+            {/each}
+          {/if}
           {#key configurationsVersion}
             {#each limited as docObject, i (docObject._id)}
               <ListItem

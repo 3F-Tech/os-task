@@ -91,135 +91,73 @@ export function issueConfig (
       label: tracker.string.Priority,
       presenter: tracker.component.PriorityEditor,
       props: { type: 'priority', kind: 'list', size: 'small' },
-      displayProps: { key: 'priority' }
-    },
-    {
-      key: '',
-      label: tracker.string.Identifier,
-      presenter: tracker.component.IssuePresenter,
-      displayProps: { key: key + 'issue', fixed: 'left' }
+      displayProps: { key: 'priority', hideLabel: true }
     },
     {
       key: '',
       label: tracker.string.Status,
       presenter: tracker.component.StatusEditor,
       props: { kind: 'list', size: 'small', justify: 'center' },
-      displayProps: { key: key + 'status' }
-    },
-    {
-      key: 'kind',
-      label: task.string.TaskType,
-      presenter: task.component.TaskTypeListPresenter,
-      props: { kind: 'list', size: 'small', justify: 'center' },
-      displayProps: { key: key + 'kind' }
+      displayProps: { key: key + 'status', hideLabel: true }
     },
     {
       key: '',
       label: tracker.string.Title,
       presenter: tracker.component.TitlePresenter,
       props: compact
-        ? { shouldUseMargin: true, showParent: false, grow: true, minWidth: '5rem' }
-        : { grow: true, minWidth: '5rem' },
+        ? { shouldUseMargin: true, showParent: false, minWidth: '5rem' }
+        : { minWidth: '5rem' },
       displayProps: { key: key + 'title' }
     },
+    { key: '', displayProps: { grow: true } },
     {
       key: '',
       label: tracker.string.SubIssues,
       presenter: tracker.component.SubIssuesSelector,
-      props: {}
+      props: { size: 'small' },
+      displayProps: { key: key + 'subIssues', compression: true, fixed: 'left', dividerBefore: true }
     },
     {
       key: '',
       label: tracker.string.ClientName,
       presenter: tracker.component.ClientNamePresenter,
-      displayProps: { key: key + 'clientName', compression: true }
+      props: { width: '8rem' },
+      displayProps: { key: key + 'clientName', compression: true, fixed: 'left', dividerBefore: true }
     },
     {
       key: '',
       label: tracker.string.ClientStage,
       presenter: tracker.component.ClientStagePresenter,
-      displayProps: { key: key + 'clientStage', compression: true }
+      props: { width: '8rem' },
+      displayProps: { key: key + 'clientStage', compression: true, fixed: 'left', dividerBefore: true }
     },
-    { key: 'comments', displayProps: { key: key + 'comments', suffix: true } },
-    { key: 'attachments', displayProps: { key: key + 'attachments', suffix: true } },
-    { key: '', displayProps: { grow: true } },
     {
       key: 'labels',
+      label: tracker.string.Labels,
       presenter: tags.component.LabelsPresenter,
-      displayProps: { compression: true },
-      props: { kind: 'list', full: false }
-    },
-    {
-      key: '',
-      label: tracker.string.Extensions,
-      presenter: tracker.component.IssueExtra,
-      displayProps: { compression: true },
-      props: { kind: 'list', full: false }
-    },
-    ...(milestone
-      ? [
-          {
-            key: '',
-            label: tracker.string.Milestone,
-            presenter: tracker.component.MilestoneEditor,
-            props: {
-              kind: 'list',
-              size: 'small',
-              shouldShowPlaceholder: false,
-              maxWidth: '30rem'
-            },
-            displayProps: {
-              key: key + 'milestone',
-              excludeByKey: 'milestone',
-              compression: true
-            }
-          }
-        ]
-      : []),
-    ...(component
-      ? [
-          {
-            key: '',
-            label: tracker.string.Component,
-            presenter: tracker.component.ComponentEditor,
-            props: {
-              kind: 'list',
-              size: 'small',
-              shouldShowPlaceholder: false,
-              maxWidth: '30rem'
-            },
-            displayProps: {
-              key: key + 'component',
-              excludeByKey: 'component',
-              compression: true
-            }
-          }
-        ]
-      : []),
-    {
-      key: '',
-      label: tracker.string.DueDate,
-      presenter: tracker.component.DueDatePresenter,
-      displayProps: { key: key + 'dueDate', compression: true },
-      props: { kind: 'list' }
+      props: { kind: 'list', full: false },
+      displayProps: { key: key + 'labels', compression: true, fixed: 'left', dividerBefore: true }
     },
     {
       key: '',
       label: tracker.string.Estimation,
       presenter: tracker.component.EstimationEditor,
       props: { kind: 'list', size: 'small' },
-      displayProps: { key: key + 'estimation', fixed: 'left', dividerBefore: true, optional: true }
+      displayProps: { key: key + 'estimation', compression: true, fixed: 'left', dividerBefore: true }
     },
     {
-      key: 'modifiedOn',
-      presenter: tracker.component.ModificationDatePresenter,
-      displayProps: { key: key + 'modified', fixed: 'left', dividerBefore: true }
-    },
-    {
-      key: 'assignee',
+      key: '',
+      label: tracker.string.Assignee,
       presenter: tracker.component.AssigneeEditor,
-      displayProps: { key: 'assignee', fixed: 'right' },
+      displayProps: { key: 'assignee', compression: true, fixed: 'left', dividerBefore: true },
       props: { kind: 'list', shouldShowName: false, avatarSize: 'x-small' }
+    },
+    {
+      key: '',
+      label: tracker.string.DueDate,
+      presenter: tracker.component.DueDatePresenter,
+      displayProps: { key: key + 'dueDate', compression: true, fixed: 'left', dividerBefore: true },
+      props: { kind: 'list' }
     }
   ]
 }
@@ -244,22 +182,19 @@ export function defineViewlets (builder: Builder): void {
       descriptor: view.viewlet.List,
       viewOptions: issuesOptions(false),
       configOptions: {
-        strict: true,
+        strict: false,
+        sortable: true,
+        customFieldsGoRight: true,
         hiddenKeys: [
-          'title',
           'blockedBy',
           'relations',
           'description',
           'number',
           'reportedTime',
           'reports',
-          'priority',
           'component',
           'milestone',
-          'estimation',
           'remainingTime',
-          'status',
-          'dueDate',
           'attachedTo',
           'createdBy',
           'modifiedBy'
@@ -294,15 +229,11 @@ export function defineViewlets (builder: Builder): void {
       viewOptions: subIssuesOptions,
       variant: 'subissue',
       configOptions: {
-        strict: true,
+        strict: false,
+        sortable: true,
         hiddenKeys: [
-          'priority',
           'number',
-          'status',
-          'title',
-          'dueDate',
           'milestone',
-          'estimation',
           'remainingTime',
           'createdBy',
           'modifiedBy'
@@ -336,15 +267,11 @@ export function defineViewlets (builder: Builder): void {
       viewOptions: milestoneIssueOptions,
       variant: 'milestone',
       configOptions: {
-        strict: true,
+        strict: false,
+        sortable: true,
         hiddenKeys: [
-          'priority',
           'number',
-          'status',
-          'title',
-          'dueDate',
           'milestone',
-          'estimation',
           'remainingTime',
           'createdBy',
           'modifiedBy'
@@ -378,15 +305,11 @@ export function defineViewlets (builder: Builder): void {
       viewOptions: componentIssueOptions,
       variant: 'component',
       configOptions: {
-        strict: true,
+        strict: false,
+        sortable: true,
         hiddenKeys: [
-          'priority',
           'number',
-          'status',
-          'title',
-          'dueDate',
           'component',
-          'estimation',
           'remainingTime',
           'createdBy',
           'modifiedBy'

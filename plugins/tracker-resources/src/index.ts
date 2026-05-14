@@ -64,6 +64,7 @@ import IssueSearchIcon from './components/issues/IssueSearchIcon.svelte'
 import IssueStatusPresenter from './components/issues/IssueStatusPresenter.svelte'
 import ClientStagePresenter from './components/issues/ClientStagePresenter.svelte'
 import ClientNamePresenter from './components/issues/ClientNamePresenter.svelte'
+import IssueColumnHeader from './components/issues/IssueColumnHeader.svelte'
 import IssuesView from './components/issues/IssuesView.svelte'
 import KanbanView from './components/issues/KanbanView.svelte'
 import ModificationDatePresenter from './components/issues/ModificationDatePresenter.svelte'
@@ -188,6 +189,9 @@ export { default as IssueStatusIcon } from './components/issues/IssueStatusIcon.
 export { default as StatusPresenter } from './components/issues/StatusPresenter.svelte'
 
 export { activeProjects, CreateProject, IssuePresenter, PriorityEditor, StatusEditor, TitlePresenter }
+
+// @ts-ignore
+IssueColumnHeader.isRowHeader = true
 
 export async function queryIssue<D extends Issue> (
   _class: Ref<Class<D>>,
@@ -496,7 +500,8 @@ export default async (): Promise<Resources> => ({
     IssueStatusPresenter,
     LabelsView,
     ClientStagePresenter,
-    ClientNamePresenter
+    ClientNamePresenter,
+    IssueColumnHeader
   },
   completion: {
     IssueQuery: async (client: Client, query: string, filter?: { in?: RelatedDocument[], nin?: RelatedDocument[] }) =>
