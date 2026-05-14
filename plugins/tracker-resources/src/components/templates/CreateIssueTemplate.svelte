@@ -20,8 +20,8 @@
   import { TaskType } from '@hcengineering/task'
   import { TaskKindSelector } from '@hcengineering/task-resources'
   import { StyledTextBox } from '@hcengineering/text-editor-resources'
-  import { Component as ComponentType, IssuePriority, IssueTemplate, Milestone, Project } from '@hcengineering/tracker'
-  import { Component, EditBox, Label } from '@hcengineering/ui'
+  import { ClientStage, Component as ComponentType, IssuePriority, IssueTemplate, Milestone, Project } from '@hcengineering/tracker'
+  import { Component, EditBox, Label, Switch } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
   import { activeComponent, activeMilestone } from '../../issues'
   import tracker from '../../plugin'
@@ -29,6 +29,8 @@
   import AssigneeEditor from '../issues/AssigneeEditor.svelte'
   import PriorityEditor from '../issues/PriorityEditor.svelte'
   import MilestoneSelector from '../milestones/MilestoneSelector.svelte'
+  import ClientStageSelector from '../issues/ClientStageSelector.svelte'
+  import PdcaCycleSection from '../issues/PdcaCycleSection.svelte'
   import ProjectPresenter from '../projects/ProjectPresenter.svelte'
   import EstimationEditor from './EstimationEditor.svelte'
   import SubIssueTemplates from './IssueTemplateChilds.svelte'
@@ -41,7 +43,6 @@
   export let relatedTo: Doc | undefined
 
   let labels: TagElement[] = []
-  let kind: Ref<TaskType> | undefined = undefined
 
   let objectId: Ref<IssueTemplate> = generateId()
   let object: Data<IssueTemplate> = {
@@ -56,7 +57,16 @@
     labels: [],
     comments: 0,
     attachments: 0,
-    relations: []
+    relations: [],
+    clientName: '',
+    clientStage: ClientStage.Onboarding,
+    pdcaCycleActive: false,
+    pdcaCycleFrequency: undefined,
+    pdcaCycleResetStatus: undefined,
+    pdcaCycleDueDays: [],
+    pdcaCycleDuplicate: false,
+    _class: tracker.class.IssueTemplate,
+    kind: undefined
   }
 
   const dispatch = createEventDispatcher()
@@ -96,8 +106,15 @@
       comments: 0,
       attachments: 0,
       labels: labels.map((it) => it._id),
-      kind,
-      relations: relatedTo !== undefined ? [{ _id: relatedTo._id, _class: relatedTo._class }] : []
+      kind: object.kind,
+      relations: relatedTo !== undefined ? [{ _id: relatedTo._id, _class: relatedTo._class }] : [],
+      clientName: getTitle(object.clientName),
+      clientStage: object.clientStage,
+      pdcaCycleActive: object.pdcaCycleActive,
+      pdcaCycleFrequency: object.pdcaCycleFrequency,
+      pdcaCycleResetStatus: object.pdcaCycleResetStatus,
+      pdcaCycleDueDays: object.pdcaCycleDueDays,
+      pdcaCycleDuplicate: object.pdcaCycleDuplicate
     }
 
     await client.createDoc(tracker.class.IssueTemplate, _space, value, objectId)
@@ -171,7 +188,7 @@
       </span>
       <TaskKindSelector
         projectType={currentProject?.type}
-        bind:value={kind}
+        bind:value={object.kind}
         baseClass={tracker.class.Issue}
         size={'small'}
       />
@@ -191,6 +208,7 @@
     bind:content={object.description}
     placeholder={tracker.string.IssueDescriptionPlaceholder}
   />
+
   <SubIssueTemplates
     bind:children={object.children}
     component={object.component}
@@ -215,6 +233,32 @@
       size={'large'}
       on:change={({ detail }) => (object.assignee = detail)}
     />
+
+    <div class="divider" />
+
+    <div class="flex-col gap-1">
+      <span class="labelOnPanel">
+        <Label label={tracker.string.ClientName} />
+      </span>
+      <EditBox bind:value={object.clientName} placeholder={tracker.string.ClientName} size="large" />
+    </div>
+
+    <div class="flex-row-center gap-4">
+      <span class="labelOnPanel">
+        <Label label={tracker.string.ClientStage} />
+      </span>
+      <ClientStageSelector
+        bind:value={object.clientStage}
+        kind={'regular'}
+        size={'large'}
+      />
+    </div>
+
+    <div class="divider" />
+    <PdcaCycleSection issue={object} />
+
+    <div class="divider" />
+
     <Component
       is={tags.component.TagsDropdownEditor}
       props={{

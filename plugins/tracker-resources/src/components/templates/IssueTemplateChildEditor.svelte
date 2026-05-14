@@ -19,16 +19,20 @@
   import { TaskKindSelector } from '@hcengineering/task-resources'
   import { StyledTextArea } from '@hcengineering/text-editor-resources'
   import {
+    ClientStage,
     Component as ComponentType,
     IssuePriority,
+    IssueTemplate,
     IssueTemplateChild,
     Milestone,
     Project
   } from '@hcengineering/tracker'
-  import { Button, Component, EditBox } from '@hcengineering/ui'
+  import { Button, Component, EditBox, ExpandCollapse, Label } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
   import tracker from '../../plugin'
   import AssigneeEditor from '../issues/AssigneeEditor.svelte'
+  import ClientStageSelector from '../issues/ClientStageSelector.svelte'
+  import PdcaCycleSection from '../issues/PdcaCycleSection.svelte'
   import PriorityEditor from '../issues/PriorityEditor.svelte'
   import EstimationEditor from './EstimationEditor.svelte'
 
@@ -70,7 +74,16 @@
       component: null,
       priority: IssuePriority.NoPriority,
       milestone,
-      estimation: 0
+      estimation: 0,
+      clientName: '',
+      clientStage: ClientStage.Onboarding,
+      pdcaCycleActive: false,
+      pdcaCycleFrequency: undefined,
+      pdcaCycleResetStatus: undefined,
+      pdcaCycleDueDays: [],
+      pdcaCycleDuplicate: false,
+      _class: tracker.class.IssueTemplate,
+      kind: undefined
     }
   }
 
@@ -153,6 +166,30 @@
           on:changeContent
         />
       {/key}
+    </div>
+    <div class="mt-2">
+      <ExpandCollapse label={tracker.string.AdditionalFields}>
+        <div class="flex-col gap-2 mt-2 pb-2">
+          <div class="flex-col gap-1">
+            <span class="labelOnPanel">
+              <Label label={tracker.string.ClientName} />
+            </span>
+            <EditBox bind:value={newIssue.clientName} placeholder={tracker.string.ClientName} />
+          </div>
+          <div class="flex-row-center gap-4">
+            <span class="labelOnPanel">
+              <Label label={tracker.string.ClientStage} />
+            </span>
+            <ClientStageSelector
+              bind:value={newIssue.clientStage}
+              kind={'regular'}
+              size={'small'}
+            />
+          </div>
+          <div class="divider mt-2" />
+          <PdcaCycleSection issue={newIssue} />
+        </div>
+      </ExpandCollapse>
     </div>
   </div>
   <div class="mt-4 flex-between items-end">

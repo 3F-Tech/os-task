@@ -28,8 +28,11 @@
     } else if (frequency === PdcaFrequency.Biweekly) {
       date.setDate(date.getDate() + 14)
       date.setHours(0, 0, 0, 0)
-    } else {
+    } else if (frequency === PdcaFrequency.Monthly) {
       date.setMonth(date.getMonth() + 1, 1)
+      date.setHours(0, 0, 0, 0)
+    } else if (frequency === PdcaFrequency.Quarterly) {
+      date.setMonth(date.getMonth() + 3, 1)
       date.setHours(0, 0, 0, 0)
     }
     return date.getTime()
@@ -61,7 +64,8 @@
   const frequencyItems: DropdownIntlItem[] = [
     { id: PdcaFrequency.Weekly, label: tracker.string.PdcaCycleWeekly },
     { id: PdcaFrequency.Biweekly, label: tracker.string.PdcaCycleBiweekly },
-    { id: PdcaFrequency.Monthly, label: tracker.string.PdcaCycleMonthly }
+    { id: PdcaFrequency.Monthly, label: tracker.string.PdcaCycleMonthly },
+    { id: PdcaFrequency.Quarterly, label: tracker.string.PdcaCycleQuarterly }
   ]
 
   // IDs as strings to avoid type mismatch in DropdownLabelsIntl
@@ -77,28 +81,51 @@
   ]
 
   async function toggleActive (val: boolean): Promise<void> {
-    if (val && issue.pdcaCycleFrequency != null && issue.pdcaCycleResetStatus != null) {
-      const nextDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency, Date.now())
-      await client.update(issue, { pdcaCycleActive: true, pdcaNextCycleDate: nextDate } as any)
+    if (issue._id && issue._class) {
+      if (val && issue.pdcaCycleFrequency != null && issue.pdcaCycleResetStatus != null) {
+        const nextDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency, Date.now())
+        await client.update(issue, { pdcaCycleActive: true, pdcaNextCycleDate: nextDate } as any)
+      } else {
+        await client.update(issue, { pdcaCycleActive: val })
+      }
     } else {
-      await client.update(issue, { pdcaCycleActive: val })
+      issue.pdcaCycleActive = val
+      if (val && issue.pdcaCycleFrequency != null && issue.pdcaCycleResetStatus != null) {
+        ;(issue as any).pdcaNextCycleDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency, Date.now())
+      }
     }
   }
 
   async function setFrequency (val: PdcaFrequency): Promise<void> {
-    await client.update(issue, { pdcaCycleFrequency: val })
+    if (issue._id && issue._class) {
+      await client.update(issue, { pdcaCycleFrequency: val })
+    } else {
+      issue.pdcaCycleFrequency = val
+    }
   }
 
   async function setResetStatus (val: Ref<IssueStatus> | undefined): Promise<void> {
-    await client.update(issue, { pdcaCycleResetStatus: val })
+    if (issue._id && issue._class) {
+      await client.update(issue, { pdcaCycleResetStatus: val } as any)
+    } else {
+      issue.pdcaCycleResetStatus = val
+    }
   }
 
   async function setDueDays (days: number[]): Promise<void> {
-    await client.update(issue, { pdcaCycleDueDays: days } as any)
+    if (issue._id && issue._class) {
+      await client.update(issue, { pdcaCycleDueDays: days } as any)
+    } else {
+      ;(issue as any).pdcaCycleDueDays = days
+    }
   }
 
   async function toggleDuplicate (val: boolean): Promise<void> {
-    await client.update(issue, { pdcaCycleDuplicate: val } as any)
+    if (issue._id && issue._class) {
+      await client.update(issue, { pdcaCycleDuplicate: val } as any)
+    } else {
+      ;(issue as any).pdcaCycleDuplicate = val
+    }
   }
 
   function openStatusPopup (event: MouseEvent): void {

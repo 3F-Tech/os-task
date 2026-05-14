@@ -358,7 +358,7 @@
     for (const label of labels ?? []) {
       allLabels.add(label)
     }
-    for (const child of children) {
+    for (const child of template.children) {
       for (const label of child.labels ?? []) {
         allLabels.add(label)
       }
@@ -572,7 +572,12 @@
         kind,
         identifier,
         clientName: getTitle((object as any).clientName),
-        clientStage: (object as any).clientStage
+        clientStage: (object as any).clientStage,
+        pdcaCycleActive: object.pdcaCycleActive,
+        pdcaCycleFrequency: object.pdcaCycleFrequency,
+        pdcaCycleResetStatus: object.pdcaCycleResetStatus,
+        pdcaCycleDueDays: object.pdcaCycleDueDays,
+        pdcaCycleDuplicate: object.pdcaCycleDuplicate
       } as any
 
       if (!isEmptyMarkup(object.description)) {

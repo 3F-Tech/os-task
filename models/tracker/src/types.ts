@@ -367,6 +367,32 @@ export class TIssueTemplate extends TDoc implements IssueTemplate {
 
   @Prop(ArrOf(TypeRef(core.class.TypeRelatedDocument)), tracker.string.RelatedTo)
     relations!: RelatedDocument[]
+
+  @Prop(TypeBoolean(), tracker.string.PdcaCycleActive)
+    pdcaCycleActive?: boolean
+
+  @Prop(TypeString(), tracker.string.PdcaCycleFrequency)
+    pdcaCycleFrequency?: PdcaFrequency
+
+  @Prop(TypeRef(tracker.class.IssueStatus), tracker.string.PdcaCycleResetStatus)
+  @Index(IndexKind.Indexed)
+    pdcaCycleResetStatus?: Ref<IssueStatus>
+
+  @Prop(ArrOf(TypeNumber()), tracker.string.PdcaDueWeekday)
+  @Hidden()
+    pdcaCycleDueDays?: number[]
+
+  @Prop(TypeBoolean(), tracker.string.PdcaDuplicate)
+  @Hidden()
+    pdcaCycleDuplicate?: boolean
+
+  @Prop(TypeString(), tracker.string.ClientName)
+  @Index(IndexKind.Indexed)
+    clientName?: string
+
+  @Prop(TypeString(), tracker.string.ClientStage)
+  @Index(IndexKind.Indexed)
+    clientStage?: ClientStage
 }
 /**
  * @public

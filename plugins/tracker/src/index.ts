@@ -56,7 +56,8 @@ export * from './analytics'
 export enum PdcaFrequency {
   Weekly = 'weekly',
   Biweekly = 'biweekly',
-  Monthly = 'monthly'
+  Monthly = 'monthly',
+  Quarterly = 'quarterly'
 }
 
 /**
@@ -303,6 +304,13 @@ export interface IssueDraft {
   attachments?: number
   labels: TagReference[]
   subIssues: IssueDraft[]
+
+  pdcaCycleActive?: boolean
+  pdcaCycleFrequency?: PdcaFrequency
+  pdcaCycleResetStatus?: Ref<IssueStatus>
+  pdcaCycleDueDays?: number[]
+  pdcaCycleDuplicate?: boolean
+
   template?: {
     // A template issue is based on
     template: Ref<IssueTemplate>
@@ -330,6 +338,15 @@ export interface IssueTemplateData {
   labels?: Ref<TagElement>[]
 
   kind?: Ref<TaskType>
+
+  pdcaCycleActive?: boolean
+  pdcaCycleFrequency?: PdcaFrequency
+  pdcaCycleResetStatus?: Ref<IssueStatus>
+  pdcaCycleDueDays?: number[]
+  pdcaCycleDuplicate?: boolean
+
+  clientName?: string
+  clientStage?: ClientStage
 }
 
 /**

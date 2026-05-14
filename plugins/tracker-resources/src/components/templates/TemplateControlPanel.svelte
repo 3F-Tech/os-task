@@ -24,6 +24,8 @@
   import tracker from '../../plugin'
   import ComponentEditor from '../components/ComponentEditor.svelte'
   import AssigneeEditor from '../issues/AssigneeEditor.svelte'
+  import ClientStageSelector from '../issues/ClientStageSelector.svelte'
+  import PdcaCycleSection from '../issues/PdcaCycleSection.svelte'
   import PriorityEditor from '../issues/PriorityEditor.svelte'
   import MilestoneEditor from '../milestones/MilestoneEditor.svelte'
 
@@ -40,7 +42,24 @@
     keys = filtredKeys.filter((key) => !isCollectionAttr(hierarchy, key))
   }
 
-  $: updateKeys(['title', 'description', 'priority', 'number', 'assignee', 'component', 'milestone', 'kind'])
+  $: updateKeys([
+    'title',
+    'description',
+    'priority',
+    'number',
+    'assignee',
+    'component',
+    'milestone',
+    'kind',
+    'pdcaCycleActive',
+    'pdcaCycleFrequency',
+    'pdcaCycleResetStatus',
+    'pdcaNextCycleDate',
+    'pdcaCycleDueDays',
+    'pdcaCycleDuplicate',
+    'clientName',
+    'clientStage'
+  ])
 
   const key: KeyedAttribute = {
     key: 'labels',
@@ -100,6 +119,28 @@
   </span>
   <AssigneeEditor object={issue} size={'medium'} width="100%" />
 
+  <div class="divider" />
+
+  <AttributeBarEditor
+    key={'clientName'}
+    _class={issue._class}
+    object={issue}
+    showHeader={true}
+    size={'medium'}
+  />
+
+  <span class="labelOnPanel">
+    <Label label={tracker.string.ClientStage} />
+  </span>
+  <ClientStageSelector
+    bind:value={issue.clientStage}
+    kind={'regular'}
+    size={'small'}
+    on:change={({ detail }) => {
+      void client.update(issue, { clientStage: detail })
+    }}
+  />
+
   <span class="labelTop">
     <Label label={tracker.string.Labels} />
   </span>
@@ -135,6 +176,9 @@
     </span>
     <MilestoneEditor value={issue} size={'medium'} />
   {/if}
+
+  <div class="divider" />
+  <PdcaCycleSection {issue} />
 
   {#if keys.length > 0}
     <div class="divider" />
