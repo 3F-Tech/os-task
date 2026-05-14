@@ -412,18 +412,6 @@ function defineApplication (
                 }
               },
               {
-                id: opt.componentsId,
-                label: tracker.string.Components,
-                icon: tracker.icon.Components,
-                component: tracker.component.ProjectComponents
-              },
-              {
-                id: opt.milestonesId,
-                label: tracker.string.Milestones,
-                icon: tracker.icon.Milestone,
-                component: tracker.component.Milestones
-              },
-              {
                 id: opt.templatesId,
                 label: tracker.string.IssueTemplates,
                 icon: tracker.icon.IssueTemplates,

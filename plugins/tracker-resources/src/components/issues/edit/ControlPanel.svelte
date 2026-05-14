@@ -229,19 +229,19 @@
     props={{ object: issue, label: tracker.string.AddLabel, readonly }}
   />
 
-  <div class="divider" />
+  <!-- <div class="divider" /> -->
 
-  <span class="labelOnPanel">
+  <!-- <span class="labelOnPanel">
     <Label label={tracker.string.Component} />
   </span>
-  <ComponentEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} />
+  <ComponentEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} /> -->
 
-  <span class="labelOnPanel">
+  <!-- <span class="labelOnPanel">
     <Label label={tracker.string.Milestone} />
   </span>
-  <MilestoneEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} />
+  <MilestoneEditor value={issue} space={issue.space} size={'medium'} isEditable={!readonly} /> -->
 
-  <div class="divider" />
+  <!-- <div class="divider" /> -->
 
   <span class="labelOnPanel">
     <Label label={tracker.string.DueDate} />
