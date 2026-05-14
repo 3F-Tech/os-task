@@ -1,4 +1,4 @@
-# Regras para Agentes — 3F Hub
+# Regras para Agentes — 3F Tasks
 
 Guia obrigatório para qualquer agente que vá fazer alterações no repositório `huly-3f`. Leia antes de tocar em qualquer arquivo.
 
@@ -8,7 +8,7 @@ Guia obrigatório para qualquer agente que vá fazer alterações no repositóri
 
 | Item | Valor |
 |---|---|
-| Projeto | Fork customizado do Huly para uso interno da 3F Venture |
+| Projeto | 3F Tasks — Fork customizado da plataforma Huly para uso interno da 3F Venture |
 | Upstream | https://github.com/hcengineering/platform |
 | Repositório | https://github.com/3F-Tech/huly-3f |
 | Branch principal | `develop` |
@@ -273,7 +273,7 @@ docker compose -f dev/docker-compose.yaml ps
 ## 10. Sincronização com upstream
 
 ```bash
-# Buscar atualizações do Huly original
+# Buscar atualizações da plataforma Huly original
 git fetch upstream
 
 # Ver o que tem de novo (só commits reais, sem merges/bumps)

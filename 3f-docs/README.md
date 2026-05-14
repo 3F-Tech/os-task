@@ -1,6 +1,6 @@
-# 3F Docs — Documentação Interna do 3F Hub
+# 3F Docs — Documentação Interna do 3F Tasks
 
-Documentação das features customizadas desenvolvidas no fork do Huly para uso interno da 3F Venture.
+Documentação das features customizadas desenvolvidas no fork do 3F Tasks (baseado em Huly) para uso interno da 3F Venture.
 
 ## Estrutura
 

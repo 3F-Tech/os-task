@@ -1,8 +1,8 @@
-# Guia de Desenvolvimento — 3F Hub
+# Guia de Desenvolvimento — 3F Tasks
 
 ## Pré-requisitos
 
-- Docker Desktop rodando com os containers do Huly ativos em `localhost:7000`
+- Docker Desktop rodando com os containers do 3F Tasks ativos em `localhost:7000`
 - Rush instalado globalmente (`npm install -g @microsoft/rush`)
 - Node.js 20+
 

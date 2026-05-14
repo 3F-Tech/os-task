@@ -1,4 +1,4 @@
-# Testes das Features Desenvolvidas — 3F Hub
+# Testes das Features Desenvolvidas — 3F Tasks
 
 > **Ambiente:** http://localhost:7000  
 > **Usuário de teste:** pedrobartelle@3fventure.com.br (Owner)  

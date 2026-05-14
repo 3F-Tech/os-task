@@ -1,9 +1,9 @@
-# 3F Hub — CLAUDE.md
+# 3F Tasks — CLAUDE.md
 
 ## Visão Geral do Projeto
 
 Fork customizado do Huly (https://github.com/hcengineering/platform)
-para uso interno da 3F Venture. O objetivo é substituir o ClickUp como
+para uso interno da 3F Venture, renomeado como 3F Tasks. O objetivo é substituir o ClickUp como
 plataforma de gestão, com customizações próprias desenvolvidas em cima
 da base open source.
 
@@ -102,7 +102,7 @@ reconverger esses campos.
 
 ## Terminologia do Projeto
 
-| Huly original | 3F Hub |
+| 3F Tasks (Huly original) | 3F Tasks (customizado) |
 |---|---|
 | Issue | Tarefa |
 | Sub-issue | Subtarefa |
@@ -195,7 +195,7 @@ Task Types → Padrão → Propriedades
 | Prioridade | Lista | Sim | Baixa / Média / Alta / Urgente |
 | Responsável | Conta | Sim | Dispara notificação no Planner |
 | Start date | Data | Sim | Preenchida automaticamente na criação (A DESENVOLVER) |
-| Due date | Data | Sim | Nativo no Huly |
+| Due date | Data | Sim | Nativo no 3F Tasks |
 | Data de Finalização | Data | Sim | Preenchida automaticamente ao status Finalizado (A DESENVOLVER) |
 | Estimation | Número | Sim | Lançado na criação pelo admin |
 | Spent time | Número | Sim | Obrigatório antes de finalizar |
@@ -218,7 +218,7 @@ Uma issue NÃO pode ser marcada como finalizada sem que:
 Configurável por projeto — cada Space Type define quais campos
 são obrigatórios para ir para o status Done.
 
-Implementação: regra nativa no frontend + backend do Huly.
+Implementação: regra nativa no frontend + backend do 3F Tasks.
 **Branch:** `feature/issue-completion-validation`
 
 ### Datas automáticas por trigger (A DESENVOLVER)
@@ -227,7 +227,7 @@ Implementação: regra nativa no frontend + backend do Huly.
 - **Data de Finalização:** preenchida automaticamente quando
   o status muda para o estado Done do projeto
 
-Implementação: trigger nativo no sistema de transações do Huly.
+Implementação: trigger nativo no sistema de transações do 3F Tasks.
 **Branch:** `feature/automatic-dates`
 
 ### Ciclo PDCA (A DESENVOLVER)
@@ -243,7 +243,7 @@ Nomenclatura da issue gerada:
 `[CLIENTE] Ciclo PDCA de Comunicação — Semana 18`
 
 Implementação: módulo nativo dentro do Tracker, estendendo
-o sistema de automações existente do Huly.
+o sistema de automações existente do 3F Tasks.
 **Branch:** `feature/pdca-cycle`
 
 ---

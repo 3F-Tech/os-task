@@ -1,8 +1,8 @@
-# Huly Platform Architecture Overview
+# 3F Tasks Platform Architecture Overview
 
 ## Service Overview
 
-The Huly platform consists of **30+ microservices** working together in a distributed architecture. Services are organized into functional layers for core business logic, data storage, real-time communication, media processing, and supporting features.
+3F Tasks (based on the Huly platform) consists of **30+ microservices** working together in a distributed architecture. Services are organized into functional layers for core business logic, data storage, real-time communication, media processing, and supporting features.
 
 ### Core Backend Services
 
@@ -67,7 +67,7 @@ The Huly platform consists of **30+ microservices** working together in a distri
 
 | Service | Port | Description |
 |---------|------|-------------|
-| **front** | 8087/8088 | Web application server. Serves the Huly UI, handles static assets and client-side routing. |
+| **front** | 8087/8088 | Web application server. Serves the 3F Tasks UI, handles static assets and client-side routing. |
 
 ### Infrastructure (Databases & Message Queues)
 

@@ -1,6 +1,6 @@
-# Deploy 3F Hub na VPS
+# Deploy 3F Tasks na VPS
 
-> Guia completo para subir o 3F Hub (fork customizado do Huly) em uma VPS Linux.
+> Guia completo para subir o 3F Tasks (fork customizado da plataforma Huly) em uma VPS Linux.
 
 ---
 
@@ -18,7 +18,7 @@
 
 ## Visão Geral da Estratégia
 
-O frontend e o account service são **imagens base do Huly com bundles customizados injetados via volume mount**. Isso significa que você não precisa buildar as imagens Docker do zero — basta:
+O frontend e o account service são **imagens base do Huly com bundles customizados do 3F Tasks injetados via volume mount**. Isso significa que você não precisa buildar as imagens Docker do zero — basta:
 
 1. **Buildar localmente** (na sua máquina Windows)
 2. **Enviar os artefatos** compilados para a VPS via rsync/scp

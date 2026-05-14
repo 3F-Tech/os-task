@@ -1,4 +1,4 @@
-# Huly Platform
+# 3F Tasks (Huly Platform Fork)
 
 [![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/huly_io?style=for-the-badge)](https://x.com/huly_io)
 ![GitHub License](https://img.shields.io/github/license/hcengineering/platform?style=for-the-badge)
@@ -7,15 +7,15 @@
 
 ## About
 
-The Huly Platform is a robust framework designed to accelerate the development of business applications, such as CRM systems.
-This repository includes several applications, such as Chat, Project Management, CRM, HRM, and ATS.
-Various teams are building products on top of the Platform, including [Huly](https://huly.io) and [TraceX](https://tracex.co).
+3F Tasks is a customized fork of the Huly Platform, a robust framework designed to accelerate the development of business applications, such as CRM systems.
+This customized version is tailored for 3F Venture's internal use and includes proprietary extensions for project management and tracking.
+The original Huly Platform and related projects can be found at [Huly](https://huly.io) and [TraceX](https://tracex.co).
 
 ![Huly](https://repository-images.githubusercontent.com/392073243/6d27d5cc-38cd-4d88-affe-bb88b393180c)
 
 ## Self-Hosting
 
-If you're primarily interested in self-hosting Huly without the intention to modify or contribute to its development, please use [huly-selfhost](https://github.com/hcengineering/huly-selfhost).
+3F Tasks is a customized version of Huly for internal use at 3F Venture. For the original Huly platform, if you're primarily interested in self-hosting Huly without the intention to modify or contribute to its development, please use [huly-selfhost](https://github.com/hcengineering/huly-selfhost).
 This project offers a convenient method to host Huly using `docker`, designed for ease of use and quick setup. Explore this option to effortlessly enjoy Huly on your own server.
 
 ## Activity
@@ -24,7 +24,7 @@ This project offers a convenient method to host Huly using `docker`, designed fo
 
 ## API Client
 
-If you want to interact with Huly programmatically, check out our [API Client](https://github.com/hcengineering/huly.core/tree/main/packages/api-client) documentation. The API client provides a typed interface for all Huly operations and can be used to build integrations and custom applications.
+If you want to interact with 3F Tasks programmatically, check out our [API Client](https://github.com/hcengineering/huly.core/tree/main/packages/api-client) documentation. The API client provides a typed interface for all 3F Tasks operations and can be used to build integrations and custom applications.
 
 You can find API usage examples in the [Huly examples](https://github.com/hcengineering/huly-examples) repository.
 
@@ -34,7 +34,7 @@ For detailed information about changes, improvements, and bug fixes in each vers
 
 ## Versions
 
-The Huly Platform uses two types of version tags to distinguish between production-ready and development releases:
+3F Tasks uses two types of version tags to distinguish between production-ready and development releases:
 
 - **Production Versions (`v*`)** - Stable releases for end users
   - Example: `v0.7.310`, `v0.7.307`, `v0.6.501`
@@ -54,7 +54,7 @@ For detailed information about the platform architecture, services, and their in
 
 ## Table of Contents
 
-- [Huly Platform](#huly-platform)
+- [3F Tasks (Huly Platform Fork)](#3f-tasks-huly-platform-fork)
   - [About](#about)
   - [Self-Hosting](#self-hosting)
   - [Activity](#activity)

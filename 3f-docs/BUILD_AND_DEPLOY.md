@@ -1,4 +1,4 @@
-# 3F Hub — Build, Deploy e Troubleshooting
+# 3F Tasks — Build, Deploy e Troubleshooting
 
 Guia técnico completo para build, deploy na VPS e resolução de problemas.
 Escrito para agentes IA ou desenvolvedores que precisam diagnosticar falhas.
@@ -7,7 +7,7 @@ Escrito para agentes IA ou desenvolvedores que precisam diagnosticar falhas.
 
 ## 1. Arquitetura de Versionamento
 
-O Huly usa **dois números de versão distintos e independentes**:
+O 3F Tasks usa **dois números de versão distintos e independentes**:
 
 | Variável | O que representa | Fonte | Onde aparece |
 |---|---|---|---|
