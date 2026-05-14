@@ -247,7 +247,7 @@ services:
       - STATS_URL=http://stats:4900
       - FILES_URL=http://localhost:4030/blob/:workspace/:blobId/:filename
       - UPLOAD_URL=/files
-      - PREVIEW_URL=http://localhost:4040
+      # - PREVIEW_URL=http://localhost:4040
       - GMAIL_URL=http://localhost:8093
       - CALENDAR_URL=http://localhost:8095
       - TELEGRAM_URL=http://localhost:8086
