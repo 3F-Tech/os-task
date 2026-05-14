@@ -57,9 +57,10 @@ export function getFileUrl (file: string, filename?: string): string {
   }
 
   const workspace = getCurrentWorkspaceUuid()
+  const token = getToken()
 
   const storage = getFileStorage()
-  return storage.getFileUrl(workspace, file, filename)
+  return storage.getFileUrl(workspace, file, filename, token)
 }
 
 /** @public */

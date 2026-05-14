@@ -72,17 +72,20 @@ function blobToSrcSet (blob: Ref<Blob>, width: number | undefined, height: numbe
     }
   }
 
+  const token = getMetadata(presentation.metadata.Token) ?? ''
+  const tokenSuffix = token !== '' ? `&token=${encodeURIComponent(token)}` : ''
+
   const frontUrl = getMetadata(presentation.metadata.FrontUrl) ?? window.location.origin
   const url = concatLink(frontUrl, frontImagePreviewUrl).replaceAll(':workspace', workspace).replaceAll(':blobId', name)
 
   let result = ''
   if (width !== undefined) {
     result +=
-      formatImageSize(url, width, height ?? width, 1) +
+      formatImageSize(url, width, height ?? width, 1) + tokenSuffix +
       ' 1x , ' +
-      formatImageSize(url, width, height ?? width, 2) +
+      formatImageSize(url, width, height ?? width, 2) + tokenSuffix +
       ' 2x, ' +
-      formatImageSize(url, width, height ?? width, 3) +
+      formatImageSize(url, width, height ?? width, 3) + tokenSuffix +
       ' 3x'
   }
 

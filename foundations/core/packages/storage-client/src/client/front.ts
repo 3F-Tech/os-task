@@ -26,13 +26,13 @@ const getPathname = (url: string): string => {
 export class FrontStorage implements FileStorage {
   constructor (private readonly baseUrl: string) {}
 
-  getFileUrl (workspace: string, file: string, filename?: string): string {
-    const path = `/${workspace}/${filename ?? file}?file=${file}&workspace=${workspace}`
+  getFileUrl (workspace: string, file: string, filename?: string, token?: string): string {
+    const path = `/${workspace}/${filename ?? file}?file=${file}&workspace=${workspace}${token ? `&token=${token}` : ''}`
     return concatLink(this.baseUrl, path)
   }
 
   getCookiePath (workspace: string): string {
-    const url = concatLink(this.baseUrl, `/${workspace}`)
+    const url = concatLink(this.baseUrl, `/files/${workspace}`)
     return getPathname(url)
   }
 

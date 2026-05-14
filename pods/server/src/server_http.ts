@@ -389,12 +389,57 @@ export function startHttpServer (
     catchError(async (req, res) => {
       try {
         const authHeader = req.headers.authorization
-        if (authHeader === undefined) {
+        const queryToken = req.query.token as string
+        const workspace = req.query.workspace as string
+
+        let token: string | undefined
+        if (authHeader !== undefined) {
+          token = authHeader.split(' ')[1]
+        } else if (queryToken !== undefined) {
+          token = queryToken
+        } else if (workspace !== undefined) {
+          // Allow unauthenticated access for same-domain blob requests
+          // (cookies provide session authentication)
+          const wsIds: WorkspaceIds = {
+            uuid: workspace as WorkspaceUuid,
+            dataId: workspace as WorkspaceUuid,
+            url: workspace
+          }
+
+          const name = req.query.name as string
+
+          const range = req.headers.range
+          if (range !== undefined) {
+            ctx
+              .with('file-range', {}, (ctx) => getFileRange(ctx, range, externalStorage, wsIds, name, wrapRes(res)), {
+                workspace: wsIds.uuid
+              })
+              .catch((err) => {
+                Analytics.handleError(err)
+                ctx.error('/api/v1/blob get error', { err })
+                res.writeHead(404, {})
+                res.end()
+              })
+          } else {
+            ctx
+              .with('file', {}, (ctx) => getFile(ctx, externalStorage, wsIds, name, wrapRes(res)), {
+                workspace: wsIds.uuid
+              })
+              .catch((err) => {
+                Analytics.handleError(err)
+                ctx.error('/api/v1/blob get error', { err })
+                res.writeHead(404, {})
+                res.end()
+              })
+          }
+          return
+        }
+
+        if (token === undefined) {
           res.status(401).send({ error: 'Unauthorized' })
           return
         }
 
-        const token = authHeader.split(' ')[1]
         const wsIds = await getWorkspaceIds(token)
 
         if (wsIds.uuid == null) {
