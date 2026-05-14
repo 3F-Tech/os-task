@@ -21,9 +21,13 @@
   const wsSettingQuery = createQuery()
 
   let workspaceSetting: WorkspaceSetting | undefined = undefined
+
   wsSettingQuery.query(setting.class.WorkspaceSetting, {}, (res) => {
-    workspaceSetting = res[0]
+    if (res && res.length > 0) {
+      workspaceSetting = res[0]
+    }
   })
+
   $: url = workspaceSetting?.icon != null ? getFileUrl(workspaceSetting.icon) : undefined
   $: srcset = workspaceSetting?.icon != null ? getFileSrcSet(workspaceSetting.icon, 128) : undefined
 </script>

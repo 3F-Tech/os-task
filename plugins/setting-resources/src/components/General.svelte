@@ -115,22 +115,20 @@
 
   async function handleAvatarDone (): Promise<void> {
     const existing = await client.findOne(settingsRes.class.WorkspaceSetting, { _id: settingsRes.ids.WorkspaceSetting })
+    const avatar = await avatarEditor.createAvatar()
+    const icon = avatar.avatarType === AvatarType.IMAGE ? avatar.avatar : null
+
     if (existing !== undefined) {
-      const avatar = await avatarEditor.createAvatar()
       // Remove old avatar if changed
-      if (existing.icon != null && existing.icon !== avatar.avatar) {
+      if (existing.icon != null && existing.icon !== icon) {
         await avatarEditor.removeAvatar(existing.icon)
       }
-
-      const icon = avatar.avatarType === AvatarType.IMAGE ? avatar.avatar : null
       await client.diffUpdate(existing, { icon })
     } else {
-      const avatar = await avatarEditor.createAvatar()
-
       await client.createDoc(
         settingsRes.class.WorkspaceSetting,
         core.space.Workspace,
-        { icon: avatar.avatar },
+        { icon },
         settingsRes.ids.WorkspaceSetting
       )
     }
