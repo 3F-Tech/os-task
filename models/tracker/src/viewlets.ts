@@ -384,13 +384,20 @@ export function defineViewlets (builder: Builder): void {
         },
         {
           key: '',
+          label: tracker.string.ClientStage,
+          presenter: tracker.component.ClientStagePresenter,
+          props: { width: '8rem' },
+          displayProps: { key: 'clientStage', compression: true, fixed: 'left', dividerBefore: true }
+        },
+        {
+          key: '',
           label: tracker.string.Estimation,
           presenter: tracker.component.TemplateEstimationEditor,
           props: {
             kind: 'list',
             size: 'small'
           },
-          displayProps: { key: 'estimation', compression: true }
+          displayProps: { key: 'estimation', compression: true, dividerBefore: true }
         },
         { key: '', displayProps: { grow: true } },
         {
