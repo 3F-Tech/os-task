@@ -251,6 +251,8 @@ services:
       - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
       - LINK_PREVIEW_URL=http://link-preview:4041
+      - LOVE_ENDPOINT=https://3ftasks.3fventure.tech/_love
+      - LIVEKIT_WS=wss://3ftasks.3fventure.tech/_livekit
     restart: unless-stopped
   transactor_cockroach:
     image: hardcoreeng/transactor:3f-local
@@ -513,7 +515,69 @@ services:
       - WATCH_URL=https://3ftasks.3fventure.tech/_calendar
       - SERVICE_ID=calendar-service
     restart: unless-stopped
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    depends_on:
+      redis:
+        condition: service_started
+    command:
+      - --config
+      - /etc/livekit.yaml
+      - --keys
+      - "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml
+    ports:
+      - 7880:7880
+      - 7881:7881
+      - 50000-50100:50000-50100/udp
+    restart: unless-stopped
+  livekit-egress:
+    image: livekit/egress:latest
+    container_name: livekit-egress
+    depends_on:
+      redis:
+        condition: service_started
+      livekit:
+        condition: service_started
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress.yaml
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+    volumes:
+      - ./livekit/egress.yaml:/etc/egress.yaml
+      - livekit_egress_tmp:/tmp/livekit-egress
+    restart: unless-stopped
+  love:
+    image: hardcoreeng/love:v0.7.413
+    depends_on:
+      account:
+        condition: service_started
+      livekit:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    ports:
+      - 8097:8097
+    environment:
+      - PORT=8097
+      - SECRET=secret
+      - SERVICE_ID=love-service
+      - ACCOUNTS_URL=http://account:3000
+      - LIVEKIT_HOST=http://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - STORAGE_PROVIDER_NAME=datalake
+      - S3_STORAGE_CONFIG=s3|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin&region=local&rootBucket=recordings
+      - RECORDING_PRESET=720p
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+    restart: unless-stopped
 volumes:
   db:
   dbpg:
   telemetry:
+  livekit_egress_tmp:
