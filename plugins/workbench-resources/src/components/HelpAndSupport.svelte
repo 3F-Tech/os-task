@@ -13,13 +13,11 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { Asset, getMetadata, IntlString } from '@hcengineering/platform'
+  import { Asset, IntlString } from '@hcengineering/platform'
   import { getClient } from '@hcengineering/presentation'
   import setting, { settingId } from '@hcengineering/setting'
-  import support from '@hcengineering/support'
   import {
     AnySvelteComponent,
-    Button,
     Icon,
     IconArrowLeft,
     Label,
@@ -35,7 +33,6 @@
   import view, { Action, ActionCategory } from '@hcengineering/view'
   import workbench from '../plugin'
   import RightArrowIcon from './icons/Collapsed.svelte'
-  import DocumentationIcon from './icons/Documentation.svelte'
   import KeyboardIcon from './icons/Keyboard.svelte'
   import { WorkbenchEvents } from '@hcengineering/workbench'
   import { Analytics } from '@hcengineering/analytics'
@@ -90,15 +87,6 @@
   }
 
   const cards: HelpCard[] = [
-    {
-      icon: DocumentationIcon,
-      title: workbench.string.Documentation,
-      description: workbench.string.OpenPlatformGuide,
-      onClick: () => {
-        window.open(getMetadata(support.metadata.DocsLink), '_blank')
-        Analytics.handleEvent(WorkbenchEvents.DocumentationOpened)
-      }
-    },
     {
       icon: view.icon.Setting,
       title: setting.string.Settings,
@@ -202,23 +190,6 @@
       </ListView>
     </Scroller>
   {/if}
-  <div class="footer">
-    <a href={getMetadata(support.metadata.PrivacyPolicyLink)} target="_blank">
-      <Button id="privacy-policy" kind={'ghost'} label={support.string.PrivacyPolicy} stopPropagation={false} />
-    </a>
-    <a href={getMetadata(support.metadata.ReportBugLink)} target="_blank">
-      <Button id="report-a-bug" kind={'primary'} label={support.string.ReportBug} stopPropagation={false} />
-    </a>
-    <a href={getMetadata(support.metadata.SupportLink)} target="_blank">
-      <Button
-        id="contact-us"
-        icon={support.icon.Support}
-        kind={'ghost'}
-        label={support.string.ContactUs}
-        stopPropagation={false}
-      />
-    </a>
-  </div>
 </div>
 
 <style lang="scss">
@@ -239,14 +210,6 @@
   }
   .rightIcon {
     align-self: center;
-  }
-  .footer {
-    display: flex;
-    justify-content: flex-end;
-    align-items: flex-end;
-    margin: 0 0.5rem 0.5rem;
-    padding-top: 0.625rem;
-    gap: 0.25rem;
   }
   .key-box {
     padding: 0 0.5rem;
