@@ -54,7 +54,7 @@ export const issuesOptions = (kanban: boolean): ViewOptionsModel => ({
     {
       key: 'shouldShowSubIssues',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
       actionTarget: 'query',
       action: tracker.function.SubIssueQuery,
       label: tracker.string.SubIssues

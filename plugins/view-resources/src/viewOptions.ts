@@ -97,7 +97,32 @@ export function getViewOptions (
   return defaults
 }
 
+// 3F — Sentinel para migrações one-shot de view options.
+// Cada migração é identificada por uma chave dentro deste objeto JSON;
+// quando presente significa que já rodou nesse navegador/usuário e não roda mais.
+const VIEW_OPTIONS_MIGRATIONS_KEY = '3f:viewOptionsMigrations'
+
+function getMigrationsState (): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(VIEW_OPTIONS_MIGRATIONS_KEY)
+    return raw !== null ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function markMigrationDone (id: string): void {
+  const state = getMigrationsState()
+  state[id] = true
+  localStorage.setItem(VIEW_OPTIONS_MIGRATIONS_KEY, JSON.stringify(state))
+}
+
 export function migrateViewOpttions (): void {
+  const migrationsState = getMigrationsState()
+  // 3F — força "Sub-tarefas" como desativado nas views existentes (one-shot por navegador).
+  const disableSubIssuesMigration = '3f-disable-sub-issues-default-2026-05'
+  const applyDisableSubIssues = migrationsState[disableSubIssuesMigration] !== true
+
   for (let index = 0; index < localStorage.length; index++) {
     const key = localStorage.key(index)
     if (key === null) continue
@@ -124,7 +149,14 @@ export function migrateViewOpttions (): void {
     if (res.orderBy[0] === 'doneState') {
       res.orderBy[0] = 'status'
     }
+    if (applyDisableSubIssues && 'shouldShowSubIssues' in res) {
+      ;(res as Record<string, unknown>).shouldShowSubIssues = false
+    }
     localStorage.setItem(key, JSON.stringify(res))
+  }
+
+  if (applyDisableSubIssues) {
+    markMigrationDone(disableSubIssuesMigration)
   }
 }
 
