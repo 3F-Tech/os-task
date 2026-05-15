@@ -246,7 +246,7 @@ services:
       - BACKUP_URL=http://backup-api:4039/api/backup,
       - EXCLUDED_APPLICATIONS_FOR_ANONYMOUS=[]
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-      # PULSE_URL: hulypulse not yet available
+      - PULSE_URL=wss://3ftasks.3fventure.tech/_pulse/ws
       - DATALAKE_URL=https://3ftasks.3fventure.tech/files
       - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
@@ -436,7 +436,18 @@ services:
   # hulylake: disabled — hardcoreeng/hulylake (Rust) not yet published to Docker Hub
   # hulykvs: disabled — hardcoreeng/hulykvs not yet published to Docker Hub
   # hulygun: disabled — hardcoreeng/hulygun not yet published to Docker Hub
-  # hulypulse: disabled — hardcoreeng/hulypulse not yet published to Docker Hub
+  hulypulse:
+    image: hardcoreeng/hulypulse:v0.7.423
+    container_name: hulypulse
+    depends_on:
+      redis:
+        condition: service_started
+    ports:
+      - 8099:8099
+    environment:
+      - HULY_REDIS_URLS=redis://redis:6379
+      - HULY_BIND_PORT=8099
+    restart: unless-stopped
   # process-service: disabled — hardcoreeng/process not yet published to Docker Hub
   # time-machine: disabled — hardcoreeng/worker not yet published; rebuild from local with: ./3f-build.sh --pod worker
   backup-cockroach:
@@ -572,8 +583,10 @@ services:
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - STORAGE_PROVIDER_NAME=datalake
-      - S3_STORAGE_CONFIG=s3|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin&region=local&rootBucket=recordings
-      - RECORDING_PRESET=720p
+      # Gravação desativada — VPS atual tem 2 cores e o livekit-egress exige mínimo 3.
+      # Reativar quando a VPS for upgrade para 4+ cores:
+      # - S3_STORAGE_CONFIG=s3|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin&region=local&rootBucket=recordings
+      # - RECORDING_PRESET=720p
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
 volumes:
