@@ -309,7 +309,26 @@
     "MissingEstimation": "Estimativa não preenchida",
     "OpenSubtasksBlocking": "{count} subtarefa(s) não concluída(s)",
     "MissingCompletedDate": "Data de finalização não preenchida",
-    "ConfigureCompletionRules": "Configurar regras de conclusão"
+    "ConfigureCompletionRules": "Configurar regras de conclusão",
+    "AutomationScripts": "Scripts de Automação",
+    "AutomationScriptsDescription": "Execute scripts de automação diretamente pela interface.",
+    "ClientOnboarding": "Onboarding de Clientes",
+    "ClientOnboardingDescription": "Crie automaticamente todas as tarefas de onboarding nos projetos da BU para um novo cliente.",
+    "NewClientOnboarding": "Novo Onboarding",
+    "ClientNamePlaceholder": "Ex: Empresa XYZ",
+    "BusinessUnit": "Unidade de Negócio",
+    "BuSeed": "Seed",
+    "BuImpulse": "Impulse",
+    "BuBomma": "Bomma",
+    "SocialMediaVariant": "Modalidade",
+    "WithSocialMedia": "Com Social Media",
+    "WithoutSocialMedia": "Sem Social Media",
+    "StartOnboarding": "Iniciar Onboarding",
+    "OnboardingSuccess": "Onboarding concluído",
+    "OnboardingProgress": "Progresso",
+    "OnboardingHistorySession": "Histórico (sessão atual)",
+    "OnboardingHistoryEmpty": "Nenhum onboarding executado nesta sessão.",
+    "OnboardingTasksCount": "tarefas"
   },
   "status": {}
 }

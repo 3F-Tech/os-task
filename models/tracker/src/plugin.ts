@@ -61,7 +61,8 @@ export default mergeIds(trackerId, tracker, {
     MembersArrayEditor: '' as AnyComponent,
     IssueExtra: '' as AnyComponent,
     SettingsCompletionRules: '' as AnyComponent,
-    EditCompletionRules: '' as AnyComponent
+    EditCompletionRules: '' as AnyComponent,
+    AutomationScriptsPage: '' as AnyComponent
   },
   app: {
     Tracker: '' as Ref<Application>

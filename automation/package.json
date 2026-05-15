@@ -1,0 +1,26 @@
+{
+  "name": "3f-automation",
+  "version": "1.0.0",
+  "description": "Scripts de automação para o 3F Hub",
+  "main": "onboard.ts",
+  "scripts": {
+    "onboard": "tsx onboard.ts",
+    "onboard-seed": "tsx Seed/onboard-seed.ts",
+    "onboard-bomma": "tsx Bomma/onboard-bomma.ts",
+    "onboard-impulse": "tsx Impulse/onboard-impulse.ts",
+    "list-projects": "tsx list-projects.ts",
+    "list-templates-by-project": "tsx list-templates-by-project.ts",
+    "get-id": "tsx extract-id.ts",
+    "list-templates": "tsx list-templates.ts",
+    "fix-issues": "tsx fix-issues.ts",
+    "delete-test-issues": "tsx delete-test-issues.ts",
+    "debug-task": "tsx debug-task.ts",
+    "debug-template": "tsx debug-template.ts"
+  },
+  "dependencies": {
+    "@hcengineering/api-client": "file:../foundations/core/packages/api-client",
+    "@hcengineering/tracker": "file:../plugins/tracker",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.10.1"
+  }
+}

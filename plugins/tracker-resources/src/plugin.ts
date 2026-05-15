@@ -316,7 +316,27 @@ export default mergeIds(trackerId, tracker, {
     UnsetParent: '' as IntlString,
     PreviousAssigned: '' as IntlString,
     EditRelatedTargets: '' as IntlString,
-    RelatedIssueTargetDescription: '' as IntlString
+    RelatedIssueTargetDescription: '' as IntlString,
+
+    AutomationScripts: '' as IntlString,
+    AutomationScriptsDescription: '' as IntlString,
+    ClientOnboarding: '' as IntlString,
+    ClientOnboardingDescription: '' as IntlString,
+    NewClientOnboarding: '' as IntlString,
+    ClientNamePlaceholder: '' as IntlString,
+    BusinessUnit: '' as IntlString,
+    BuSeed: '' as IntlString,
+    BuImpulse: '' as IntlString,
+    BuBomma: '' as IntlString,
+    SocialMediaVariant: '' as IntlString,
+    WithSocialMedia: '' as IntlString,
+    WithoutSocialMedia: '' as IntlString,
+    StartOnboarding: '' as IntlString,
+    OnboardingSuccess: '' as IntlString,
+    OnboardingProgress: '' as IntlString,
+    OnboardingHistorySession: '' as IntlString,
+    OnboardingHistoryEmpty: '' as IntlString,
+    OnboardingTasksCount: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,

@@ -94,6 +94,7 @@ import SetParentIssueActionPopup from './components/SetParentIssueActionPopup.sv
 import SettingsRelatedTargets from './components/SettingsRelatedTargets.svelte'
 import SettingsCompletionRules from './components/SettingsCompletionRules.svelte'
 import EditCompletionRules from './components/EditCompletionRules.svelte'
+import AutomationScriptsPage from './components/settings/AutomationScriptsPage.svelte'
 import CompletionBlockedNotification from './components/issues/CompletionBlockedNotification.svelte'
 import CreateIssueTemplate from './components/templates/CreateIssueTemplate.svelte'
 import {
@@ -488,6 +489,7 @@ export default async (): Promise<Resources> => ({
     SettingsRelatedTargets,
     SettingsCompletionRules,
     EditCompletionRules,
+    AutomationScriptsPage,
     CompletionBlockedNotification,
     TimePresenter,
     EstimationValueEditor,

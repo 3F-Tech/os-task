@@ -659,6 +659,16 @@ export function createModel (builder: Builder): void {
     order: 4100
   })
 
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'automationScripts',
+    label: tracker.string.AutomationScripts,
+    icon: tracker.icon.Issue,
+    component: tracker.component.AutomationScriptsPage,
+    group: 'settings-editor',
+    role: AccountRole.Maintainer,
+    order: 6000
+  })
+
   builder.createDoc(
     core.class.ClassPermission,
     core.space.Model,

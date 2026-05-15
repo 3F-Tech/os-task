@@ -326,7 +326,26 @@
     "MissingEstimation": "Estimation is not set",
     "OpenSubtasksBlocking": "{count} subtask(s) are not completed",
     "MissingCompletedDate": "Completion date is not set",
-    "ConfigureCompletionRules": "Configure completion rules"
+    "ConfigureCompletionRules": "Configure completion rules",
+    "AutomationScripts": "Automation Scripts",
+    "AutomationScriptsDescription": "Execute automation scripts directly from the interface.",
+    "ClientOnboarding": "Client Onboarding",
+    "ClientOnboardingDescription": "Automatically create all onboarding tasks in the BU projects for a new client.",
+    "NewClientOnboarding": "New Onboarding",
+    "ClientNamePlaceholder": "e.g.: Company XYZ",
+    "BusinessUnit": "Business Unit",
+    "BuSeed": "Seed",
+    "BuImpulse": "Impulse",
+    "BuBomma": "Bomma",
+    "SocialMediaVariant": "Variant",
+    "WithSocialMedia": "With Social Media",
+    "WithoutSocialMedia": "Without Social Media",
+    "StartOnboarding": "Start Onboarding",
+    "OnboardingSuccess": "Onboarding completed",
+    "OnboardingProgress": "Progress",
+    "OnboardingHistorySession": "History (current session)",
+    "OnboardingHistoryEmpty": "No onboarding executed in this session.",
+    "OnboardingTasksCount": "tasks"
   },
   "status": {}
 }
