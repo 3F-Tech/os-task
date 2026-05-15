@@ -8,14 +8,14 @@
   import tags from '@hcengineering/tags'
   import task from '@hcengineering/task'
   import tracker, { type Issue, type IssueTemplate, type Project } from '@hcengineering/tracker'
-  import { Button, EditBox, Label, RadioButton } from '@hcengineering/ui'
+  import { Button, EditBox, Label } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
 
   import trackerRes from '../../plugin'
-  import { type BU, type BommaVariant, type OnboardingEntry, getTarefas } from './onboarding-config'
+  import { type BU, type BommaVariant, type BommaScenario, type OnboardingEntry, getTarefas } from './onboarding-config'
 
   export let onClose: () => void = () => {}
-  export let onComplete: (entry: { clientName: string, bu: BU, variant?: BommaVariant, count: number }) => void = () =>
+  export let onComplete: (entry: { clientName: string, bu: BU, variant?: BommaVariant, cenario?: BommaScenario, count: number }) => void = () =>
     {}
 
   const dispatch = createEventDispatcher()
@@ -23,6 +23,7 @@
   let nomeCliente = ''
   let buSelecionada: BU | null = null
   let bommaVariant: BommaVariant = 'com SM'
+  let bommaScenario: BommaScenario = '1e2'
   let executando = false
   let concluido = false
   let progresso: Array<{ label: string, ok: boolean }> = []
@@ -32,7 +33,7 @@
     !concluido &&
     nomeCliente.trim().length > 0 &&
     buSelecionada !== null &&
-    (buSelecionada !== 'Bomma' || bommaVariant !== undefined)
+    (buSelecionada !== 'Bomma' || (bommaVariant !== undefined && bommaScenario !== undefined))
 
   function cancel (): void {
     onClose()
@@ -47,7 +48,8 @@
     const client = getClient()
     const tarefas: OnboardingEntry[] = getTarefas(
       buSelecionada,
-      buSelecionada === 'Bomma' ? bommaVariant : undefined
+      buSelecionada === 'Bomma' ? bommaVariant : undefined,
+      buSelecionada === 'Bomma' ? bommaScenario : undefined
     )
 
     const tagElements = await client.findAll(tags.class.TagElement, {})
@@ -200,6 +202,7 @@
       clientName: nomeCliente.trim(),
       bu: buSelecionada,
       variant: buSelecionada === 'Bomma' ? bommaVariant : undefined,
+      cenario: buSelecionada === 'Bomma' ? bommaScenario : undefined,
       count: sucessos
     })
   }
@@ -251,18 +254,40 @@
       {#if buSelecionada === 'Bomma'}
         <section class="form-section">
           <h3 class="section-title"><Label label={trackerRes.string.SocialMediaVariant} /></h3>
-          <div class="radio-group">
-            <RadioButton
-              labelIntl={trackerRes.string.WithSocialMedia}
-              value={'com SM'}
-              bind:group={bommaVariant}
+          <div class="bu-buttons">
+            <Button
+              label={trackerRes.string.WithSocialMedia}
+              kind={bommaVariant === 'com SM' ? 'primary' : 'regular'}
+              size="medium"
               disabled={executando}
+              on:click={() => (bommaVariant = 'com SM')}
             />
-            <RadioButton
-              labelIntl={trackerRes.string.WithoutSocialMedia}
-              value={'sem SM'}
-              bind:group={bommaVariant}
+            <Button
+              label={trackerRes.string.WithoutSocialMedia}
+              kind={bommaVariant === 'sem SM' ? 'primary' : 'regular'}
+              size="medium"
               disabled={executando}
+              on:click={() => (bommaVariant = 'sem SM')}
+            />
+          </div>
+        </section>
+
+        <section class="form-section">
+          <h3 class="section-title"><Label label={trackerRes.string.BommaScenario} /></h3>
+          <div class="bu-buttons">
+            <Button
+              label={trackerRes.string.Scenario1e2}
+              kind={bommaScenario === '1e2' ? 'primary' : 'regular'}
+              size="medium"
+              disabled={executando}
+              on:click={() => (bommaScenario = '1e2')}
+            />
+            <Button
+              label={trackerRes.string.Scenario3}
+              kind={bommaScenario === '3' ? 'primary' : 'regular'}
+              size="medium"
+              disabled={executando}
+              on:click={() => (bommaScenario = '3')}
             />
           </div>
         </section>

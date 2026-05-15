@@ -5,6 +5,7 @@
 
 export type BU = 'Seed' | 'Impulse' | 'Bomma'
 export type BommaVariant = 'com SM' | 'sem SM'
+export type BommaScenario = '1e2' | '3'
 
 export interface OnboardingEntry {
   projetoId: string
@@ -80,22 +81,23 @@ export const BOMMA_BASE: OnboardingEntry[] = [
   { projetoId: '6a0374bfcec98c57fca9e50e', templateId: '6a0388579d1b435cda0e8757', label: 'Semana 01 do mês 02 | Encontro de 1º Cronograma' }
 ]
 
-export const BOMMA_COM_SM: OnboardingEntry[] = [
-  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0381e89d1b435cda0e72ca', label: 'Cenário 01 e 02 com Social Media' },
-  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0385a79d1b435cda0e84d0', label: 'Cenário 03 com Social Media' }
-]
-
-export const BOMMA_SEM_SM: OnboardingEntry[] = [
-  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0384c89d1b435cda0e844b', label: 'Cenário 01 e 02 sem Social Media' },
-  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0385289d1b435cda0e84a6', label: 'Cenário 03 sem Social Media' }
-]
-
-export function getTarefasBomma (variant: BommaVariant): OnboardingEntry[] {
-  return [...BOMMA_BASE, ...(variant === 'com SM' ? BOMMA_COM_SM : BOMMA_SEM_SM)]
+export const BOMMA_CENARIOS: Record<BommaVariant, Record<BommaScenario, OnboardingEntry>> = {
+  'com SM': {
+    '1e2': { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0381e89d1b435cda0e72ca', label: 'Cenário 01 e 02 com Social Media' },
+    '3':    { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0385a79d1b435cda0e84d0', label: 'Cenário 03 com Social Media' }
+  },
+  'sem SM': {
+    '1e2': { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0384c89d1b435cda0e844b', label: 'Cenário 01 e 02 sem Social Media' },
+    '3':    { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0385289d1b435cda0e84a6', label: 'Cenário 03 sem Social Media' }
+  }
 }
 
-export function getTarefas (bu: BU, bommaVariant?: BommaVariant): OnboardingEntry[] {
+export function getTarefasBomma (variant: BommaVariant, cenario: BommaScenario): OnboardingEntry[] {
+  return [...BOMMA_BASE, BOMMA_CENARIOS[variant][cenario]]
+}
+
+export function getTarefas (bu: BU, bommaVariant?: BommaVariant, bommaScenario?: BommaScenario): OnboardingEntry[] {
   if (bu === 'Seed') return SEED_TAREFAS
   if (bu === 'Impulse') return IMPULSE_TAREFAS
-  return getTarefasBomma(bommaVariant ?? 'com SM')
+  return getTarefasBomma(bommaVariant ?? 'com SM', bommaScenario ?? '1e2')
 }

@@ -327,7 +327,10 @@
     "OnboardingProgress": "Progress",
     "OnboardingHistorySession": "History (current session)",
     "OnboardingHistoryEmpty": "No onboarding executed in this session.",
-    "OnboardingTasksCount": "tasks"
+    "OnboardingTasksCount": "tasks",
+    "BommaScenario": "Scenario",
+    "Scenario1e2": "Scenario 1 and 2",
+    "Scenario3": "Scenario 3"
   },
   "status": {}
 }

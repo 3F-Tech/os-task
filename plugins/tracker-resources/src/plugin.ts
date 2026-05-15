@@ -336,7 +336,10 @@ export default mergeIds(trackerId, tracker, {
     OnboardingProgress: '' as IntlString,
     OnboardingHistorySession: '' as IntlString,
     OnboardingHistoryEmpty: '' as IntlString,
-    OnboardingTasksCount: '' as IntlString
+    OnboardingTasksCount: '' as IntlString,
+    BommaScenario: '' as IntlString,
+    Scenario1e2: '' as IntlString,
+    Scenario3: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,

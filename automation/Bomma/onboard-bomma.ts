@@ -68,10 +68,13 @@ async function run() {
 
   const nomeCliente = process.argv[2];
   const smParam = process.argv[3]?.toLowerCase();
+  const cenarioParam = process.argv[4]?.toLowerCase();
 
-  if (!nomeCliente || !smParam) {
-    console.log('Uso: npm run onboard-bomma -- "Nome do Cliente" "com SM"');
-    console.log('     npm run onboard-bomma -- "Nome do Cliente" "sem SM"');
+  if (!nomeCliente || !smParam || !cenarioParam) {
+    console.log('Uso: npm run onboard-bomma -- "Nome do Cliente" "com SM" "1e2"');
+    console.log('     npm run onboard-bomma -- "Nome do Cliente" "com SM" "3"');
+    console.log('     npm run onboard-bomma -- "Nome do Cliente" "sem SM" "1e2"');
+    console.log('     npm run onboard-bomma -- "Nome do Cliente" "sem SM" "3"');
     return;
   }
 
@@ -80,8 +83,18 @@ async function run() {
     process.exit(1);
   }
 
-  const cenarios = smParam === 'com sm' ? TAREFAS_SM : TAREFAS_SEM_SM;
-  const TAREFAS_ONBOARDING = [...TAREFAS_BASE, ...cenarios];
+  if (cenarioParam !== '1e2' && cenarioParam !== '3') {
+    console.error('❌ Cenário inválido. Use "1e2" ou "3".');
+    process.exit(1);
+  }
+
+  const smKey = smParam === 'com sm' ? TAREFAS_SM : TAREFAS_SEM_SM;
+  const cenarioEntry = smKey.find(t =>
+    cenarioParam === '1e2' ? t.label.includes('01 e 02') : t.label.includes('03')
+  );
+  const TAREFAS_ONBOARDING = cenarioEntry
+    ? [...TAREFAS_BASE, cenarioEntry]
+    : TAREFAS_BASE;
 
   const url = HUB_TRANSACTOR_URL ?? 'https://3ftasks.3fventure.tech:3332';
   const readClient = createRestClient(url, workspaceId!, HUB_API_TOKEN);
