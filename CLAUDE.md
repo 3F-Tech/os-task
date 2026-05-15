@@ -10,7 +10,7 @@ da base open source.
 **Repositório upstream:** https://github.com/hcengineering/platform  
 **Licença:** EPL-2.0 — uso interno, repositório privado permitido  
 **Versão atual:** 0.7.413  
-**URL local:** http://localhost:7000  
+**URL local:** http://localhost:8087 
 
 ---
 
