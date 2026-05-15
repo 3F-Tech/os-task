@@ -1,0 +1,19 @@
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+
+redis:
+  address: redis:6379
+
+keys:
+  # As chaves reais são lidas via env vars LIVEKIT_API_KEY / LIVEKIT_API_SECRET
+  # e injetadas no comando do container (ver docker-compose.prod.yaml).
+  placeholder: change-me
+
+logging:
+  level: info
+  pion_level: error

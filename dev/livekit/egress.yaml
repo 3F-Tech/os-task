@@ -1,0 +1,24 @@
+log_level: info
+
+# WebSocket interno do livekit-server (mesma docker network)
+ws_url: ws://livekit:7880
+
+# As mesmas chaves usadas pelo livekit-server. Os valores reais vêm das
+# env vars LIVEKIT_API_KEY / LIVEKIT_API_SECRET via docker-compose.
+api_key: placeholder
+api_secret: placeholder
+
+redis:
+  address: redis:6379
+
+# Diretório temporário onde o egress monta os arquivos antes do upload.
+local_directory: /tmp/livekit-egress
+
+# Encoding leve para 720p (override de qualidade por sala vem do RECORDING_PRESET
+# do serviço love).
+insecure: false
+cpu_cost:
+  room_composite_cpu_cost: 3.0
+  audio_room_composite_cpu_cost: 1.0
+  track_composite_cpu_cost: 2.0
+  track_cpu_cost: 1.0

@@ -320,6 +320,8 @@ services:
       - HULYLAKE_URL=http://huly.local:8096
       - EXPORT_URL=http://huly.local:4009
       - LINK_PREVIEW_URL=http://huly.local:4041
+      - LOVE_ENDPOINT=https://3ftasks.3fventure.tech/_love
+      - LIVEKIT_WS=wss://3ftasks.3fventure.tech/_livekit
     volumes:
       - ../pods/front/bundle/bundle.js:/app/bundle.js
       - ../pods/front/dist:/app/dist
@@ -747,6 +749,66 @@ services:
       - SERVICE_ID=calendar-service
       - Credentials=COLE_AQUI_O_JSON_DO_GOOGLE_EM_UMA_LINHA_SÓ
     restart: unless-stopped
+  livekit:
+    image: livekit/livekit-server:latest
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    container_name: livekit
+    depends_on:
+      redis:
+        condition: service_started
+    command: --config /etc/livekit.yaml --keys "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml
+    ports:
+      - 7880:7880
+      - 7881:7881
+      - 50000-50100:50000-50100/udp
+    restart: unless-stopped
+  livekit-egress:
+    image: livekit/egress:latest
+    container_name: livekit-egress
+    depends_on:
+      redis:
+        condition: service_started
+      livekit:
+        condition: service_started
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress.yaml
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+    volumes:
+      - ./livekit/egress.yaml:/etc/egress.yaml
+      - livekit_egress_tmp:/tmp/livekit-egress
+    restart: unless-stopped
+  love:
+    image: hardcoreeng/love
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    depends_on:
+      account:
+        condition: service_started
+      livekit:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    ports:
+      - 8097:8097
+    environment:
+      - PORT=8097
+      - SECRET=secret
+      - SERVICE_ID=love-service
+      - ACCOUNTS_URL=http://huly.local:3000
+      - LIVEKIT_HOST=http://huly.local:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
+      - STORAGE_PROVIDER_NAME=datalake
+      - S3_STORAGE_CONFIG=s3|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin&region=local&rootBucket=recordings
+      - RECORDING_PRESET=720p
+    restart: unless-stopped
 volumes:
   db:
   dbpg:
@@ -755,3 +817,4 @@ volumes:
   cockroach_db:
   redpanda:
   telemetry:
+  livekit_egress_tmp:
