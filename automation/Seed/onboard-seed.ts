@@ -201,7 +201,7 @@ async function run () {
         pdcaCycleFrequency: pdcaFrequency,
         pdcaCycleDueDays: pdcaDueDays,
         pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
-        ...(pdcaDueDate !== null ? { dueDate: pdcaDueDate } : {}),
+        dueDate: pdcaDueDate,
         space: projetoId,
         attachedTo: 'tracker:ids:NoParent',
         attachedToClass: tracker.class.Issue,

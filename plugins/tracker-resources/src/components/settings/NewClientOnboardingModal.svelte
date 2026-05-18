@@ -176,7 +176,7 @@
           pdcaCycleFrequency: pdcaFrequency,
           pdcaCycleDueDays: pdcaDueDays,
           pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
-          ...(pdcaDueDate !== null ? { dueDate: pdcaDueDate } : {}),
+          dueDate: pdcaDueDate,
           template: { template: templateId as unknown as Ref<IssueTemplate> }
         } as any
       )
