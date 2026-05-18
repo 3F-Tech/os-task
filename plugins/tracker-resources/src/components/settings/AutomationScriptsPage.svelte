@@ -7,13 +7,13 @@
 
   import tracker from '../../plugin'
   import NewClientOnboardingModal from './NewClientOnboardingModal.svelte'
-  import { type BU, type BommaVariant, type BommaScenario } from './onboarding-config'
+  import { type BU, type SmVariant, type BommaScenario } from './onboarding-config'
 
   interface HistoryEntry {
     date: string
     clientName: string
     bu: BU
-    variant?: BommaVariant
+    variant?: SmVariant
     cenario?: BommaScenario
     count: number
   }
@@ -26,19 +26,19 @@
   }
 
   function buLabel (entry: HistoryEntry): string {
+    const sm = entry.variant === 'com SM' ? 'com SM' : entry.variant === 'sem SM' ? 'sem SM' : undefined
     if (entry.bu === 'Bomma') {
-      const sm = entry.variant === 'com SM' ? 'SM' : 'sem SM'
       const cen = entry.cenario === '3' ? 'Cen. 3' : 'Cen. 1e2'
-      return `Bomma ${sm} / ${cen}`
+      return `Bomma ${sm ?? ''} / ${cen}`.replace(/\s+/g, ' ').trim()
     }
-    return entry.bu
+    return sm !== undefined ? `${entry.bu} ${sm}` : entry.bu
   }
 
   function openOnboardingModal (): void {
     showPopup(
       NewClientOnboardingModal,
       {
-        onComplete: (entry: { clientName: string, bu: BU, variant?: BommaVariant, cenario?: BommaScenario, count: number }) => {
+        onComplete: (entry: { clientName: string, bu: BU, variant?: SmVariant, cenario?: BommaScenario, count: number }) => {
           historico = [
             { date: formatDate(), clientName: entry.clientName, bu: entry.bu, variant: entry.variant, cenario: entry.cenario, count: entry.count },
             ...historico

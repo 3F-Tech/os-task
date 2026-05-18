@@ -7,7 +7,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Templates hardcoded por projeto
 // IDs obtidos via: npm run list-templates-by-project -- <projetoId>
-const TAREFAS_ONBOARDING: Array<{ projetoId: string; templateId: string; label: string }> = [
+const TAREFAS_BASE: Array<{ projetoId: string; templateId: string; label: string }> = [
   // Seed | 1. Coordenação (projeto: 6a0215ac91e156605a9fed2d)
   { projetoId: '6a0215ac91e156605a9fed2d', templateId: '6a047b19e23f15e9fdd19857', label: 'Breve Apresentação do Cliente para time interno' },
   { projetoId: '6a0215ac91e156605a9fed2d', templateId: '6a047b0fe23f15e9fdd19846', label: 'Handoff (vendas > operação)' },
@@ -23,12 +23,57 @@ const TAREFAS_ONBOARDING: Array<{ projetoId: string; templateId: string; label: 
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bc4e23f15e9fdd19908', label: 'Impactos' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bd3e23f15e9fdd19925', label: 'Setup de Estrutura de Performance' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bede23f15e9fdd19945', label: 'Acessos aos ativos digitais do cliente' },
-  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bf5e23f15e9fdd19958', label: 'Montagem de Estratégia de Conteúdo' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bfce23f15e9fdd19969', label: 'Acessos aos materiais da marca' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c01e23f15e9fdd1997a', label: 'Ativar Primeiras Campanhas' },
 ];
 
+// Tarefas adicionais criadas APENAS quando o cliente Seed tem Social Media
+const TAREFAS_SM: Array<{ projetoId: string; templateId: string; label: string }> = [
+  // Seed | 2. Performance (projeto: 69fce02121c2dabdabe3d3b7)
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bf5e23f15e9fdd19958', label: 'Montagem de Estratégia de Conteúdo' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c3fe23f15e9fdd1998b', label: 'Ciclo PDCA de Comunicação' },
+
+  // Seed | 3. Planejamento & Design (projeto: 6a021ebc3e05e60cba80d8ca)
+  { projetoId: '6a021ebc3e05e60cba80d8ca', templateId: '6a060dc8a699f2bce935fd00', label: '[MÊS] Planejamento de Conteúdo' },
+
+  // Seed | 4. Audiovisual (projeto: 6a0220f3b0af3ef0cc3088b7)
+  { projetoId: '6a0220f3b0af3ef0cc3088b7', templateId: '6a060d07a699f2bce935fa03', label: '[MÊS] Planejamento de Conteúdo' },
+];
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+type PdcaFreq = 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
+
+// Due date do ciclo PDCA *atual* — diferente do worker, que pula para o PRÓXIMO ciclo.
+// Aqui aceitamos datas já passadas (ex.: terça desta semana mesmo se hoje for sexta).
+function calculateCurrentCycleDueDate (frequency: PdcaFreq | undefined, dueDays: number[] | undefined): number | null {
+  if (frequency === undefined || dueDays === undefined || dueDays.length === 0) return null;
+  const now = new Date();
+
+  if (frequency === 'weekly') {
+    const targetWeekday = dueDays[0];
+    const diff = targetWeekday - now.getDay();
+    const due = new Date(now);
+    due.setDate(now.getDate() + diff);
+    due.setHours(23, 59, 0, 0);
+    return due.getTime();
+  }
+
+  if (frequency === 'monthly' || frequency === 'quarterly') {
+    const targetDay = dueDays[0];
+    return new Date(now.getFullYear(), now.getMonth(), targetDay, 23, 59, 0, 0).getTime();
+  }
+
+  if (frequency === 'biweekly') {
+    const sorted = [...dueDays].sort((a, b) => a - b);
+    const todayDay = now.getDate();
+    const past = [...sorted].reverse().find((d) => d <= todayDay);
+    const target = past ?? sorted[0];
+    return new Date(now.getFullYear(), now.getMonth(), target, 23, 59, 0, 0).getTime();
+  }
+
+  return null;
+}
 
 async function nextSequence (writeClient: any, projetoId: string, identifier: string): Promise<{ number: number; identifier: string }> {
   const inc = await writeClient.updateDoc(
@@ -58,16 +103,28 @@ async function run () {
   }
 
   const nomeCliente = process.argv[2];
-  if (!nomeCliente) {
-    console.log('Uso: npm run onboard-seed -- "Nome do Cliente"');
+  const smParam = process.argv[3]?.toLowerCase();
+
+  if (!nomeCliente || !smParam) {
+    console.log('Uso: npm run onboard-seed -- "Nome do Cliente" "com SM"');
+    console.log('     npm run onboard-seed -- "Nome do Cliente" "sem SM"');
     return;
   }
+
+  if (smParam !== 'com sm' && smParam !== 'sem sm') {
+    console.error('❌ Parâmetro inválido. Use "com SM" ou "sem SM".');
+    process.exit(1);
+  }
+
+  const TAREFAS_ONBOARDING = smParam === 'com sm'
+    ? [...TAREFAS_BASE, ...TAREFAS_SM]
+    : TAREFAS_BASE;
 
   const url = HUB_TRANSACTOR_URL ?? 'https://3ftasks.3fventure.tech:3332';
   const readClient = createRestClient(url, workspaceId!, HUB_API_TOKEN);
   const writeClient = await createRestTxOperations(url, workspaceId!, HUB_API_TOKEN);
 
-  console.log(`\n✨ Iniciando onboarding Seed: ${nomeCliente}\n`);
+  console.log(`\n✨ Iniciando onboarding Seed: ${nomeCliente} (${smParam === 'com sm' ? 'com SM' : 'sem SM'})\n`);
 
   // Cache de TagElements para popular title e color nas TagReferences
   const tagElements = await readClient.findAll('tags:class:TagElement' as any, {});
@@ -118,6 +175,11 @@ async function run () {
 
     // Cria tarefa principal
     const seq = await nextSequence(writeClient, projetoId, projeto.identifier);
+    const pdcaActive = (template as any).pdcaCycleActive === true;
+    const pdcaFrequency = (template as any).pdcaCycleFrequency as PdcaFreq | undefined;
+    const pdcaDueDays = (template as any).pdcaCycleDueDays as number[] | undefined;
+    const pdcaDueDate = pdcaActive ? calculateCurrentCycleDueDate(pdcaFrequency, pdcaDueDays) : null;
+
     const tarefaId = await writeClient.addCollection(
       tracker.class.Issue,
       projetoId,
@@ -135,10 +197,11 @@ async function run () {
         estimation: (template as any).estimation ?? 0,
         clientName: nomeCliente,
         clientStage: 'onboarding',
-        pdcaCycleActive: (template as any).pdcaCycleActive ?? false,
-        pdcaCycleFrequency: (template as any).pdcaCycleFrequency,
-        pdcaCycleDueDays: (template as any).pdcaCycleDueDays,
+        pdcaCycleActive: pdcaActive,
+        pdcaCycleFrequency: pdcaFrequency,
+        pdcaCycleDueDays: pdcaDueDays,
         pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
+        ...(pdcaDueDate !== null ? { dueDate: pdcaDueDate } : {}),
         space: projetoId,
         attachedTo: 'tracker:ids:NoParent',
         attachedToClass: tracker.class.Issue,

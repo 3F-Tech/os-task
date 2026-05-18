@@ -39,6 +39,39 @@ const TAREFAS_SEM_SM: Array<{ projetoId: string; templateId: string; label: stri
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+type PdcaFreq = 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
+
+// Due date do ciclo PDCA *atual* — diferente do worker, que pula para o PRÓXIMO ciclo.
+// Aqui aceitamos datas já passadas (ex.: terça desta semana mesmo se hoje for sexta).
+function calculateCurrentCycleDueDate (frequency: PdcaFreq | undefined, dueDays: number[] | undefined): number | null {
+  if (frequency === undefined || dueDays === undefined || dueDays.length === 0) return null;
+  const now = new Date();
+
+  if (frequency === 'weekly') {
+    const targetWeekday = dueDays[0];
+    const diff = targetWeekday - now.getDay();
+    const due = new Date(now);
+    due.setDate(now.getDate() + diff);
+    due.setHours(23, 59, 0, 0);
+    return due.getTime();
+  }
+
+  if (frequency === 'monthly' || frequency === 'quarterly') {
+    const targetDay = dueDays[0];
+    return new Date(now.getFullYear(), now.getMonth(), targetDay, 23, 59, 0, 0).getTime();
+  }
+
+  if (frequency === 'biweekly') {
+    const sorted = [...dueDays].sort((a, b) => a - b);
+    const todayDay = now.getDate();
+    const past = [...sorted].reverse().find((d) => d <= todayDay);
+    const target = past ?? sorted[0];
+    return new Date(now.getFullYear(), now.getMonth(), target, 23, 59, 0, 0).getTime();
+  }
+
+  return null;
+}
+
 async function nextSequence(writeClient: any, projetoId: string, identifier: string): Promise<{ number: number; identifier: string }> {
   const inc = await writeClient.updateDoc(
     tracker.class.Project,
@@ -131,6 +164,11 @@ async function run() {
 
     // Cria tarefa principal
     const seq = await nextSequence(writeClient, projetoId, projeto.identifier);
+    const pdcaActive = (template as any).pdcaCycleActive === true;
+    const pdcaFrequency = (template as any).pdcaCycleFrequency as PdcaFreq | undefined;
+    const pdcaDueDays = (template as any).pdcaCycleDueDays as number[] | undefined;
+    const pdcaDueDate = pdcaActive ? calculateCurrentCycleDueDate(pdcaFrequency, pdcaDueDays) : null;
+
     const tarefaId = await writeClient.addCollection(
       tracker.class.Issue,
       projetoId,
@@ -148,10 +186,11 @@ async function run() {
         estimation: (template as any).estimation ?? 0,
         clientName: nomeCliente,
         clientStage: 'onboarding',
-        pdcaCycleActive: (template as any).pdcaCycleActive ?? false,
-        pdcaCycleFrequency: (template as any).pdcaCycleFrequency,
-        pdcaCycleDueDays: (template as any).pdcaCycleDueDays,
+        pdcaCycleActive: pdcaActive,
+        pdcaCycleFrequency: pdcaFrequency,
+        pdcaCycleDueDays: pdcaDueDays,
         pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
+        ...(pdcaDueDate !== null ? { dueDate: pdcaDueDate } : {}),
         space: projetoId,
         attachedTo: 'tracker:ids:NoParent',
         attachedToClass: tracker.class.Issue,

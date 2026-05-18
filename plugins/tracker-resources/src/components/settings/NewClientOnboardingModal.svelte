@@ -12,28 +12,65 @@
   import { createEventDispatcher } from 'svelte'
 
   import trackerRes from '../../plugin'
-  import { type BU, type BommaVariant, type BommaScenario, type OnboardingEntry, getTarefas } from './onboarding-config'
+  import { type BU, type SmVariant, type BommaScenario, type OnboardingEntry, getTarefas } from './onboarding-config'
+
+  type PdcaFreq = 'weekly' | 'biweekly' | 'monthly' | 'quarterly'
+
+  // Due date do ciclo PDCA *atual* — diferente do worker, que calcula o PRÓXIMO ciclo.
+  // Aqui aceitamos datas já passadas (ex.: terça desta semana, mesmo se hoje for sexta),
+  // pois ao criar o cliente o vencimento do ciclo corrente deve ser registrado.
+  function calculateCurrentCycleDueDate (frequency: PdcaFreq | undefined, dueDays: number[] | undefined): number | null {
+    if (frequency === undefined || dueDays === undefined || dueDays.length === 0) return null
+    const now = new Date()
+
+    if (frequency === 'weekly') {
+      const targetWeekday = dueDays[0]
+      const diff = targetWeekday - now.getDay()
+      const due = new Date(now)
+      due.setDate(now.getDate() + diff)
+      due.setHours(23, 59, 0, 0)
+      return due.getTime()
+    }
+
+    if (frequency === 'monthly' || frequency === 'quarterly') {
+      const targetDay = dueDays[0]
+      return new Date(now.getFullYear(), now.getMonth(), targetDay, 23, 59, 0, 0).getTime()
+    }
+
+    if (frequency === 'biweekly') {
+      const sorted = [...dueDays].sort((a, b) => a - b)
+      const todayDay = now.getDate()
+      const past = [...sorted].reverse().find((d) => d <= todayDay)
+      const target = past ?? sorted[0]
+      return new Date(now.getFullYear(), now.getMonth(), target, 23, 59, 0, 0).getTime()
+    }
+
+    return null
+  }
 
   export let onClose: () => void = () => {}
-  export let onComplete: (entry: { clientName: string, bu: BU, variant?: BommaVariant, cenario?: BommaScenario, count: number }) => void = () =>
+  export let onComplete: (entry: { clientName: string, bu: BU, variant?: SmVariant, cenario?: BommaScenario, count: number }) => void = () =>
     {}
 
   const dispatch = createEventDispatcher()
 
   let nomeCliente = ''
   let buSelecionada: BU | null = null
-  let bommaVariant: BommaVariant = 'com SM'
+  let smVariant: SmVariant = 'com SM'
   let bommaScenario: BommaScenario = '1e2'
   let executando = false
   let concluido = false
   let progresso: Array<{ label: string, ok: boolean }> = []
+
+  $: needsScenario = buSelecionada === 'Bomma'
 
   $: canStart =
     !executando &&
     !concluido &&
     nomeCliente.trim().length > 0 &&
     buSelecionada !== null &&
-    (buSelecionada !== 'Bomma' || (bommaVariant !== undefined && bommaScenario !== undefined))
+    smVariant !== undefined &&
+    (!needsScenario || bommaScenario !== undefined)
 
   function cancel (): void {
     onClose()
@@ -48,7 +85,7 @@
     const client = getClient()
     const tarefas: OnboardingEntry[] = getTarefas(
       buSelecionada,
-      buSelecionada === 'Bomma' ? bommaVariant : undefined,
+      smVariant,
       buSelecionada === 'Bomma' ? bommaScenario : undefined
     )
 
@@ -113,6 +150,11 @@
       const number = (inc as any).object.sequence as number
       const identifier = `${projeto.identifier}-${number}`
 
+      const pdcaActive = (template as any).pdcaCycleActive === true
+      const pdcaFrequency = (template as any).pdcaCycleFrequency
+      const pdcaDueDays = (template as any).pdcaCycleDueDays
+      const pdcaDueDate = pdcaActive ? calculateCurrentCycleDueDate(pdcaFrequency, pdcaDueDays) : null
+
       const tarefaId = await client.addCollection(
         tracker.class.Issue,
         projetoId as unknown as Ref<Project>,
@@ -130,10 +172,11 @@
           estimation: (template as any).estimation ?? 0,
           clientName: nomeCliente.trim(),
           clientStage: 'onboarding',
-          pdcaCycleActive: (template as any).pdcaCycleActive ?? false,
-          pdcaCycleFrequency: (template as any).pdcaCycleFrequency,
-          pdcaCycleDueDays: (template as any).pdcaCycleDueDays,
+          pdcaCycleActive: pdcaActive,
+          pdcaCycleFrequency: pdcaFrequency,
+          pdcaCycleDueDays: pdcaDueDays,
           pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
+          ...(pdcaDueDate !== null ? { dueDate: pdcaDueDate } : {}),
           template: { template: templateId as unknown as Ref<IssueTemplate> }
         } as any
       )
@@ -201,7 +244,7 @@
     onComplete({
       clientName: nomeCliente.trim(),
       bu: buSelecionada,
-      variant: buSelecionada === 'Bomma' ? bommaVariant : undefined,
+      variant: smVariant,
       cenario: buSelecionada === 'Bomma' ? bommaScenario : undefined,
       count: sucessos
     })
@@ -251,27 +294,29 @@
         </div>
       </section>
 
-      {#if buSelecionada === 'Bomma'}
+      {#if buSelecionada !== null}
         <section class="form-section">
           <h3 class="section-title"><Label label={trackerRes.string.SocialMediaVariant} /></h3>
           <div class="bu-buttons">
             <Button
               label={trackerRes.string.WithSocialMedia}
-              kind={bommaVariant === 'com SM' ? 'primary' : 'regular'}
+              kind={smVariant === 'com SM' ? 'primary' : 'regular'}
               size="medium"
               disabled={executando}
-              on:click={() => (bommaVariant = 'com SM')}
+              on:click={() => (smVariant = 'com SM')}
             />
             <Button
               label={trackerRes.string.WithoutSocialMedia}
-              kind={bommaVariant === 'sem SM' ? 'primary' : 'regular'}
+              kind={smVariant === 'sem SM' ? 'primary' : 'regular'}
               size="medium"
               disabled={executando}
-              on:click={() => (bommaVariant = 'sem SM')}
+              on:click={() => (smVariant = 'sem SM')}
             />
           </div>
         </section>
+      {/if}
 
+      {#if needsScenario}
         <section class="form-section">
           <h3 class="section-title"><Label label={trackerRes.string.BommaScenario} /></h3>
           <div class="bu-buttons">

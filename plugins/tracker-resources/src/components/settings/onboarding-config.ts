@@ -4,7 +4,9 @@
 //
 
 export type BU = 'Seed' | 'Impulse' | 'Bomma'
-export type BommaVariant = 'com SM' | 'sem SM'
+export type SmVariant = 'com SM' | 'sem SM'
+/** @deprecated Use SmVariant — kept for backwards-compat type references. */
+export type BommaVariant = SmVariant
 export type BommaScenario = '1e2' | '3'
 
 export interface OnboardingEntry {
@@ -31,9 +33,21 @@ export const SEED_TAREFAS: OnboardingEntry[] = [
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bc4e23f15e9fdd19908', label: 'Impactos' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bd3e23f15e9fdd19925', label: 'Setup de Estrutura de Performance' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bede23f15e9fdd19945', label: 'Acessos aos ativos digitais do cliente' },
-  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bf5e23f15e9fdd19958', label: 'Montagem de Estratégia de Conteúdo' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bfce23f15e9fdd19969', label: 'Acessos aos materiais da marca' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c01e23f15e9fdd1997a', label: 'Ativar Primeiras Campanhas' }
+]
+
+// Tarefas adicionais criadas APENAS quando o cliente Seed tem Social Media
+export const SEED_TAREFAS_SM: OnboardingEntry[] = [
+  // Seed | 2. Performance (projeto: 69fce02121c2dabdabe3d3b7)
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bf5e23f15e9fdd19958', label: 'Montagem de Estratégia de Conteúdo' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c3fe23f15e9fdd1998b', label: 'Ciclo PDCA de Comunicação' },
+
+  // Seed | 3. Planejamento & Design (projeto: 6a021ebc3e05e60cba80d8ca)
+  { projetoId: '6a021ebc3e05e60cba80d8ca', templateId: '6a060dc8a699f2bce935fd00', label: '[MÊS] Planejamento de Conteúdo' },
+
+  // Seed | 4. Audiovisual (projeto: 6a0220f3b0af3ef0cc3088b7)
+  { projetoId: '6a0220f3b0af3ef0cc3088b7', templateId: '6a060d07a699f2bce935fa03', label: '[MÊS] Planejamento de Conteúdo' }
 ]
 
 // ─── IMPULSE ─────────────────────────────────────────────────────────────────
@@ -54,9 +68,21 @@ export const IMPULSE_TAREFAS: OnboardingEntry[] = [
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047695e8250543d0eac675', label: 'Impactos' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476a0e8250543d0eac68e', label: 'Setup de Estrutura de Performance' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c2e8250543d0eac6ab', label: 'Acessos aos ativos digitais do cliente' },
-  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c6e8250543d0eac6b9', label: 'Montagem de Estratégia de Conteúdo' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c9e8250543d0eac6c7', label: 'Acessos aos materiais da marca' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476d9e8250543d0eac6e3', label: 'Ativar Primeiras Campanhas' }
+]
+
+// Tarefas adicionais criadas APENAS quando o cliente Impulse tem Social Media
+export const IMPULSE_TAREFAS_SM: OnboardingEntry[] = [
+  // Impulse | 2. Performance (projeto: 6a033a5587d4dc88317f2dbd)
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c6e8250543d0eac6b9', label: 'Montagem de Estratégia de Conteúdo' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476f9e8250543d0eac73a', label: 'Ciclo PDCA de Comunicação' },
+
+  // Impulse | 3. Planejamento & Design (projeto: 6a033a8087d4dc88317f2df3)
+  { projetoId: '6a033a8087d4dc88317f2df3', templateId: '6a0477a9e8250543d0eac899', label: '[MÊS] Planejamento de Conteúdo' },
+
+  // Impulse | 4. Audiovisual (projeto: 6a033aac87d4dc88317f2e22)
+  { projetoId: '6a033aac87d4dc88317f2e22', templateId: '6a0477f5e8250543d0eac9d7', label: '[MÊS] Planejamento de Conteúdo' }
 ]
 
 // ─── BOMMA ───────────────────────────────────────────────────────────────────
@@ -81,7 +107,7 @@ export const BOMMA_BASE: OnboardingEntry[] = [
   { projetoId: '6a0374bfcec98c57fca9e50e', templateId: '6a0388579d1b435cda0e8757', label: 'Semana 01 do mês 02 | Encontro de 1º Cronograma' }
 ]
 
-export const BOMMA_CENARIOS: Record<BommaVariant, Record<BommaScenario, OnboardingEntry>> = {
+export const BOMMA_CENARIOS: Record<SmVariant, Record<BommaScenario, OnboardingEntry>> = {
   'com SM': {
     '1e2': { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0381e89d1b435cda0e72ca', label: 'Cenário 01 e 02 com Social Media' },
     '3':    { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0385a79d1b435cda0e84d0', label: 'Cenário 03 com Social Media' }
@@ -92,12 +118,20 @@ export const BOMMA_CENARIOS: Record<BommaVariant, Record<BommaScenario, Onboardi
   }
 }
 
-export function getTarefasBomma (variant: BommaVariant, cenario: BommaScenario): OnboardingEntry[] {
+export function getTarefasBomma (variant: SmVariant, cenario: BommaScenario): OnboardingEntry[] {
   return [...BOMMA_BASE, BOMMA_CENARIOS[variant][cenario]]
 }
 
-export function getTarefas (bu: BU, bommaVariant?: BommaVariant, bommaScenario?: BommaScenario): OnboardingEntry[] {
-  if (bu === 'Seed') return SEED_TAREFAS
-  if (bu === 'Impulse') return IMPULSE_TAREFAS
-  return getTarefasBomma(bommaVariant ?? 'com SM', bommaScenario ?? '1e2')
+export function getTarefasSeed (variant: SmVariant): OnboardingEntry[] {
+  return variant === 'com SM' ? [...SEED_TAREFAS, ...SEED_TAREFAS_SM] : SEED_TAREFAS
+}
+
+export function getTarefasImpulse (variant: SmVariant): OnboardingEntry[] {
+  return variant === 'com SM' ? [...IMPULSE_TAREFAS, ...IMPULSE_TAREFAS_SM] : IMPULSE_TAREFAS
+}
+
+export function getTarefas (bu: BU, variant?: SmVariant, bommaScenario?: BommaScenario): OnboardingEntry[] {
+  if (bu === 'Seed') return getTarefasSeed(variant ?? 'com SM')
+  if (bu === 'Impulse') return getTarefasImpulse(variant ?? 'com SM')
+  return getTarefasBomma(variant ?? 'com SM', bommaScenario ?? '1e2')
 }
