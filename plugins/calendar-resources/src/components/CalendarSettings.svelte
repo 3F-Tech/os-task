@@ -110,7 +110,7 @@
               </div>
               <div></div>
               {#each cat[1] as _calendar}
-                <div>{_calendar.name}</div>
+                <div>{_calendar._class === calendar.class.Calendar ? '3ftasks' : _calendar.name}</div>
                 <VisibilityEditor
                   value={_calendar.visibility}
                   kind={'inline'}

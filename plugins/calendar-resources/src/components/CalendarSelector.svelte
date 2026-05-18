@@ -48,7 +48,7 @@
   $: items = calendars.map((p) => {
     return {
       _id: p._id,
-      label: p.name
+      label: p._class === calendar.class.Calendar ? '3ftasks' : p.name
     }
   })
 
