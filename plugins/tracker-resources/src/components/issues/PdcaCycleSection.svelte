@@ -149,6 +149,7 @@
     const val = parseInt((e.target as HTMLInputElement).value)
     if (isNaN(val) || val < 1 || val > 31) return
     const current = (issue as any).pdcaCycleDueDays as number[] | undefined
+    if (current?.[0] === val && current?.[1] !== undefined) return
     void setDueDays([val, current?.[1] ?? val])
   }
 
@@ -156,13 +157,22 @@
     const val = parseInt((e.target as HTMLInputElement).value)
     if (isNaN(val) || val < 1 || val > 31) return
     const current = (issue as any).pdcaCycleDueDays as number[] | undefined
+    if (current?.[1] === val && current?.[0] !== undefined) return
     void setDueDays([current?.[0] ?? val, val])
   }
 
   function handleMonthDay (e: Event): void {
     const val = parseInt((e.target as HTMLInputElement).value)
     if (isNaN(val) || val < 1 || val > 31) return
+    const current = (issue as any).pdcaCycleDueDays as number[] | undefined
+    if (current?.[0] === val && current?.length === 1) return
     void setDueDays([val])
+  }
+
+  function handleMonthDayKey (e: KeyboardEvent): void {
+    if (e.key === 'Enter') {
+      ;(e.target as HTMLInputElement).blur()
+    }
   }
 
   $: isActive = issue.pdcaCycleActive === true
@@ -245,6 +255,8 @@
             disabled={readonly}
             placeholder="15"
             on:change={handleMonthDay}
+            on:blur={handleMonthDay}
+            on:keydown={handleMonthDayKey}
           />
         </div>
       {/if}
@@ -264,6 +276,8 @@
               disabled={readonly}
               placeholder="1"
               on:change={handleMonthDay1}
+              on:blur={handleMonthDay1}
+              on:keydown={handleMonthDayKey}
             />
             <span class="pdca-day-sep">e</span>
             <input
@@ -275,6 +289,8 @@
               disabled={readonly}
               placeholder="15"
               on:change={handleMonthDay2}
+              on:blur={handleMonthDay2}
+              on:keydown={handleMonthDayKey}
             />
           </div>
         </div>
