@@ -44,7 +44,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\automation\" -Recurse -Force)",
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(Sort-Object FullName)",
-      "Bash(Format-Table -AutoSize)"
+      "Bash(Format-Table -AutoSize)",
+      "Bash(git push *)"
     ]
   }
 }

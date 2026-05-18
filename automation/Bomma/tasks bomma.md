@@ -17,4 +17,3 @@ Projeto: Bomma | 3. Social Media
 Projeto: Bomma | 4. Planejamento & Design
 1. Onboarding Semana 02 - Marcar Reunião Inicial de Conteúdo (Plano de Ideias + 1º briefing de contéudo digital)
 2. Semana 01 do mês 02 | Encontro de 1º Cronograma + cronograma de stories
-
