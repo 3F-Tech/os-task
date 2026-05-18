@@ -29,7 +29,7 @@
   )
 
   $: categories = groupByArray(calendars, (c) => {
-    return (c as ExternalCalendar).externalUser ?? 'HULY'
+    return (c as ExternalCalendar).externalUser ?? '3ftasks'
   })
 
   async function changeHidden (calendar: Calendar, value: boolean): Promise<void> {

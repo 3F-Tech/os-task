@@ -651,6 +651,11 @@ export const calendarOperation: MigrateOperation = {
         state: 'update-calendar-user',
         mode: 'upgrade',
         func: updateCalendarUser
+      },
+      {
+        state: 'rename-huly-calendar-to-3ftasks',
+        mode: 'upgrade',
+        func: renameHulyCalendarTo3fTasks
       }
     ])
   },
@@ -684,6 +689,14 @@ async function fillSocialIdsFromIntegrations (client: MigrationClient): Promise<
   }
 }
 
+async function renameHulyCalendarTo3fTasks (client: MigrationClient): Promise<void> {
+  await client.update<Calendar>(
+    DOMAIN_CALENDAR,
+    { _class: calendar.class.Calendar, name: 'HULY' },
+    { name: '3ftasks' }
+  )
+}
+
 async function fillCalendarUserAndAccess (client: MigrationClient): Promise<void> {
   const calendars = await client.find<Calendar>(DOMAIN_CALENDAR, { user: { $exists: false } })
   const userMap = new Map<PersonId, PersonId>()
@@ -707,7 +720,7 @@ async function fillCalendarUserAndAccess (client: MigrationClient): Promise<void
         access: getCalendarAccess(_calendar)
       }
       if (_calendar._class === calendar.class.Calendar) {
-        update.name = 'HULY'
+        update.name = '3ftasks'
       }
 
       await client.update(DOMAIN_CALENDAR, { _id: _calendar._id }, update)
