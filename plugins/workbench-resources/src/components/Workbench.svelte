@@ -41,7 +41,6 @@
     reduceCalls
   } from '@hcengineering/presentation'
   import setting from '@hcengineering/setting'
-  import support, { supportLink, SupportStatus } from '@hcengineering/support'
   import {
     AnyComponent,
     areLocationsEqual,
@@ -739,35 +738,6 @@
     }
   }
 
-  let supportStatus: SupportStatus | undefined = undefined
-  function handleSupportStatusChanged (status: SupportStatus) {
-    supportStatus = status
-  }
-
-  const supportClient = getResource(support.function.GetSupport).then(
-    async (res) =>
-      await res((status) => {
-        handleSupportStatusChanged(status)
-      })
-  )
-  onDestroy(async () => {
-    await supportClient?.then((support) => {
-      support?.destroy()
-    })
-  })
-
-  let supportWidgetLoading = false
-  async function handleToggleSupportWidget (): Promise<void> {
-    const timer = setTimeout(() => {
-      supportWidgetLoading = true
-    }, 100)
-
-    const support = await supportClient
-    await support.toggleWidget()
-
-    clearTimeout(timer)
-    supportWidgetLoading = false
-  }
 
   $: checkInbox($popupstore)
 
@@ -930,31 +900,6 @@
           size={appsMini ? 'small' : 'large'}
           on:click={() => showPopup(AppSwitcher, { apps }, popupPosition)}
         />
-        <a href={supportLink} target="_blank" rel="noopener noreferrer">
-          <AppItem
-            icon={support.icon.Support}
-            label={support.string.ContactUs}
-            size={appsMini ? 'small' : 'large'}
-            notify={supportStatus?.hasUnreadMessages}
-            selected={supportStatus?.visible}
-            loading={supportWidgetLoading}
-          />
-        </a>
-        <!-- {#await supportClient then client}
-          {#if client}
-            <AppItem
-              icon={support.icon.Support}
-              label={support.string.ContactUs}
-              size={appsMini ? 'small' : 'large'}
-              notify={supportStatus?.hasUnreadMessages}
-              selected={supportStatus?.visible}
-              loading={supportWidgetLoading}
-              on:click={async () => {
-                await handleToggleSupportWidget()
-              }}
-            />
-          {/if}
-        {/await} -->
         <div
           class="flex-center"
           class:mt-3={$deviceInfo.navigator.direction === 'vertical'}
