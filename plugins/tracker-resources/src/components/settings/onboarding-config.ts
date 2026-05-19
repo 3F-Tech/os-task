@@ -34,7 +34,14 @@ export const SEED_TAREFAS: OnboardingEntry[] = [
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bd3e23f15e9fdd19925', label: 'Setup de Estrutura de Performance' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bede23f15e9fdd19945', label: 'Acessos aos ativos digitais do cliente' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bfce23f15e9fdd19969', label: 'Acessos aos materiais da marca' },
-  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c01e23f15e9fdd1997a', label: 'Ativar Primeiras Campanhas' }
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c01e23f15e9fdd1997a', label: 'Ativar Primeiras Campanhas' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c7ce23f15e9fdd199ab', label: 'Ciclo PDCA de Midia Paga' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cb2e23f15e9fdd199cc', label: 'Ciclo PDCA de Gestão do Cliente' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cdde23f15e9fdd199eb', label: 'Relatório Mensal' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047ce8e23f15e9fdd199fc', label: 'Solicitação de Resultados Comerciais' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cf4e23f15e9fdd19a0d', label: 'Enviar NPS' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cffe23f15e9fdd19a1e', label: 'Reunião Quinzenal' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047d0ae23f15e9fdd19a31', label: 'Atualização e Análise de Métricas (Health Score)' }
 ]
 
 // Tarefas adicionais criadas APENAS quando o cliente Seed tem Social Media
@@ -69,7 +76,22 @@ export const IMPULSE_TAREFAS: OnboardingEntry[] = [
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476a0e8250543d0eac68e', label: 'Setup de Estrutura de Performance' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c2e8250543d0eac6ab', label: 'Acessos aos ativos digitais do cliente' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c9e8250543d0eac6c7', label: 'Acessos aos materiais da marca' },
-  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476d9e8250543d0eac6e3', label: 'Ativar Primeiras Campanhas' }
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476d9e8250543d0eac6e3', label: 'Ativar Primeiras Campanhas' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047716e8250543d0eac75a', label: 'Ciclo PDCA de Midia Paga' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04772fe8250543d0eac779', label: 'Ciclo PDCA de Gestão do Cliente' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04774be8250543d0eac798', label: 'Relatório Mensal' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047751e8250543d0eac7a9', label: 'Solicitação de Resultados Comerciais' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047758e8250543d0eac7ba', label: 'Enviar NPS' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04775ee8250543d0eac7cb', label: 'Alinhamento Quinzenal' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047764e8250543d0eac7dc', label: 'Atualização e Análise de Métricas (Health Score)' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04777fe8250543d0eac7ed', label: 'Verificação do Saldo | Envio de boletos/pix dos Ads' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047787e8250543d0eac7fe', label: 'Solicitação de Novos Criativos' },
+
+  // Impulse | 3. Planejamento & Design (projeto: 6a033a8087d4dc88317f2df3)
+  { projetoId: '6a033a8087d4dc88317f2df3', templateId: '6a0477a0e8250543d0eac888', label: 'Anúncios' },
+
+  // Impulse | 4. Audiovisual (projeto: 6a033aac87d4dc88317f2e22)
+  { projetoId: '6a033aac87d4dc88317f2e22', templateId: '6a0477ede8250543d0eac9c6', label: 'Anúncios' }
 ]
 
 // Tarefas adicionais criadas APENAS quando o cliente Impulse tem Social Media
@@ -92,19 +114,35 @@ export const BOMMA_BASE: OnboardingEntry[] = [
   { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0386cb9d1b435cda0e8532', label: 'Reunião de Onboarding | Boas-Vindas + Planejamento' },
   { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0386e29d1b435cda0e854e', label: 'Reunião de Estratégia' },
   { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0386b79d1b435cda0e8517', label: 'Onboarding' },
+  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0386f99d1b435cda0e8569', label: 'Ponto de contato no grupo do cliente' },
+  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0387049d1b435cda0e8577', label: 'Atualização Planilha Divisão de Clientes - Consolidado Geral' },
+  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a03870d9d1b435cda0e8585', label: 'Encontro mensal de Geração de Impacto' },
+  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0387149d1b435cda0e8593', label: 'Consolidado Semanal - Panorama resultados comerciais' },
+  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a0387189d1b435cda0e85a1', label: 'Ligação com cliente' },
+  { projetoId: '6a037491cec98c57fca9e4d2', templateId: '6a03871d9d1b435cda0e85af', label: 'Enviar NPS' },
 
   // Bomma | 2. Performance (projeto: 6a0374a9cec98c57fca9e4ef)
   { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0387999d1b435cda0e8676', label: 'Ativar Primeira Campanha de Leads' },
   { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0387889d1b435cda0e865c', label: 'Ativar Primeira Campanha de Aumento de Base' },
   { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a03874c9d1b435cda0e8620', label: 'Setup de Estrutura de Performance' },
   { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0387729d1b435cda0e8640', label: 'Encontro 03 - Geração de Oportunidades' },
+  { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0387e79d1b435cda0e86aa', label: 'Reunião de Mensal de Performance' },
+  { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0387f79d1b435cda0e86c5', label: 'Otimização Campanhas' },
+  { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0388169d1b435cda0e86df', label: 'Solicitação de novos criativos' },
+  { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a03881f9d1b435cda0e86ed', label: 'Consolidado Semanal - Panorama resultados de tráfego' },
+  { projetoId: '6a0374a9cec98c57fca9e4ef', templateId: '6a0388349d1b435cda0e86fb', label: 'Verificação do Saldo | Envio de boletos/pix dos Ads' },
 
   // Bomma | 3. Social Media (projeto: 6a037558cec98c57fca9e5ca)
   { projetoId: '6a037558cec98c57fca9e5ca', templateId: '6a0479aee23f15e9fdd19557', label: 'Onboarding' },
+  { projetoId: '6a037558cec98c57fca9e5ca', templateId: '6a0479c2e23f15e9fdd19574', label: 'Reunião mensal de planejamento de cronograma + Panorama de resultados' },
 
   // Bomma | 4. Planejamento & Design (projeto: 6a0374bfcec98c57fca9e50e)
   { projetoId: '6a0374bfcec98c57fca9e50e', templateId: '6a0388469d1b435cda0e873d', label: 'Onboarding Semana 02 - Marcar Reunião Inicial de Conteúdo' },
-  { projetoId: '6a0374bfcec98c57fca9e50e', templateId: '6a0388579d1b435cda0e8757', label: 'Semana 01 do mês 02 | Encontro de 1º Cronograma' }
+  { projetoId: '6a0374bfcec98c57fca9e50e', templateId: '6a0388579d1b435cda0e8757', label: 'Semana 01 do mês 02 | Encontro de 1º Cronograma' },
+  { projetoId: '6a0374bfcec98c57fca9e50e', templateId: '6a0388639d1b435cda0e8765', label: '[Mês] Encontro de planejamento de conteúdo mensal + Panorama de Resultados' },
+
+  // Bomma | 5. Audiovisual (projeto: 6a0374e5cec98c57fca9e550)
+  { projetoId: '6a0374e5cec98c57fca9e550', templateId: '6a0612b2a2ab6b9edb306f76', label: '[MÊS] Planejamento de Conteúdo' }
 ]
 
 export const BOMMA_CENARIOS: Record<SmVariant, Record<BommaScenario, OnboardingEntry>> = {
