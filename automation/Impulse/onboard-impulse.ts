@@ -25,6 +25,21 @@ const TAREFAS_BASE: Array<{ projetoId: string; templateId: string; label: string
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c2e8250543d0eac6ab', label: 'Acessos aos ativos digitais do cliente' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476c9e8250543d0eac6c7', label: 'Acessos aos materiais da marca' },
   { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a0476d9e8250543d0eac6e3', label: 'Ativar Primeiras Campanhas' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047716e8250543d0eac75a', label: 'Ciclo PDCA de Midia Paga' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04772fe8250543d0eac779', label: 'Ciclo PDCA de Gestão do Cliente' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04774be8250543d0eac798', label: 'Relatório Mensal' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047751e8250543d0eac7a9', label: 'Solicitação de Resultados Comerciais' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047758e8250543d0eac7ba', label: 'Enviar NPS' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04775ee8250543d0eac7cb', label: 'Alinhamento Quinzenal' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047764e8250543d0eac7dc', label: 'Atualização e Análise de Métricas (Health Score)' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a04777fe8250543d0eac7ed', label: 'Verificação do Saldo | Envio de boletos/pix dos Ads' },
+  { projetoId: '6a033a5587d4dc88317f2dbd', templateId: '6a047787e8250543d0eac7fe', label: 'Solicitação de Novos Criativos' },
+
+  // Impulse | 3. Planejamento & Design (projeto: 6a033a8087d4dc88317f2df3)
+  { projetoId: '6a033a8087d4dc88317f2df3', templateId: '6a0477a0e8250543d0eac888', label: 'Anúncios' },
+
+  // Impulse | 4. Audiovisual (projeto: 6a033aac87d4dc88317f2e22)
+  { projetoId: '6a033aac87d4dc88317f2e22', templateId: '6a0477ede8250543d0eac9c6', label: 'Anúncios' },
 ];
 
 // Tarefas adicionais criadas APENAS quando o cliente Impulse tem Social Media

@@ -25,6 +25,13 @@ const TAREFAS_BASE: Array<{ projetoId: string; templateId: string; label: string
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bede23f15e9fdd19945', label: 'Acessos aos ativos digitais do cliente' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047bfce23f15e9fdd19969', label: 'Acessos aos materiais da marca' },
   { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c01e23f15e9fdd1997a', label: 'Ativar Primeiras Campanhas' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047c7ce23f15e9fdd199ab', label: 'Ciclo PDCA de Midia Paga' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cb2e23f15e9fdd199cc', label: 'Ciclo PDCA de Gestão do Cliente' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cdde23f15e9fdd199eb', label: 'Relatório Mensal' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047ce8e23f15e9fdd199fc', label: 'Solicitação de Resultados Comerciais' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cf4e23f15e9fdd19a0d', label: 'Enviar NPS' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047cffe23f15e9fdd19a1e', label: 'Reunião Quinzenal' },
+  { projetoId: '69fce02121c2dabdabe3d3b7', templateId: '6a047d0ae23f15e9fdd19a31', label: 'Atualização e Análise de Métricas (Health Score)' },
 ];
 
 // Tarefas adicionais criadas APENAS quando o cliente Seed tem Social Media
