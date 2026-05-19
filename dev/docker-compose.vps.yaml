@@ -233,7 +233,7 @@ services:
       - REKONI_URL=http://rekoni:4004
       - COLLABORATOR_URL=wss://3ftasks.3fventure.tech:3078
       - STORAGE_CONFIG=datalake|http://datalake:4030
-      - GITHUB_URL=http://huly.local:3500
+      - GITHUB_URL=http://github:3500
       - PRINT_URL=http://print:4005
       - SIGN_URL=http://sign:4006
       - DESKTOP_UPDATES_URL=https://dist.huly.io
@@ -295,6 +295,32 @@ services:
       - COMMUNICATION_API_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - HYLYLAKE_URL=http://hulylake:8096
+    restart: unless-stopped
+  github:
+    image: hardcoreeng/github:3f-local
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    depends_on:
+      account:
+        condition: service_started
+    ports:
+      - 13500:3500
+    environment:
+      - PORT=3500
+      - APP_ID=${GITHUB_APP_ID}
+      - CLIENT_ID=${GITHUB_CLIENT_ID}
+      - CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - PRIVATE_KEY=${GITHUB_PRIVATE_KEY}
+      - WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - SERVER_SECRET=secret
+      - BOT_NAME=os-tasks[bot]
+      - ACCOUNTS_URL=http://account:3000
+      - COLLABORATOR_URL=ws://collaborator:3078
+      - FRONT_URL=https://3ftasks.3fventure.tech
+      - STORAGE_CONFIG=datalake|http://datalake:4030
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+    env_file:
+      - .env.secrets
     restart: unless-stopped
   rekoni:
     image: hardcoreeng/rekoni-service:v0.7.413
