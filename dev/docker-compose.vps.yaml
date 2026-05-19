@@ -307,11 +307,6 @@ services:
       - 13500:3500
     environment:
       - PORT=3500
-      - APP_ID=${GITHUB_APP_ID}
-      - CLIENT_ID=${GITHUB_CLIENT_ID}
-      - CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - PRIVATE_KEY=${GITHUB_PRIVATE_KEY}
-      - WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - SERVER_SECRET=secret
       - BOT_NAME=os-tasks[bot]
       - ACCOUNTS_URL=http://account:3000
@@ -320,7 +315,7 @@ services:
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
     env_file:
-      - .env.secrets
+      - .env.github
     restart: unless-stopped
   rekoni:
     image: hardcoreeng/rekoni-service:v0.7.413
