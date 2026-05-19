@@ -203,7 +203,7 @@ async function run () {
         status: (template as any).status ?? projeto.defaultIssueStatus,
         estimation: (template as any).estimation ?? 0,
         clientName: nomeCliente,
-        clientStage: 'onboarding',
+        clientStage: (template as any).clientStage ?? 'onboarding',
         pdcaCycleActive: pdcaActive,
         pdcaCycleFrequency: pdcaFrequency,
         pdcaCycleDueDays: pdcaDueDays,

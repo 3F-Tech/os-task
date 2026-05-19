@@ -171,7 +171,7 @@
           status: ((template as any).status ?? projeto.defaultIssueStatus) as any,
           estimation: (template as any).estimation ?? 0,
           clientName: nomeCliente.trim(),
-          clientStage: 'onboarding',
+          clientStage: (template as any).clientStage ?? 'onboarding',
           pdcaCycleActive: pdcaActive,
           pdcaCycleFrequency: pdcaFrequency,
           pdcaCycleDueDays: pdcaDueDays,
