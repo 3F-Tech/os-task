@@ -66,6 +66,7 @@ jspm_packages/
 # .env
 *.secrets
 .env.secrets
+dev/.env.github
 
 # next.js build output
 .next
