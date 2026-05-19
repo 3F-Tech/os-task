@@ -28,6 +28,7 @@
   export let viewOptionsConfig: ViewOptionModel[] | undefined = undefined
   export let defaultViewOptions: ViewOptions | undefined = undefined
   export let defaultConfig: (BuildModelKey | string)[] | undefined = undefined
+  export let allowedMixins: Set<string> | undefined = undefined
 
   let btn: HTMLButtonElement
   let pressed: boolean = false
@@ -35,7 +36,7 @@
   function clickHandler () {
     pressed = true
     closeTooltip()
-    showPopup(ViewletSetting, { viewlet, defaultConfig }, btn, () => {
+    showPopup(ViewletSetting, { viewlet, defaultConfig, allowedMixins }, btn, () => {
       pressed = false
     })
   }

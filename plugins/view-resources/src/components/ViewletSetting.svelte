@@ -26,6 +26,7 @@
 
   export let viewlet: Viewlet
   export let defaultConfig: (BuildModelKey | string)[] | undefined = undefined
+  export let allowedMixins: Set<string> | undefined = undefined
 
   const dispatch = createEventDispatcher()
 
@@ -341,7 +342,9 @@
       const desc = hierarchy.getDescendants(viewlet.attachTo)
       for (const d of desc) {
         if (!hierarchy.isMixin(d)) continue
-        hierarchy.getOwnAttributes(d).forEach((attr) => {
+        if (allowedMixins !== undefined && !allowedMixins.has(d)) continue
+        const ownAttrs = hierarchy.getOwnAttributes(d)
+        ownAttrs.forEach((attr) => {
           processAttribute(attr, result, true)
         })
       }
@@ -366,6 +369,7 @@
       .filter((p) => hierarchy.isMixin(p._id) && p.extends && ancestors.has(p.extends))
 
     parentMixins.forEach((it) => {
+      if (allowedMixins !== undefined && !allowedMixins.has(it._id)) return
       hierarchy.getOwnAttributes(it._id).forEach((attr) => {
         processAttribute(attr, result, true)
       })

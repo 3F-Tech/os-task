@@ -1,11 +1,12 @@
 <script lang="ts">
   import { DocumentQuery, Ref, Space, WithLookup } from '@hcengineering/core'
   import { Asset, IntlString, translateCB } from '@hcengineering/platform'
-  import { ComponentExtensions } from '@hcengineering/presentation'
-  import { Issue, TrackerEvents } from '@hcengineering/tracker'
+  import { ComponentExtensions, createQuery } from '@hcengineering/presentation'
+  import { Issue, Project, TrackerEvents } from '@hcengineering/tracker'
   import { IModeSelector, themeStore } from '@hcengineering/ui'
   import { ViewOptions, Viewlet } from '@hcengineering/view'
   import { FilterBar, SpaceHeader, ViewletContentView, ViewletSettingButton } from '@hcengineering/view-resources'
+  import task, { ProjectType, TaskType } from '@hcengineering/task'
   import tracker from '../../plugin'
   import CreateIssue from '../CreateIssue.svelte'
 
@@ -19,6 +20,42 @@
   let viewlet: WithLookup<Viewlet> | undefined = undefined
   const viewlets: WithLookup<Viewlet>[] | undefined = undefined
   let viewOptions: ViewOptions | undefined
+
+  let spaceDoc: Project | undefined
+  let projectType: ProjectType | undefined
+  let spaceTaskTypes: TaskType[] = []
+  let allowedMixins: Set<string> | undefined = undefined
+
+  const spaceDocQuery = createQuery()
+  const projectTypeQuery = createQuery()
+  const taskTypesQuery = createQuery()
+
+  $: if (space !== undefined) {
+    spaceDocQuery.query(tracker.class.Project, { _id: space as Ref<Project> }, (res) => {
+      spaceDoc = res[0]
+    })
+  } else {
+    spaceDoc = undefined
+    allowedMixins = undefined
+  }
+
+  $: if (spaceDoc?.type !== undefined) {
+    projectTypeQuery.query(task.class.ProjectType, { _id: spaceDoc.type as Ref<ProjectType> }, (res) => {
+      projectType = res[0]
+    })
+  } else {
+    projectType = undefined
+  }
+
+  $: if (projectType !== undefined) {
+    taskTypesQuery.query(task.class.TaskType, { _id: { $in: projectType.tasks } }, (res) => {
+      spaceTaskTypes = res
+      allowedMixins = new Set(res.map((tt) => tt.targetClass as string))
+    })
+  } else {
+    spaceTaskTypes = []
+    allowedMixins = undefined
+  }
 
   let search = ''
   let searchQuery: DocumentQuery<Issue> = { ...query }
@@ -49,7 +86,7 @@
   {modeSelectorProps}
 >
   <svelte:fragment slot="header-tools">
-    <ViewletSettingButton bind:viewOptions bind:viewlet />
+    <ViewletSettingButton bind:viewOptions bind:viewlet {allowedMixins} />
   </svelte:fragment>
 
   <svelte:fragment slot="label_selector">

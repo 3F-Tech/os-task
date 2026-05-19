@@ -27,6 +27,7 @@
     ObjectBox,
     restrictionStore
   } from '@hcengineering/view-resources'
+  import task, { TaskType } from '@hcengineering/task'
 
   import tracker from '../../../plugin'
   import ComponentEditor from '../../components/ComponentEditor.svelte'
@@ -56,6 +57,21 @@
 
   const client = getClient()
   const hierarchy = client.getHierarchy()
+
+  let issueTaskType: TaskType | undefined = undefined
+  let taskTypeMixinIds = new Set<string>()
+
+  const taskTypeQuery = createQuery()
+  const allTaskTypesQuery = createQuery()
+
+  $: taskTypeQuery.query(task.class.TaskType, { _id: issue.kind }, (res) => {
+    issueTaskType = res[0]
+  })
+
+  $: allTaskTypesQuery.query(task.class.TaskType, {}, (res) => {
+    taskTypeMixinIds = new Set(res.map((tt) => tt.targetClass as string))
+  })
+
   const ignoreKeys = [
     'title',
     'description',
@@ -90,7 +106,9 @@
 
   let mixins: Mixin<Doc>[] = []
 
-  $: _mixins = getDocMixins(issue, showAllMixins)
+  $: _mixins = getDocMixins(issue, showAllMixins).filter(
+    (mixin) => !taskTypeMixinIds.has(mixin._id) || mixin._id === issueTaskType?.targetClass
+  )
 
   $: mixins = _mixins.find((p) => p._id === notification.mixin.Collaborators)
     ? _mixins

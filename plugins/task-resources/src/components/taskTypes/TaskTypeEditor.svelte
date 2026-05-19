@@ -14,7 +14,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { Ref, SortingOrder, Status } from '@hcengineering/core'
+  import core, { ClassifierKind, Ref, SortingOrder, Status, generateId } from '@hcengineering/core'
   import { Asset, getEmbeddedLabel, getResource } from '@hcengineering/platform'
   import { AttributeEditor, MessageBox, createQuery, getClient } from '@hcengineering/presentation'
   import { ClassAttributes, settingsStore } from '@hcengineering/setting-resources'
@@ -48,6 +48,56 @@
   export let readonly: boolean = true
 
   const client = getClient()
+
+  let allProjectTypes: ProjectType[] = []
+  const allProjectTypesQuery = createQuery()
+  $: allProjectTypesQuery.query(task.class.ProjectType, {}, (res) => {
+    allProjectTypes = res
+  })
+
+  $: isSharedTaskType =
+    taskType !== undefined && allProjectTypes.filter((pt) => pt.tasks.includes(taskType!._id)).length > 1
+
+
+  async function createDedicatedCopy (): Promise<void> {
+    if (taskType === undefined) return
+
+    const ofClassClass = client.getHierarchy().getClass(taskType.ofClass)
+    const newTaskTypeId = generateId<TaskType>()
+
+    const newTargetClass = await client.createDoc(core.class.Class, core.space.Model, {
+      extends: taskType.ofClass,
+      kind: ClassifierKind.MIXIN,
+      label: getEmbeddedLabel(taskType.name),
+      icon: ofClassClass.icon
+    })
+
+    await client.createDoc(
+      task.class.TaskType,
+      core.space.Model,
+      {
+        name: taskType.name,
+        kind: taskType.kind,
+        ofClass: taskType.ofClass,
+        descriptor: taskType.descriptor,
+        targetClass: newTargetClass,
+        statusClass: taskType.statusClass,
+        statusCategories: taskType.statusCategories,
+        statuses: [...taskType.statuses],
+        allowedAsChildOf: [...taskType.allowedAsChildOf],
+        icon: taskType.icon,
+        parent: spaceType._id
+      },
+      newTaskTypeId
+    )
+
+    const updatedTasks = spaceType.tasks.map((id) => (id === taskType!._id ? newTaskTypeId : id))
+    await client.update(spaceType, { tasks: updatedTasks })
+
+    const loc = getCurrentLocation()
+    loc.path[6] = newTaskTypeId
+    navigate(loc)
+  }
 
   let taskTypes: TaskType[] = []
   const taskTypesQuery = createQuery()
@@ -317,7 +367,19 @@
             />
           </div>
 
-          <ClassAttributes _class={taskType.targetClass} showHierarchy disabled={readonly} />
+          {#if isSharedTaskType && !readonly}
+            <div class="sharedTaskTypeWarning">
+              <span>⚠️ Este modelo de tarefa é compartilhado entre Space Types. Colunas adicionadas aqui aparecem em todos os projetos que o usam.</span>
+              <button
+                class="antiButton medium ghost"
+                on:click={createDedicatedCopy}
+              >
+                Criar cópia dedicada para este Space Type
+              </button>
+            </div>
+          {/if}
+
+          <ClassAttributes _class={taskType.targetClass} ofClass={taskType.ofClass} showHierarchy disabled={readonly} />
         </div>
       </Scroller>
     </div>
@@ -335,6 +397,23 @@
 
     &.editable {
       margin-left: 0;
+    }
+  }
+
+  .sharedTaskTypeWarning {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    background-color: var(--theme-warning-color, #fef3c7);
+    color: var(--theme-warning-text, #92400e);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+
+    button {
+      align-self: flex-start;
+      cursor: pointer;
     }
   }
 </style>

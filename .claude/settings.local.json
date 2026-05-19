@@ -45,7 +45,10 @@
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npm --version)",
+      "Read(//Users/mateusdesouza/.nvm/versions/node/**)",
+      "Read(//Users/mateusdesouza/**)"
     ]
   }
 }
