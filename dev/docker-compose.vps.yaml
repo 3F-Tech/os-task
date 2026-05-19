@@ -233,7 +233,7 @@ services:
       - REKONI_URL=http://rekoni:4004
       - COLLABORATOR_URL=wss://3ftasks.3fventure.tech:3078
       - STORAGE_CONFIG=datalake|http://datalake:4030
-      - GITHUB_URL=http://github:3500
+      - GITHUB_URL=https://3ftasks.3fventure.tech:3500
       - GITHUB_APP=os-tasks
       - GITHUB_CLIENTID=Iv23liz1iroLtzYJl96V
       - PRINT_URL=http://print:4005
