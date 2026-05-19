@@ -234,13 +234,14 @@
 
   let descriptionBox: any
 
+  $: projectUsesClientName = currentProject?.useClientName ?? true
   $: updateIssueStatusId(object, currentProject)
   $: updateAssigneeId(object, currentProject)
   $: canSave =
     descriptionBox != null &&
     getTitle(object.title ?? '').length > 0 &&
     object.status !== undefined &&
-    getTitle((object as any).clientName ?? '').length > 0 &&
+    (!projectUsesClientName || getTitle((object as any).clientName ?? '').length > 0) &&
     kind !== undefined &&
     currentProject !== undefined
 
@@ -964,23 +965,25 @@
   {/if}
   <DocCreateExtComponent manager={docCreateManager} kind={'body'} space={currentProject} props={extraProps} />
   <svelte:fragment slot="pool">
-    <div id="client-name-editor">
-      <EditBox
-        focusIndex={2.5}
-        bind:value={object.clientName}
-        placeholder={tracker.string.ClientName}
-        kind={'regular'}
-        size={'large'}
-        short
-      />
-    </div>
-    <div id="client-stage-editor">
-      <ClientStageSelector
-        bind:value={object.clientStage}
-        kind={'regular'}
-        size={'large'}
-      />
-    </div>
+    {#if projectUsesClientName}
+      <div id="client-name-editor">
+        <EditBox
+          focusIndex={2.5}
+          bind:value={object.clientName}
+          placeholder={tracker.string.ClientName}
+          kind={'regular'}
+          size={'large'}
+          short
+        />
+      </div>
+      <div id="client-stage-editor">
+        <ClientStageSelector
+          bind:value={object.clientStage}
+          kind={'regular'}
+          size={'large'}
+        />
+      </div>
+    {/if}
     <div id="status-editor">
       {#if kind !== undefined}
         <StatusEditor

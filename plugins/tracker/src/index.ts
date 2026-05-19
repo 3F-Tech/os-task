@@ -84,6 +84,7 @@ export interface Project extends TaskProject, IconProps {
   defaultIssueStatus?: Ref<IssueStatus>
   defaultAssignee?: Ref<Employee>
   defaultTimeReportDay: TimeReportDayType
+  useClientName?: boolean
 }
 
 /**
@@ -617,6 +618,7 @@ const pluginState = plugin(trackerId, {
     MissingCompletedDate: '' as IntlString,
     ClientName: '' as IntlString,
     ClientStage: '' as IntlString,
+    UseClientName: '' as IntlString,
     PdcaDueWeekday: '' as IntlString,
     PdcaDueMonthDay: '' as IntlString,
     PdcaDueMonthDays: '' as IntlString,

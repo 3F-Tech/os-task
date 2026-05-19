@@ -85,6 +85,7 @@
   $: typeType = typeId !== undefined ? $typeStore.get(typeId) : undefined
   $: membersPersons = members.map((m) => $employeeRefByAccountUuidStore.get(m)).filter(notEmpty)
   let autoJoin = project?.autoJoin ?? typeType?.autoJoin ?? false
+  let useClientName: boolean = project?.useClientName ?? true
   let autoJoinForRoles: AccountRole[] =
     project?.autoJoinForRoles != null ? hierarchy.clone(project.autoJoinForRoles) : []
 
@@ -130,7 +131,8 @@
       color,
       defaultIssueStatus: defaultStatus ?? ('' as Ref<IssueStatus>),
       defaultTimeReportDay: project?.defaultTimeReportDay ?? TimeReportDayType.PreviousWorkDay,
-      autoJoinForRoles: normalizeAutoJoinForRoles(autoJoinForRoles)
+      autoJoinForRoles: normalizeAutoJoinForRoles(autoJoinForRoles),
+      useClientName
     }
   }
 
@@ -184,6 +186,9 @@
     }
     if (!autoJoinRolesEqual(projectData.autoJoinForRoles, project?.autoJoinForRoles)) {
       update.autoJoinForRoles = projectData.autoJoinForRoles
+    }
+    if (projectData.useClientName !== project?.useClientName) {
+      update.useClientName = projectData.useClientName
     }
     if (projectData.members.length !== project?.members.length) {
       update.members = projectData.members
@@ -549,6 +554,13 @@
         <span><Label label={core.string.AutoJoinDescr} /></span>
       </div>
       <Toggle bind:on={autoJoin} />
+    </div>
+
+    <div class="antiGrid-row">
+      <div class="antiGrid-row__header">
+        <Label label={tracker.string.UseClientName} />
+      </div>
+      <Toggle bind:on={useClientName} />
     </div>
 
     <div class="antiGrid-row">

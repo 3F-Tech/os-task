@@ -48,7 +48,8 @@
       "Bash(git push *)",
       "Bash(npm --version)",
       "Read(//Users/mateusdesouza/.nvm/versions/node/**)",
-      "Read(//Users/mateusdesouza/**)"
+      "Read(//Users/mateusdesouza/**)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|svelte\\)$\")"
     ]
   }
 }

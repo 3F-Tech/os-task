@@ -139,6 +139,9 @@ export class TProject extends TTaskProject implements Project {
 
   @Prop(Collection(tracker.class.RelatedIssueTarget), tracker.string.RelatedIssues)
     relatedIssueTargets!: number
+
+  @Prop(TypeBoolean(), tracker.string.UseClientName)
+    useClientName?: boolean
 }
 /**
  * @public

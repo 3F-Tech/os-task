@@ -65,6 +65,17 @@
   $: if (query) updateSearchQuery(search)
   let resultQuery: DocumentQuery<Issue> = { ...searchQuery }
 
+  $: effectiveViewlet = (() => {
+    if (viewlet === undefined || spaceDoc?.useClientName !== false) return viewlet
+    return {
+      ...viewlet,
+      config: viewlet.config.filter((c) => {
+        const key = typeof c === 'string' ? c : ((c as any)?.displayProps?.key ?? '')
+        return !key.includes('clientName') && !key.includes('clientStage')
+      })
+    } as WithLookup<Viewlet>
+  })()
+
   $: if (title) {
     translateCB(title, {}, $themeStore.language, (res) => {
       label = res
@@ -112,10 +123,10 @@
   on:change={(e) => (resultQuery = e.detail)}
 />
 <slot name="afterHeader" />
-{#if viewlet && viewOptions}
+{#if effectiveViewlet && viewOptions}
   <ViewletContentView
     _class={tracker.class.Issue}
-    {viewlet}
+    viewlet={effectiveViewlet}
     query={resultQuery}
     {space}
     {viewOptions}

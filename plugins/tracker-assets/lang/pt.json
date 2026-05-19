@@ -43,6 +43,7 @@
     "PdcaCycleQuarterly": "Trimestral",
     "ClientName": "Nome do Cliente",
     "ClientStage": "Etapa",
+    "UseClientName": "Usar Nome do Cliente",
     "PdcaDueWeekday": "Vencimento (dia da semana)",
     "PdcaDueMonthDay": "Vencimento (dia do mês)",
     "PdcaDueMonthDays": "Vencimento (dias do mês)",

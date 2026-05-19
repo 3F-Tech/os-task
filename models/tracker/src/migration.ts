@@ -415,6 +415,20 @@ export const trackerOperation: MigrateOperation = {
             }
           )
         }
+      },
+      {
+        state: 'projectUseClientName',
+        mode: 'upgrade',
+        func: async (client) => {
+          await client.update(
+            DOMAIN_SPACE,
+            {
+              _class: tracker.class.Project,
+              useClientName: { $exists: false }
+            },
+            { useClientName: true }
+          )
+        }
       }
     ])
   },
