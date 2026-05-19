@@ -4,6 +4,7 @@
   "description": "Scripts de automação para o 3F Hub",
   "main": "onboard.ts",
   "scripts": {
+    "create-users": "tsx users/create-users.ts",
     "onboard": "tsx onboard.ts",
     "onboard-seed": "tsx Seed/onboard-seed.ts",
     "onboard-bomma": "tsx Bomma/onboard-bomma.ts",
@@ -18,6 +19,7 @@
     "debug-template": "tsx debug-template.ts"
   },
   "dependencies": {
+    "@hcengineering/account-client": "file:../foundations/core/packages/account-client",
     "@hcengineering/api-client": "file:../foundations/core/packages/api-client",
     "@hcengineering/tracker": "file:../plugins/tracker",
     "dotenv": "^16.4.5",
