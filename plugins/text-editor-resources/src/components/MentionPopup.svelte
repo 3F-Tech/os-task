@@ -26,7 +26,7 @@
   import { createEventDispatcher } from 'svelte'
   import contact from '@hcengineering/contact'
   import { getReferenceLabel, getReferenceObject } from './extension/reference'
-  import { translate } from '@hcengineering/platform'
+  import { getResource, translate } from '@hcengineering/platform'
 
   export let query: string = ''
   export let multipleMentions: boolean = false
@@ -149,13 +149,39 @@
   const updateItems = reduceCalls(async function (localQuery: string): Promise<void> {
     const r = await searchFor('mention', localQuery)
     if (r.query === query) {
-      const latestIndex = r.items.findLastIndex((it) => it.category.classToSearch === contact.mixin.Employee)
-      const multipleEmployeeSearchItems = await getMultipleEmployeeSearchItems(localQuery, latestIndex)
+      let latestIndex = r.items.findLastIndex((it) => it.category.classToSearch === contact.mixin.Employee)
 
-      items =
-        latestIndex === -1
-          ? [...multipleEmployeeSearchItems, ...r.items]
-          : [...r.items.slice(0, latestIndex + 1), ...multipleEmployeeSearchItems, ...r.items.slice(latestIndex + 1)]
+      let directEmployeeItems: SearchItem[] = []
+      if (latestIndex === -1 && employeeSearchCategory !== undefined) {
+        try {
+          const queryFn = await getResource(employeeSearchCategory.query)
+          const employeeResults = await queryFn(client, localQuery)
+          directEmployeeItems = employeeResults.slice(0, 5).map((result, idx) => ({
+            num: idx,
+            category: employeeSearchCategory,
+            item: {
+              id: result.doc._id as Ref<Doc>,
+              title: result.title,
+              iconComponent: {
+                component: contact.component.AvatarRef as any,
+                props: { _id: result.doc._id as string }
+              },
+              doc: result.doc
+            } as SearchResultDoc
+          }))
+        } catch {}
+      }
+
+      const effectiveLastIndex = directEmployeeItems.length > 0 ? directEmployeeItems.length - 1 : latestIndex
+      const multipleEmployeeSearchItems = await getMultipleEmployeeSearchItems(localQuery, effectiveLastIndex)
+
+      if (latestIndex === -1 && directEmployeeItems.length > 0) {
+        items = [...directEmployeeItems, ...multipleEmployeeSearchItems, ...r.items]
+      } else if (latestIndex === -1) {
+        items = [...multipleEmployeeSearchItems, ...r.items]
+      } else {
+        items = [...r.items.slice(0, latestIndex + 1), ...multipleEmployeeSearchItems, ...r.items.slice(latestIndex + 1)]
+      }
     }
   })
   $: void updateItems(query)
