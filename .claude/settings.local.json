@@ -46,10 +46,9 @@
       "Bash(Sort-Object FullName)",
       "Bash(Format-Table -AutoSize)",
       "Bash(git push *)",
-      "Bash(npm --version)",
-      "Read(//Users/mateusdesouza/.nvm/versions/node/**)",
-      "Read(//Users/mateusdesouza/**)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx|svelte\\)$\")"
+      "Bash(grep -o \"pdcaDueDate.\\\\{0,200\\\\}\" dev/prod/dist/90548.0771161e54fb50b89f78.js)",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ]
   }
 }
