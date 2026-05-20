@@ -5,8 +5,7 @@ import * as dotenv from 'dotenv'
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
-// AccountRole.User = 2
-const USER_ROLE = 2 as any
+const USER_ROLE = 'USER' as any
 
 interface UserEntry {
   first: string
