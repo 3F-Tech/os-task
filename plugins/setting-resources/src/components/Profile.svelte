@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import contact, { combineName, getFirstName, getLastName } from '@hcengineering/contact'
-  import { ChannelsEditor, EditableAvatar, myEmployeeStore } from '@hcengineering/contact-resources'
+  import { ChannelsEditor, EditableAvatar, getAccountClient, myEmployeeStore } from '@hcengineering/contact-resources'
   import { AccountRole, getCurrentAccount, SocialIdType } from '@hcengineering/core'
   import login, { loginId } from '@hcengineering/login'
   import platform, { getResource, PlatformError } from '@hcengineering/platform'
@@ -27,6 +27,7 @@
     EditBox,
     FocusHandler,
     Header,
+    Label,
     navigate,
     Scroller,
     showPopup
@@ -35,11 +36,23 @@
 
   import rating, { type PersonRating } from '@hcengineering/rating'
   import setting from '../plugin'
+  import ApiTokenPopup from './ApiTokenPopup.svelte'
   import SocialIdsEditor from './socialIds/SocialIdsEditor.svelte'
 
   const client = getClient()
+  const accountClient = getAccountClient()
   const account = getCurrentAccount()
   const email = account.fullSocialIds.find((si) => si.type === SocialIdType.EMAIL)?.value ?? ''
+
+  let workspaceUrl = ''
+  void accountClient.getWorkspaceInfo().then((res) => {
+    workspaceUrl = res.url
+  })
+
+  async function handleGenerateApiToken (): Promise<void> {
+    const { token } = await accountClient.selectWorkspace(workspaceUrl)
+    showPopup(ApiTokenPopup, { token })
+  }
 
   const levelQuery = createQuery()
 
@@ -194,6 +207,19 @@
         <div class="separator" />
       {/if}
       <SocialIdsEditor rating={personRating} />
+      <div class="separator" />
+      <div class="flex-col flex-gap-4">
+        <div class="title"><Label label={setting.string.ApiAccess} /></div>
+        <div class="w-32">
+          <Button
+            label={setting.string.GenerateApiToken}
+            kind="regular"
+            disabled={workspaceUrl === ''}
+            showTooltip={{ label: setting.string.GenerateApiToken }}
+            on:click={handleGenerateApiToken}
+          />
+        </div>
+      </div>
       <div class="footer">
         <Button
           icon={setting.icon.Signout}
@@ -211,6 +237,11 @@
 <style lang="scss">
   .content {
     flex: 0 0 auto;
+  }
+
+  .title {
+    font-weight: 500;
+    font-size: 1rem;
   }
 
   .location {
