@@ -40,6 +40,7 @@ export default plugin(serverTrackerId, {
     OnProjectRemove: '' as Resource<TriggerFunc>,
     OnAutomaticDates: '' as Resource<TriggerFunc>,
     OnIssueCompletionCheck: '' as Resource<TriggerFunc>,
+    OnIssueClientPropagate: '' as Resource<TriggerFunc>,
     OnPdcaCycleToggle: '' as Resource<TriggerFunc>,
     OnPdcaCycleCancel: '' as Resource<TriggerFunc>
   }

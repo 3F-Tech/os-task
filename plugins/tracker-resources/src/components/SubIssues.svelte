@@ -18,7 +18,7 @@
   import { DraftController, draftsStore, getClient, deleteFile, createMarkup } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import { isEmptyMarkup } from '@hcengineering/text'
-  import { Component, Issue, IssueDraft, IssueParentInfo, Milestone, Project } from '@hcengineering/tracker'
+  import { ClientStage, Component, Issue, IssueDraft, IssueParentInfo, Milestone, Project } from '@hcengineering/tracker'
   import { Button, ExpandCollapse, Scroller } from '@hcengineering/ui'
   import { onDestroy } from 'svelte'
   import tracker from '../plugin'
@@ -34,6 +34,8 @@
   export let milestone: Ref<Milestone> | null = null
   export let component: Ref<Component> | null = null
   export let subIssues: IssueDraft[] = []
+  export let clientName: string = ''
+  export let clientStage: ClientStage = ClientStage.Onboarding
   let lastProject = project
   let isCollapsed = false
   async function handleIssueSwap (ev: CustomEvent<{ fromIndex: number, toIndex: number }>) {
@@ -95,8 +97,10 @@
         relations: [],
         childInfo: [],
         kind: subIssue.kind,
-        identifier: `${project.identifier}-${number}`
-      }
+        identifier: `${project.identifier}-${number}`,
+        clientName,
+        clientStage
+      } as AttachedData<Issue>
 
       if (!isEmptyMarkup(subIssue.description)) {
         const collabId = makeCollabId(tracker.class.Issue, childId, 'description')

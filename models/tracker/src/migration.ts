@@ -429,6 +429,44 @@ export const trackerOperation: MigrateOperation = {
             { useClientName: true }
           )
         }
+      },
+      {
+        state: 'subIssueInheritClientFields',
+        mode: 'upgrade',
+        func: async (client) => {
+          const subIssues = await client.find<Issue>(DOMAIN_TASK, {
+            _class: tracker.class.Issue,
+            'parents.0': { $exists: true }
+          })
+          if (subIssues.length === 0) return
+
+          const rootIds = new Set<Ref<Issue>>()
+          for (const issue of subIssues) {
+            const rootId = issue.parents[issue.parents.length - 1]?.parentId
+            if (rootId !== undefined) rootIds.add(rootId)
+          }
+          if (rootIds.size === 0) return
+
+          const roots = await client.find<Issue>(DOMAIN_TASK, {
+            _class: tracker.class.Issue,
+            _id: { $in: Array.from(rootIds) }
+          })
+          const rootMap = toIdMap(roots)
+
+          for (const issue of subIssues) {
+            const rootId = issue.parents[issue.parents.length - 1]?.parentId
+            if (rootId === undefined) continue
+            const root = rootMap.get(rootId)
+            if (root === undefined) continue
+            const rootName = (root as any).clientName ?? ''
+            const rootStage = (root as any).clientStage ?? 'onboarding'
+            const update: Record<string, unknown> = {}
+            if ((issue as any).clientName !== rootName) update.clientName = rootName
+            if ((issue as any).clientStage !== rootStage) update.clientStage = rootStage
+            if (Object.keys(update).length === 0) continue
+            await client.update(DOMAIN_TASK, { _id: issue._id }, update)
+          }
+        }
       }
     ])
   },

@@ -760,6 +760,119 @@ export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): P
   return result
 }
 
+async function doIssueClientPropagate (
+  updateTx: TxUpdateDoc<Issue>,
+  control: TriggerControl
+): Promise<Tx[]> {
+  const ops = updateTx.operations as Record<string, unknown>
+  const hasClientName = Object.prototype.hasOwnProperty.call(ops, 'clientName')
+  const hasClientStage = Object.prototype.hasOwnProperty.call(ops, 'clientStage')
+  if (!hasClientName && !hasClientStage) return []
+
+  const newClientName = hasClientName ? (ops.clientName as string) : undefined
+  const newClientStage = hasClientStage ? (ops.clientStage as Issue['clientStage']) : undefined
+
+  const descendants: Issue[] = []
+  let frontier: Ref<Issue>[] = [updateTx.objectId]
+  while (frontier.length > 0) {
+    const children = await control.findAll(control.ctx, tracker.class.Issue, {
+      attachedTo: { $in: frontier }
+    })
+    if (children.length === 0) break
+    descendants.push(...children)
+    frontier = children.map((c) => c._id)
+  }
+
+  const res: Tx[] = []
+  for (const issue of descendants) {
+    const update: DocumentUpdate<Issue> = {}
+    if (hasClientName && (issue as any).clientName !== newClientName) {
+      ;(update as any).clientName = newClientName
+    }
+    if (hasClientStage && (issue as any).clientStage !== newClientStage) {
+      ;(update as any).clientStage = newClientStage
+    }
+    if (Object.keys(update).length === 0) continue
+    res.push(control.txFactory.createTxUpdateDoc(issue._class, issue.space, issue._id, update))
+  }
+
+  return res
+}
+
+async function doIssueReparentSync (
+  updateTx: TxUpdateDoc<Issue>,
+  control: TriggerControl
+): Promise<Tx[]> {
+  const newParentId = updateTx.operations.attachedTo as Ref<Issue> | undefined
+  if (newParentId === undefined || newParentId === tracker.ids.NoParent) return []
+
+  const [newParent] = await control.findAll(control.ctx, tracker.class.Issue, { _id: newParentId }, { limit: 1 })
+  if (newParent === undefined) return []
+
+  const [issue] = await control.findAll(control.ctx, tracker.class.Issue, { _id: updateTx.objectId }, { limit: 1 })
+  if (issue === undefined) return []
+
+  const parentName = (newParent as any).clientName ?? ''
+  const parentStage = (newParent as any).clientStage ?? 'onboarding'
+  const update: DocumentUpdate<Issue> = {}
+  if ((issue as any).clientName !== parentName) (update as any).clientName = parentName
+  if ((issue as any).clientStage !== parentStage) (update as any).clientStage = parentStage
+  if (Object.keys(update).length === 0) return []
+
+  return [control.txFactory.createTxUpdateDoc(updateTx.objectClass, updateTx.objectSpace, updateTx.objectId, update)]
+}
+
+async function doIssueCreateInherit (
+  createTx: TxCreateDoc<Issue>,
+  control: TriggerControl
+): Promise<Tx[]> {
+  const attrs = createTx.attributes as any
+  const attachedTo = attrs.attachedTo as Ref<Issue> | undefined
+  if (attachedTo === undefined || attachedTo === tracker.ids.NoParent) return []
+
+  const [parent] = await control.findAll(control.ctx, tracker.class.Issue, { _id: attachedTo }, { limit: 1 })
+  if (parent === undefined) return []
+
+  const parentName = (parent as any).clientName ?? ''
+  const parentStage = (parent as any).clientStage ?? 'onboarding'
+  const childName = attrs.clientName ?? ''
+  const childStage = attrs.clientStage ?? 'onboarding'
+
+  const update: DocumentUpdate<Issue> = {}
+  if (childName !== parentName) (update as any).clientName = parentName
+  if (childStage !== parentStage) (update as any).clientStage = parentStage
+  if (Object.keys(update).length === 0) return []
+
+  return [control.txFactory.createTxUpdateDoc(createTx.objectClass, createTx.objectSpace, createTx.objectId, update)]
+}
+
+/**
+ * @public
+ * Keeps sub-issues' clientName/clientStage mirrored to their parent. Covers three paths:
+ *   1) Parent updates clientName/clientStage → propagate to all descendants (BFS via attachedTo).
+ *   2) Issue's attachedTo changes (re-parented) → pull values from the new parent.
+ *   3) Issue is created with attachedTo pointing to another issue → pull values from the parent
+ *      (covers scripts/API integrations that create sub-issues without setting client fields).
+ */
+export async function OnIssueClientPropagate (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
+  const result: Tx[] = []
+  for (const tx of txes) {
+    const objectClass = (tx as TxCUD<Issue>).objectClass
+    if (objectClass === undefined) continue
+    if (!control.hierarchy.isDerived(objectClass, tracker.class.Issue)) continue
+    if (tx._class === core.class.TxCreateDoc) {
+      result.push(...(await doIssueCreateInherit(tx as TxCreateDoc<Issue>, control)))
+    } else if (tx._class === core.class.TxUpdateDoc) {
+      const updateTx = tx as TxUpdateDoc<Issue>
+      if (Object.prototype.hasOwnProperty.call(updateTx.operations, 'attachedTo')) {
+        result.push(...(await doIssueReparentSync(updateTx, control)))
+      }
+      result.push(...(await doIssueClientPropagate(updateTx, control)))
+    }
+  }
+  return result
+}
+
 /**
  * @public
  * Cancels the PDCA timer when a PDCA-active issue is deleted.
@@ -791,6 +904,7 @@ export default async () => ({
     OnProjectRemove,
     OnAutomaticDates,
     OnIssueCompletionCheck,
+    OnIssueClientPropagate,
     OnPdcaCycleToggle,
     OnPdcaCycleCancel
   }

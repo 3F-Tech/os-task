@@ -47,6 +47,9 @@
   export let showAllMixins: boolean = false
   export let readonly = false
 
+  $: isSubIssue = issue.attachedTo !== undefined && issue.attachedTo !== tracker.ids.NoParent
+  $: clientFieldsReadonly = readonly || isSubIssue
+
   const query = createQuery()
   let showIsBlocking = false
   let blockedBy: Doc[]
@@ -217,7 +220,7 @@
   <div class="divider" />
 
   <AttributeBarEditor
-    {readonly}
+    readonly={clientFieldsReadonly}
     key={'clientName'}
     identifier={issue.identifier}
     _class={issue._class}
@@ -233,7 +236,7 @@
     bind:value={issue.clientStage}
     kind={'regular'}
     size={'small'}
-    disabled={readonly}
+    disabled={clientFieldsReadonly}
     on:change={({ detail }) => {
       void client.update(issue, { clientStage: detail })
     }}

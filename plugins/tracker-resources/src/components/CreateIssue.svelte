@@ -237,16 +237,30 @@
 
   let descriptionBox: any
 
+  $: isSubIssue = parentIssue !== undefined
   $: projectUsesClientName = currentProject?.useClientName ?? true
+  $: showClientFields = projectUsesClientName && !isSubIssue
+  $: effectiveClientName = (object as any).clientName ?? ''
+  $: effectiveClientStage = ((object as any).clientStage ?? ClientStage.Onboarding) as ClientStage
+  $: syncClientFromParent(parentIssue)
   $: updateIssueStatusId(object, currentProject)
   $: updateAssigneeId(object, currentProject)
   $: canSave =
     descriptionBox != null &&
     getTitle(object.title ?? '').length > 0 &&
     object.status !== undefined &&
-    (!projectUsesClientName || getTitle((object as any).clientName ?? '').length > 0) &&
+    (!projectUsesClientName || isSubIssue || getTitle((object as any).clientName ?? '').length > 0) &&
     kind !== undefined &&
     currentProject !== undefined
+
+  function syncClientFromParent (parent: Issue | undefined): void {
+    if (parent === undefined) return
+    const parentName = (parent as any).clientName ?? ''
+    const parentStage = (parent as any).clientStage ?? ClientStage.Onboarding
+    if ((object as any).clientName !== parentName || (object as any).clientStage !== parentStage) {
+      object = { ...object, clientName: parentName, clientStage: parentStage } as any
+    }
+  }
 
   $: empty = {
     assignee: assignee ?? currentProject?.defaultAssignee,
@@ -1063,12 +1077,14 @@
       project={currentProject}
       milestone={object.milestone}
       component={object.component}
+      clientName={effectiveClientName}
+      clientStage={effectiveClientStage}
       bind:subIssues={object.subIssues}
     />
   {/if}
   <DocCreateExtComponent manager={docCreateManager} kind={'body'} space={currentProject} props={extraProps} />
   <svelte:fragment slot="pool">
-    {#if projectUsesClientName}
+    {#if showClientFields}
       <div id="client-name-editor" class="pool-item">
         <EditBox
           focusIndex={2.5}
