@@ -468,6 +468,15 @@ export interface GithubProject extends Project {
   repositories: Ref<GithubIntegrationRepository>[]
 }
 
+export interface GithubBranchRequest extends Doc {
+  issueId: Ref<Issue>
+  repo: string
+  branchName: string
+  action: 'create' | 'delete'
+  status: 'pending' | 'done' | 'error'
+  error?: string
+}
+
 export interface GithubPullRequestReviewThread extends Doc {
   githubId: string
   line: number
@@ -524,6 +533,7 @@ export default plugin(githubId, {
     GithubIntegrationRepository: '' as Ref<Class<GithubIntegrationRepository>>,
     GithubPatch: '' as Ref<Class<GithubPatch>>,
     GithubUserInfo: '' as Ref<Class<GithubUserInfo>>,
+    GithubBranchRequest: '' as Ref<Class<GithubBranchRequest>>,
 
     GithubPullRequestReview: '' as Ref<Class<GithubPullRequestReview>>,
     GithubReview: '' as Ref<Class<GithubReview>>,

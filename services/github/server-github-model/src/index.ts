@@ -31,6 +31,15 @@ export function createModel (builder: Builder): void {
     isAsync: false
   })
 
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverGithub.trigger.OnTechIssueChange,
+    isAsync: true,
+    txMatch: {
+      objectClass: tracker.class.Issue,
+      _class: { $in: [core.class.TxCreateDoc, core.class.TxRemoveDoc] }
+    }
+  })
+
   // We should skip activity github mixin stuff.
   builder.createDoc(time.class.TodoAutomationHelper, core.space.Model, {
     onDoneTester: serverGithub.functions.TodoDoneTester

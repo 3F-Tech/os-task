@@ -402,7 +402,7 @@ export function startHttpServer (
           // (cookies provide session authentication)
           const wsIds: WorkspaceIds = {
             uuid: workspace as WorkspaceUuid,
-            dataId: workspace as WorkspaceUuid,
+            dataId: workspace as unknown as import('@hcengineering/core').WorkspaceDataId,
             url: workspace
           }
 

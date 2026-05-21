@@ -46,6 +46,7 @@ import { type Person } from '@hcengineering/contact'
 import {
   type DocSyncInfo,
   type GithubAuthentication,
+  type GithubBranchRequest,
   type GithubComponent,
   type GithubIntegration,
   type GithubIntegrationRepository,
@@ -73,6 +74,7 @@ import {
 import contact, { TPerson } from '@hcengineering/model-contact'
 import presentation from '@hcengineering/model-presentation'
 import tracker, { TComponent, TIssue, TProject, issuesOptions } from '@hcengineering/model-tracker'
+import { type Issue } from '@hcengineering/tracker'
 import view, { classPresenter } from '@hcengineering/model-view'
 import workbench from '@hcengineering/model-workbench'
 import { getEmbeddedLabel } from '@hcengineering/platform'
@@ -556,6 +558,29 @@ export class TGithubReviewComment extends TAttachedDoc implements GithubReviewCo
 @Model(github.class.GithubPatch, attachment.class.Attachment)
 export class TGithubPatch extends TAttachment implements GithubPatch {}
 
+@Model(github.class.GithubBranchRequest, core.class.Doc, DOMAIN_GITHUB)
+export class TGithubBranchRequest extends TDoc implements GithubBranchRequest {
+  @Prop(TypeRef(tracker.class.Issue), getEmbeddedLabel('Issue'))
+  @Index(IndexKind.Indexed)
+    issueId!: Ref<Issue>
+
+  @Prop(TypeString(), getEmbeddedLabel('Repo'))
+    repo!: string
+
+  @Prop(TypeString(), getEmbeddedLabel('Branch Name'))
+    branchName!: string
+
+  @Prop(TypeString(), getEmbeddedLabel('Action'))
+    action!: 'create' | 'delete'
+
+  @Prop(TypeString(), getEmbeddedLabel('Status'))
+  @Index(IndexKind.Indexed)
+    status!: 'pending' | 'done' | 'error'
+
+  @Prop(TypeString(), getEmbeddedLabel('Error'))
+    error?: string
+}
+
 export function createModel (builder: Builder): void {
   builder.createModel(
     TDocSyncInfo,
@@ -573,7 +598,8 @@ export function createModel (builder: Builder): void {
     TGithubUserInfo,
     TGithubComponent,
     TGithubUser,
-    TGithubTodo
+    TGithubTodo,
+    TGithubBranchRequest
   )
 
   builder.createDoc(

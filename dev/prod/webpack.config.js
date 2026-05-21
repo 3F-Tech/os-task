@@ -52,40 +52,40 @@ const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPl
 
 const devProxy = {
   '/account': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:3000',
     changeOrigin: true,
-    pathRewrite: { '^/account': '/_accounts' },
+    pathRewrite: { '^/account': '' },
     logLevel: 'debug'
   },
   '/files': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:8087',
     changeOrigin: true,
     logLevel: 'debug'
   },
   '/api/v1': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:3332',
     changeOrigin: true,
     logLevel: 'debug'
   },
   '/import': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:8087',
     changeOrigin: true,
     logLevel: 'debug'
   },
   '/rekoni/recognize': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:4004',
     changeOrigin: true,
-    pathRewrite: { '^/rekoni/recognize': '/_rekoni/recognize' },
+    pathRewrite: { '^/rekoni/recognize': '/recognize' },
     logLevel: 'debug'
   },
   '/eyJ': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:3332',
     changeOrigin: true,
     ws: true,
     logLevel: 'debug'
   },
   '/_transactor': {
-    target: 'http://localhost:7000',
+    target: 'http://localhost:3332',
     changeOrigin: true,
     ws: true,
     logLevel: 'debug'

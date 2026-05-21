@@ -1222,6 +1222,60 @@ export class GithubWorker implements IntegrationManager {
     }
   }
 
+  async processBranchRequests (): Promise<void> {
+    const requests = await this._client.findAll(github.class.GithubBranchRequest, { status: 'pending' })
+    if (requests.length > 0) {
+      this.ctx.info('processBranchRequests: found pending requests', { count: requests.length })
+    }
+    for (const req of requests) {
+      this.ctx.info('processBranchRequests: processing', { action: req.action, repo: req.repo, branchName: req.branchName, issueId: req.issueId })
+      try {
+        const container = [...this.integrations.values()].find((c) => c.type === 'Organization')
+        if (container === undefined) {
+          this.ctx.warn('processBranchRequests: no Organization integration found', { integrations: [...this.integrations.values()].map((c) => ({ login: c.login, type: c.type })) })
+          continue
+        }
+
+        const octokit = container.octokit
+        const owner = container.login
+        this.ctx.info('processBranchRequests: using org', { owner })
+
+        if (req.action === 'create') {
+          const { data: repoData } = await octokit.rest.repos.get({ owner, repo: req.repo })
+          const { data: refData } = await octokit.rest.git.getRef({
+            owner,
+            repo: req.repo,
+            ref: `heads/${repoData.default_branch}`
+          })
+          await octokit.rest.git.createRef({
+            owner,
+            repo: req.repo,
+            ref: `refs/heads/${req.branchName}`,
+            sha: refData.object.sha
+          })
+          this.ctx.info('processBranchRequests: branch created', { owner, repo: req.repo, branchName: req.branchName })
+        } else if (req.action === 'delete') {
+          await octokit.rest.git.deleteRef({
+            owner,
+            repo: req.repo,
+            ref: `heads/${req.branchName}`
+          })
+          this.ctx.info('processBranchRequests: branch deleted', { owner, repo: req.repo, branchName: req.branchName })
+        }
+
+        await this._client.updateDoc(req._class, req.space, req._id, { status: 'done' })
+      } catch (err: any) {
+        // 422 em 'create' = branch já existe = objetivo cumprido
+        const alreadyExists = err.status === 422 && req.action === 'create'
+        this.ctx.error('processBranchRequests: error', { action: req.action, repo: req.repo, branchName: req.branchName, status: err.status, message: err.message, alreadyExists })
+        await this._client.updateDoc(req._class, req.space, req._id, {
+          status: alreadyExists ? 'done' : 'error',
+          error: alreadyExists ? undefined : (err.message ?? String(err))
+        })
+      }
+    }
+  }
+
   async syncAndWait (): Promise<void> {
     this.updateRequests = 1
 
@@ -1237,6 +1291,8 @@ export class GithubWorker implements IntegrationManager {
         )
       }
       try {
+        await this.processBranchRequests()
+
         const { projects, repositories } = await this.collectActiveProjects()
         if (projects.length === 0 && repositories.length === 0) {
           await this.waitChanges()

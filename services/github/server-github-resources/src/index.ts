@@ -12,6 +12,7 @@ import core, {
   Storage,
   Tx,
   TxCUD,
+  TxCreateDoc,
   TxProcessor,
   TxUpdateDoc,
   systemAccount,
@@ -22,7 +23,7 @@ import core, {
 import github, { DocSyncInfo, GithubProject } from '@hcengineering/github'
 import { TriggerControl } from '@hcengineering/server-core'
 import time, { ToDo } from '@hcengineering/time'
-import tracker from '@hcengineering/tracker'
+import tracker, { type Issue, type Project } from '@hcengineering/tracker'
 
 /**
  * @public
@@ -140,12 +141,89 @@ export async function OnProjectRemove (txes: Tx[], control: TriggerControl): Pro
   return result
 }
 
+function sanitizeBranchName (title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 200)
+}
+
+/**
+ * @public
+ */
+export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerControl): Promise<Tx[]> {
+  const result: Tx[] = []
+  for (const tx of txes) {
+    if (!control.hierarchy.isDerived(tx.objectClass, tracker.class.Issue)) continue
+
+    if (tx._class === core.class.TxCreateDoc) {
+      const createTx = tx as TxCreateDoc<Issue>
+      const projects = await control.findAll(control.ctx, tracker.class.Project, {
+        _id: createTx.objectSpace as Ref<Project>
+      })
+      const project = projects[0]
+      control.ctx.info('OnTechIssueChange: issue created', { projectIdentifier: project?.identifier, issueId: tx.objectId })
+      if (project?.identifier !== 'TECH_') {
+        control.ctx.info('OnTechIssueChange: skipping — not TECH_ project', { projectIdentifier: project?.identifier })
+        continue
+      }
+
+      const issue = TxProcessor.createDoc2Doc(createTx) as Issue
+      control.ctx.info('OnTechIssueChange: TECH_ issue', { title: issue.title, clientName: issue.clientName })
+      if (!issue.clientName) {
+        control.ctx.warn('OnTechIssueChange: skipping — clientName (Nome do Projeto) is empty')
+        continue
+      }
+
+      const branchName = sanitizeBranchName(issue.title)
+      control.ctx.info('OnTechIssueChange: creating GithubBranchRequest', { repo: issue.clientName, branchName })
+      result.push(
+        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, tx.objectSpace, {
+          issueId: tx.objectId as Ref<Issue>,
+          repo: issue.clientName,
+          branchName,
+          action: 'create',
+          status: 'pending'
+        })
+      )
+    }
+
+    if (tx._class === core.class.TxRemoveDoc) {
+      const requests = await control.findAll(control.ctx, github.class.GithubBranchRequest, {
+        issueId: tx.objectId as Ref<Issue>,
+        action: 'create',
+        status: 'done'
+      })
+      control.ctx.info('OnTechIssueChange: issue removed', { issueId: tx.objectId, branchRequestsFound: requests.length })
+      if (requests.length === 0) continue
+
+      const req = requests[0]
+      control.ctx.info('OnTechIssueChange: creating delete GithubBranchRequest', { repo: req.repo, branchName: req.branchName })
+      result.push(
+        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, tx.objectSpace, {
+          issueId: tx.objectId as Ref<Issue>,
+          repo: req.repo,
+          branchName: req.branchName,
+          action: 'delete',
+          status: 'pending'
+        })
+      )
+    }
+  }
+  return result
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default async () => ({
   trigger: {
     OnProjectChanges,
     OnProjectRemove,
-    OnGithubBroadcast
+    OnGithubBroadcast,
+    OnTechIssueChange
   },
   functions: {
     TodoDoneTester

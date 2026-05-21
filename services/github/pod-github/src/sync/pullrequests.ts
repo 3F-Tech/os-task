@@ -34,7 +34,7 @@ import github, {
 } from '@hcengineering/github'
 import task, { TaskType, calcRank, makeRank } from '@hcengineering/task'
 import time, { ToDo, ToDoPriority } from '@hcengineering/time'
-import tracker, { Issue, IssuePriority, IssueStatus, Project } from '@hcengineering/tracker'
+import tracker, { ClientStage, Issue, IssuePriority, IssueStatus, Project } from '@hcengineering/tracker'
 import { ProjectsV2ItemEvent, PullRequestEvent } from '@octokit/webhooks-types'
 import { Octokit } from 'octokit'
 import config from '../config'
@@ -970,7 +970,7 @@ export class PullRequestSyncManager extends IssueSyncManagerBase implements DocS
     info: DocSyncInfo,
     existing: WithMarkup<Issue>,
     platformUpdate: DocumentUpdate<Issue>,
-    issueData: Pick<WithMarkup<Issue>, 'title' | 'description' | 'assignee' | 'status' | 'remainingTime' | 'component'>,
+    issueData: GithubIssueData,
     container: ContainerFocus,
     issueExternal: IssueExternalData,
     okit: Octokit,
@@ -982,7 +982,7 @@ export class PullRequestSyncManager extends IssueSyncManagerBase implements DocS
       info,
       existing,
       platformUpdate,
-      issueData,
+      issueData as unknown as Pick<WithMarkup<Issue>, 'title' | 'description' | 'assignee' | 'status'>,
       container,
       issueExternal,
       github.class.GithubPullRequest
@@ -1179,7 +1179,9 @@ export class PullRequestSyncManager extends IssueSyncManagerBase implements DocS
       childInfo: [],
       commits: 0,
       reviewComments: 0,
-      reviews: 0
+      reviews: 0,
+      clientName: '',
+      clientStage: ClientStage.Onboarding
     }
 
     const collabId = makeCollabId(github.class.GithubPullRequest, prId, 'description')

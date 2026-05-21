@@ -74,6 +74,8 @@ WithMarkup<Issue>,
 | 'reviewThreads'
 | 'reviewComments'
 | 'component'
+| 'clientName'
+| 'clientStage'
 | keyof AttachedDoc
 > &
 Record<string, any>

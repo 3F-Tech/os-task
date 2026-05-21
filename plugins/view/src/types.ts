@@ -457,6 +457,7 @@ export interface ViewletConfigOptions {
   strict?: boolean
   extraProps?: Omit<BuildModelKey, 'key'>
   sortable?: boolean
+  customFieldsGoRight?: boolean
 }
 
 /**
@@ -651,6 +652,7 @@ export interface DisplayProps {
   compression?: boolean
   grow?: boolean
   dividerBefore?: boolean // should show divider before
+  hideLabel?: boolean
 }
 
 /**

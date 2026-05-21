@@ -36,6 +36,7 @@
   import { getResource, translate } from '@hcengineering/platform'
   import preference, { SpacePreference } from '@hcengineering/preference'
   import {
+    AttributeBarEditor,
     Card,
     createMarkup,
     createQuery,
@@ -43,14 +44,16 @@
     DocCreateExtensionManager,
     DraftController,
     getClient,
+    getFiltredKeys,
     getMarkup,
+    isCollectionAttr,
     KeyedAttribute,
     MessageBox,
     MultipleDraftController,
     SpaceSelector
   } from '@hcengineering/presentation'
   import tags, { type TagElement, TagReference } from '@hcengineering/tags'
-  import { TaskType } from '@hcengineering/task'
+  import task, { TaskType } from '@hcengineering/task'
   import { TaskKindSelector } from '@hcengineering/task-resources'
   import { EmptyMarkup, isEmptyMarkup } from '@hcengineering/text'
   import {
@@ -80,7 +83,7 @@
     showPopup,
     themeStore
   } from '@hcengineering/ui'
-  import view from '@hcengineering/view'
+  import view, { type Viewlet, type ViewletPreference } from '@hcengineering/view'
   import { ObjectBox } from '@hcengineering/view-resources'
   import { createEventDispatcher, onDestroy } from 'svelte'
 
@@ -293,6 +296,7 @@
     const detail = evt.detail
     object.priority = detail
     manager.setFocusPos(4)
+    if (detail !== IssuePriority.NoPriority) void activateInView('priority')
   }
 
   function onAssigneeChanged (evt: any): void {
@@ -300,6 +304,7 @@
     isAssigneeTouched = true
     object.assignee = detail
     manager.setFocusPos(5)
+    if (detail != null) void activateInView('assignee')
   }
 
   function onAttachmentRemoved (result: any): void {
@@ -308,6 +313,7 @@
 
   function onTagOpened (evt: any): void {
     addTagRef(evt.detail)
+    void activateInView('labels')
   }
 
   function onTagDeleted (evt: any): void {
@@ -434,6 +440,85 @@
   }
 
   const docCreateManager = DocCreateExtensionManager.create(tracker.class.Issue)
+
+  let issueListViewlet: Viewlet | undefined
+  const viewletQuery = createQuery()
+  viewletQuery.query(
+    view.class.Viewlet,
+    { attachTo: tracker.class.Issue, descriptor: view.viewlet.List },
+    (res) => {
+      issueListViewlet = res.find((v) => v.variant === undefined) ?? res[0]
+    }
+  )
+
+  let viewletPreferences: ViewletPreference[] = []
+  const viewletPrefQuery = createQuery()
+  $: if (issueListViewlet !== undefined) {
+    viewletPrefQuery.query(
+      view.class.ViewletPreference,
+      { attachedTo: issueListViewlet._id },
+      (res) => { viewletPreferences = res }
+    )
+  }
+
+  let currentTaskType: TaskType | undefined
+  const taskTypeQuery = createQuery()
+  $: if (kind !== undefined) {
+    taskTypeQuery.query(task.class.TaskType, { _id: kind }, (res) => {
+      currentTaskType = res[0]
+    })
+  } else {
+    currentTaskType = undefined
+    taskTypeQuery.unsubscribe()
+  }
+
+  async function activateInView (fieldKey: string): Promise<void> {
+    if (issueListViewlet === undefined) return
+    const pref = viewletPreferences.find((p) => p.attachedTo === issueListViewlet!._id)
+    const alreadyActive =
+      pref?.config.some((c) => (typeof c === 'string' ? c : c.key) === fieldKey) ??
+      issueListViewlet.config.some((c) => (typeof c === 'string' ? c : c.key) === fieldKey)
+    if (alreadyActive) return
+    if (pref === undefined) {
+      await client.createDoc(view.class.ViewletPreference, core.space.Workspace, {
+        attachedTo: issueListViewlet._id,
+        config: [...issueListViewlet.config, fieldKey]
+      })
+    } else {
+      await client.update(pref, { config: [...pref.config, fieldKey] })
+    }
+  }
+
+  const standardIgnoreKeys = [
+    'title', 'description', 'status', 'priority', 'assignee', 'component', 'dueDate',
+    'milestone', 'estimation', 'labels', 'kind', 'parentIssue', 'attachments',
+    'subIssues', 'relations', 'blockedBy', 'parents', 'childInfo', 'reportedTime',
+    'remainingTime', 'reports', 'number', 'rank', 'modifiedOn', 'modifiedBy',
+    'createdOn', 'createdBy', 'space', '_id', '_class', 'template',
+    'clientName', 'clientStage', 'startDate', 'completedDate'
+  ]
+
+  let customAttributes: KeyedAttribute[] = []
+  $: {
+    const allKeys = getFiltredKeys(hierarchy, tracker.class.Issue, standardIgnoreKeys)
+    const base = allKeys.filter(k => k.attr.isCustom === true && !isCollectionAttr(hierarchy, k))
+
+    const mixinKeys: KeyedAttribute[] = []
+    if (currentTaskType?.targetClass !== undefined) {
+      const mixinClass = hierarchy.getClass(currentTaskType.targetClass)
+      const to = hierarchy.isMixin(mixinClass.extends as Ref<Class<Doc>>)
+        ? (mixinClass.extends as Ref<Class<Doc>>)
+        : tracker.class.Issue
+      const seenKeys = new Set(base.map(k => k.key))
+      for (const k of getFiltredKeys(hierarchy, currentTaskType.targetClass, [], to)) {
+        if (!isCollectionAttr(hierarchy, k) && !seenKeys.has(k.key)) {
+          mixinKeys.push(k)
+        }
+      }
+    }
+
+    customAttributes = [...base, ...mixinKeys]
+  }
 
   function updateIssueStatusId (object: IssueDraft, currentProject: Project | undefined): void {
     if (currentProject?.defaultIssueStatus !== undefined && object.status === undefined) {
@@ -598,6 +683,22 @@
         _id
       )
       await docCreateManager.commit(operations, _id, currentProject, value, 'post')
+
+      for (const customAttr of customAttributes) {
+        const customValue = (object as any)[customAttr.key]
+        if (customValue === undefined || customValue === null || customValue === '' || customValue === 0) continue
+        const attrOf = customAttr.attr.attributeOf
+        if (!hierarchy.isMixin(attrOf)) {
+          await operations.updateDoc(tracker.class.Issue, _space, _id, {
+            [customAttr.key]: customValue
+          } as any)
+        } else {
+          await operations.updateMixin(_id, tracker.class.Issue, _space, attrOf, {
+            [customAttr.key]: customValue
+          })
+        }
+      }
+
       for (const label of object.labels) {
         await operations.addCollection(label._class, label.space, _id, tracker.class.Issue, 'labels', {
           title: label.title,
@@ -688,6 +789,7 @@
     }
 
     object.component = componentId
+    if (componentId != null) void activateInView('component')
   }
 
   const handleMilestoneIdChanged = (milestoneId: Ref<Milestone> | null | undefined): void => {
@@ -696,6 +798,7 @@
     }
 
     object.milestone = milestoneId
+    if (milestoneId != null) void activateInView('milestone')
   }
 
   function addTagRef (tag: TagElement): void {
@@ -966,17 +1069,16 @@
   <DocCreateExtComponent manager={docCreateManager} kind={'body'} space={currentProject} props={extraProps} />
   <svelte:fragment slot="pool">
     {#if projectUsesClientName}
-      <div id="client-name-editor">
+      <div id="client-name-editor" class="pool-item">
         <EditBox
           focusIndex={2.5}
           bind:value={object.clientName}
           placeholder={tracker.string.ClientName}
           kind={'regular'}
           size={'large'}
-          short
         />
       </div>
-      <div id="client-stage-editor">
+      <div id="client-stage-editor" class="pool-item">
         <ClientStageSelector
           bind:value={object.clientStage}
           kind={'regular'}
@@ -984,16 +1086,16 @@
         />
       </div>
     {/if}
-    <div id="status-editor">
+    <div id="status-editor" class="pool-item">
       {#if kind !== undefined}
         <StatusEditor
           focusIndex={3}
           value={{ ...object, kind }}
           kind={'regular'}
           size={'large'}
+          width={'100%'}
           defaultIssueStatus={currentProject?.defaultIssueStatus}
           shouldShowLabel={true}
-          short
           on:refocus={() => {
             manager.setFocusPos(3)
           }}
@@ -1001,7 +1103,7 @@
         />
       {/if}
     </div>
-    <div id="priority-editor">
+    <div id="priority-editor" class="pool-item">
       <PriorityEditor
         focusIndex={4}
         value={object}
@@ -1009,47 +1111,62 @@
         isEditable
         kind={'regular'}
         size={'large'}
+        width={'100%'}
         justify="center"
         on:change={onPriorityChanged}
       />
     </div>
-    <div id="assignee-editor">
+    <div id="assignee-editor" class="pool-item">
       <AssigneeEditor
         focusIndex={5}
         {object}
         kind={'regular'}
         size={'large'}
-        short
+        width={'100%'}
         on:change={onAssigneeChanged}
       />
     </div>
-    <Component
-      is={tags.component.TagsDropdownEditor}
-      props={{
-        focusIndex: 6,
-        items: object.labels,
-        key,
-        targetClass: tracker.class.Issue,
-        countLabel: tracker.string.NumberLabels,
-        kind: 'regular',
-        size: 'large'
-      }}
-      on:open={onTagOpened}
-      on:delete={onTagDeleted}
-    />
-    <ComponentSelector
-      focusIndex={7}
-      value={object.component}
-      space={_space}
-      onChange={handleComponentIdChanged}
-      isEditable={true}
-      kind={'regular'}
-      size={'large'}
-    />
-    <div id="estimation-editor" class="new-line">
-      <EstimationEditor focusIndex={8} kind={'regular'} size={'large'} value={object} />
+    <div id="labels-editor" class="new-line pool-item">
+      <Component
+        is={tags.component.TagsDropdownEditor}
+        props={{
+          focusIndex: 6,
+          items: object.labels,
+          key,
+          targetClass: tracker.class.Issue,
+          countLabel: tracker.string.NumberLabels,
+          kind: 'regular',
+          size: 'large',
+          width: '100%'
+        }}
+        on:open={onTagOpened}
+        on:delete={onTagDeleted}
+      />
     </div>
-    <div id="milestone-editor" class="new-line">
+    <div id="component-editor" class="new-line pool-item">
+      <ComponentSelector
+        focusIndex={7}
+        value={object.component}
+        space={_space}
+        onChange={handleComponentIdChanged}
+        isEditable={true}
+        kind={'regular'}
+        size={'large'}
+        width={'100%'}
+      />
+    </div>
+    <div id="estimation-editor" class="new-line pool-item">
+      <EstimationEditor
+        focusIndex={8}
+        kind={'regular'}
+        size={'large'}
+        value={object}
+        width={'100%'}
+        on:change={(e) => { if ((e.detail ?? 0) > 0) void activateInView('estimation') }}
+      />
+    </div>
+    <div class="new-line row-break" />
+    <div id="milestone-editor" class="new-line pool-item">
       <MilestoneSelector
         focusIndex={9}
         value={object.milestone}
@@ -1057,30 +1174,61 @@
         onChange={handleMilestoneIdChanged}
         kind={'regular'}
         size={'large'}
-        short
+        width={'100%'}
       />
     </div>
-    <div id="duedate-editor" class="new-line">
+    <div id="duedate-editor" class="new-line pool-item">
       <DatePresenter
         focusIndex={10}
         bind:value={object.dueDate}
         labelNull={tracker.string.DueDate}
         kind={'regular'}
         size={'large'}
+        width={'100%'}
         editable
+        on:change={() => { if (object.dueDate != null) void activateInView('dueDate') }}
       />
     </div>
-    <div id="parentissue-editor" class="new-line">
+    <div id="parentissue-editor" class="new-line pool-item">
       <Button
         focusIndex={11}
         icon={tracker.icon.Parent}
         label={object.parentIssue != null ? tracker.string.RemoveParent : tracker.string.SetParent}
         kind={'regular'}
         size={'large'}
+        width={'100%'}
         notSelected={object.parentIssue === undefined}
         on:click={object.parentIssue != null ? clearParentIssue : setParentIssue}
       />
     </div>
+    {#if customAttributes.length > 0}
+      <div class="new-line custom-fields-divider">
+        <span class="custom-fields-label">Custom</span>
+      </div>
+    {/if}
+    {#each customAttributes as customAttr (customAttr.key)}
+      <div id={`custom-${customAttr.key}-editor`} class="new-line flex-row-center gap-2" style="width: 100%;">
+        <span class="labelOnPanel" style="min-width: 5rem;">
+          <Label label={customAttr.attr.label} />
+        </span>
+        <div style="flex: 1; min-width: 0;">
+          <AttributeBarEditor
+            key={customAttr}
+            object={object}
+            _class={customAttr.attr.attributeOf}
+            draft={true}
+            showHeader={false}
+            kind={'regular'}
+            size={'large'}
+            on:update={(e) => {
+              if (e.detail?.value != null && e.detail.value !== '' && e.detail.value !== 0) {
+                void activateInView(customAttr.key)
+              }
+            }}
+          />
+        </div>
+      </div>
+    {/each}
     <DocCreateExtComponent manager={docCreateManager} kind={'pool'} space={currentProject} props={extraProps} />
   </svelte:fragment>
   <svelte:fragment slot="attachments">
@@ -1135,3 +1283,60 @@
     </DocCreateExtComponent>
   </svelte:fragment>
 </Card>
+
+<style lang="scss">
+  .row-break {
+    flex-basis: 100%;
+    height: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .pool-item {
+    flex: 1 1 0;
+    min-width: 0;
+
+    /* force the component root element to fill the cell */
+    & > :global(*) {
+      width: 100%;
+      min-width: 0;
+    }
+
+    /* force any button descendant to also fill */
+    & :global(button) {
+      width: 100%;
+    }
+  }
+
+  .custom-fields-divider {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-top: 1rem;
+
+    &::before {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--theme-list-divider-color);
+    }
+
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--theme-list-divider-color);
+    }
+  }
+
+  .custom-fields-label {
+    font-size: .625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--theme-trans-color);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+</style>

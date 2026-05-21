@@ -32,7 +32,7 @@ import github, {
   GithubIssue as TGithubIssue
 } from '@hcengineering/github'
 import task, { TaskType, calcRank } from '@hcengineering/task'
-import tracker, { Issue, IssuePriority } from '@hcengineering/tracker'
+import tracker, { ClientStage, Issue, IssuePriority } from '@hcengineering/tracker'
 import { Issue as GithubIssue, IssuesEvent, ProjectsV2ItemEvent } from '@octokit/webhooks-types'
 import { Octokit } from 'octokit'
 import config from '../config'
@@ -599,7 +599,7 @@ export class IssueSyncManager extends IssueSyncManagerBase implements DocSyncMan
     info: DocSyncInfo,
     existing: WithMarkup<Issue>,
     platformUpdate: DocumentUpdate<Issue>,
-    issueData: Pick<WithMarkup<Issue>, 'title' | 'description' | 'assignee' | 'status' | 'remainingTime' | 'component'>,
+    issueData: GithubIssueData,
     container: ContainerFocus,
     issueExternal: IssueExternalData,
     okit: Octokit,
@@ -611,7 +611,7 @@ export class IssueSyncManager extends IssueSyncManagerBase implements DocSyncMan
       info,
       existing,
       platformUpdate,
-      issueData,
+      issueData as unknown as Pick<WithMarkup<Issue>, 'title' | 'description' | 'assignee' | 'status'>,
       container,
       issueExternal,
       tracker.class.Issue
@@ -876,7 +876,9 @@ export class IssueSyncManager extends IssueSyncManagerBase implements DocSyncMan
       reports: 0,
       relations: [],
       childInfo: [],
-      identifier: `${prj.identifier}-${number}`
+      identifier: `${prj.identifier}-${number}`,
+      clientName: '',
+      clientStage: ClientStage.Onboarding
     }
 
     await this.collaborator.updateMarkup(collabId, description)

@@ -22,7 +22,8 @@ export default plugin(serverGithubId, {
   trigger: {
     OnProjectChanges: '' as Resource<TriggerFunc>,
     OnProjectRemove: '' as Resource<TriggerFunc>,
-    OnGithubBroadcast: '' as Resource<TriggerFunc>
+    OnGithubBroadcast: '' as Resource<TriggerFunc>,
+    OnTechIssueChange: '' as Resource<TriggerFunc>
   },
   functions: {
     TodoDoneTester: '' as Resource<TodoDoneTester>

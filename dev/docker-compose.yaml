@@ -237,6 +237,7 @@ services:
     links:
       - stats
     ports:
+      - 7000:8080
       - 8087:8080
       - 8088:8080
     environment:
@@ -255,6 +256,8 @@ services:
       - COLLABORATOR_URL=ws://localhost:3078
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - GITHUB_URL=http://localhost:3500
+      - GITHUB_APP=os-tasks
+      - GITHUB_CLIENTID=Iv23liz1iroLtzYJl96V
       - PRINT_URL=http://localhost:4005
       - SIGN_URL=http://localhost:4006
       #      - ANALYTICS_COLLECTOR_URL=http://localhost:4017
@@ -516,6 +519,28 @@ services:
       - BADGER_DIRECTORY_KEY=/badger/key
     restart: unless-stopped
   # calendar: disabled — requires Google OAuth credentials
+  github:
+    image: hardcoreeng/github:3f-local
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    depends_on:
+      account:
+        condition: service_started
+    ports:
+      - 3500:3500
+    environment:
+      - PORT=3500
+      - SERVER_SECRET=secret
+      - BOT_NAME=os-tasks[bot]
+      - ACCOUNTS_URL=http://account:3000
+      - COLLABORATOR_URL=ws://collaborator:3078
+      - FRONT_URL=http://localhost:8087
+      - STORAGE_CONFIG=${STORAGE_CONFIG}
+      - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+    env_file:
+      - .env.github
+    restart: unless-stopped
 volumes:
   db:
   dbpg:
