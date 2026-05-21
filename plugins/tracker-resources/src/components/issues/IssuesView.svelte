@@ -130,6 +130,7 @@
     query={resultQuery}
     {space}
     {viewOptions}
+    {allowedMixins}
     createItemDialog={CreateIssue}
     createItemLabel={tracker.string.AddIssueTooltip}
     createItemEvent={TrackerEvents.IssuePlusButtonClicked}

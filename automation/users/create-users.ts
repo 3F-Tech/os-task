@@ -5,8 +5,7 @@ import * as dotenv from 'dotenv'
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') })
 
-// AccountRole.User = 2
-const USER_ROLE = 2 as any
+const USER_ROLE = 'USER' as any
 
 interface UserEntry {
   first: string
@@ -66,7 +65,7 @@ async function run (): Promise<void> {
 
   for (const user of users) {
     try {
-      await accountClient.signUpJoin(
+      const loginInfo = await accountClient.signUpJoin(
         user.email,
         defaultPassword,
         user.first,
@@ -74,6 +73,11 @@ async function run (): Promise<void> {
         inviteId,
         HUB_WORKSPACE_URL
       )
+
+      // Inicializa a sessão no workspace para o usuário aparecer na lista de membros
+      const userClient = getClient(HUB_ACCOUNTS_URL!, loginInfo.token)
+      await userClient.selectWorkspace(HUB_WORKSPACE_URL!)
+
       console.log(`  ✅ ${user.first} ${user.last} <${user.email}>`)
       ok++
     } catch (err: any) {
