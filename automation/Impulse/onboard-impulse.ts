@@ -196,6 +196,8 @@ async function run() {
     const pdcaDueDays = (template as any).pdcaCycleDueDays as number[] | undefined;
     const pdcaDueDate = pdcaActive ? calculateCurrentCycleDueDate(pdcaFrequency, pdcaDueDays) : null;
 
+    const clientStage = (template as any).clientStage ?? 'onboarding';
+
     const tarefaId = await writeClient.addCollection(
       tracker.class.Issue,
       projetoId,
@@ -212,7 +214,7 @@ async function run() {
         status: (template as any).status ?? projeto.defaultIssueStatus,
         estimation: (template as any).estimation ?? 0,
         clientName: nomeCliente,
-        clientStage: (template as any).clientStage ?? 'onboarding',
+        clientStage,
         pdcaCycleActive: pdcaActive,
         pdcaCycleFrequency: pdcaFrequency,
         pdcaCycleDueDays: pdcaDueDays,
@@ -260,6 +262,8 @@ async function run() {
           kind: (child as any).kind ?? kind,
           status: child.status ?? projeto.defaultIssueStatus,
           estimation: child.estimation ?? 0,
+          clientName: nomeCliente,
+          clientStage,
           space: projetoId,
           attachedTo: tarefaId,
           attachedToClass: tracker.class.Issue,
