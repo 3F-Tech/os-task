@@ -154,6 +154,8 @@
       const pdcaFrequency = (template as any).pdcaCycleFrequency
       const pdcaDueDays = (template as any).pdcaCycleDueDays
       const pdcaDueDate = pdcaActive ? calculateCurrentCycleDueDate(pdcaFrequency, pdcaDueDays) : null
+      const clientName = nomeCliente.trim()
+      const clientStage = (template as any).clientStage ?? 'onboarding'
 
       const tarefaId = await client.addCollection(
         tracker.class.Issue,
@@ -170,8 +172,8 @@
           kind: kind as any,
           status: ((template as any).status ?? projeto.defaultIssueStatus) as any,
           estimation: (template as any).estimation ?? 0,
-          clientName: nomeCliente.trim(),
-          clientStage: (template as any).clientStage ?? 'onboarding',
+          clientName,
+          clientStage,
           pdcaCycleActive: pdcaActive,
           pdcaCycleFrequency: pdcaFrequency,
           pdcaCycleDueDays: pdcaDueDays,
@@ -218,7 +220,9 @@
             priority: child.priority ?? 0,
             kind: (child.kind ?? kind) as any,
             status: (child.status ?? projeto.defaultIssueStatus) as any,
-            estimation: child.estimation ?? 0
+            estimation: child.estimation ?? 0,
+            clientName,
+            clientStage
           } as any
         )
 
