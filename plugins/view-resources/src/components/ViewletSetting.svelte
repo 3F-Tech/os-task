@@ -388,6 +388,22 @@
     })
   }
 
+  // 3F — Identifica entradas da preferência que referenciam mixins fora do escopo
+  // do projeto atual (allowedMixins). ViewletPreference é workspace-wide, então ao
+  // salvar precisamos preservar o que pertence a outros projetos, senão escolher
+  // colunas no projeto B apaga as do projeto A.
+  function isOutOfScopeMixinEntry (entry: string | BuildModelKey): boolean {
+    if (allowedMixins === undefined) return false
+    const key = typeof entry === 'string' ? entry : (entry.displayProps?.key ?? entry.key ?? '')
+    if (key === '') return false
+    if (key.startsWith('$lookup') || key.startsWith('$relation') || key.startsWith('$associations')) return false
+    const dot = key.indexOf('.')
+    if (dot <= 0) return false
+    const head = key.slice(0, dot) as Ref<Class<Doc>>
+    if (!hierarchy.hasClass(head) || !hierarchy.isMixin(head)) return false
+    return !allowedMixins.has(head)
+  }
+
   async function save (viewletId: Ref<Viewlet>, items: Array<Config | AttributeConfig>): Promise<void> {
     const configValues = items.filter(
       (p) =>
@@ -395,7 +411,7 @@
         ((p.type === 'divider' && typeof p.value === 'object' && p.value.displayProps?.grow) ||
           (p.type === 'attribute' && (p as AttributeConfig).enabled))
     )
-    const config = configValues.map((p) => {
+    const newConfig = configValues.map((p) => {
       const value = p.value as string | BuildModelKey
       const key = typeof value === 'string' ? value : value.key
       if (key?.startsWith('custom')) {
@@ -409,6 +425,8 @@
       return value
     })
     const preference = preferences.find((p) => p.attachedTo === viewletId)
+    const preserved = preference !== undefined ? preference.config.filter(isOutOfScopeMixinEntry) : []
+    const config = [...newConfig, ...preserved]
     if (preference !== undefined) {
       await client.update(preference, {
         config

@@ -16,8 +16,29 @@
   export let createItemLabel: IntlString | undefined = undefined
   export let createItemEvent: string | undefined = undefined
   export let createItemDialogProps = { shouldSaveDraft: true }
+  export let allowedMixins: Set<string> | undefined = undefined
 
   const hierarchy = getClient().getHierarchy()
+
+  // 3F — Filtra colunas cuja chave referencia um Mixin que não pertence ao SpaceType
+  // do projeto atual. ViewletPreference é workspace-wide; sem isso, custom fields
+  // habilitados em um projeto vazariam para outros como "Não selecionado".
+  function filterConfigByAllowedMixins (
+    config: Array<string | BuildModelKey>,
+    allowed: Set<string> | undefined
+  ): Array<string | BuildModelKey> {
+    if (allowed === undefined) return config
+    return config.filter((c) => {
+      const key = typeof c === 'string' ? c : (c.key ?? c.displayProps?.key ?? '')
+      if (key === '') return true
+      if (key.startsWith('$lookup') || key.startsWith('$relation') || key.startsWith('$associations')) return true
+      const dot = key.indexOf('.')
+      if (dot <= 0) return true
+      const head = key.slice(0, dot) as Ref<Class<Doc>>
+      if (!hierarchy.hasClass(head) || !hierarchy.isMixin(head)) return true
+      return allowed.has(head)
+    })
+  }
 
   const preferenceQuery = createQuery()
   const objectConfigurations = createQuery()
@@ -62,11 +83,15 @@
     )
   }
 
-  function updateConfiguration (configurationRaw: Viewlet[], preference: ViewletPreference[]): void {
+  function updateConfiguration (
+    configurationRaw: Viewlet[],
+    preference: ViewletPreference[],
+    allowedMixins: Set<string> | undefined
+  ): void {
     const newConfigurations: Record<Ref<Class<Doc>>, Viewlet['config']> = {}
 
     for (const v of configurationRaw) {
-      newConfigurations[v.attachTo] = v.config
+      newConfigurations[v.attachTo] = filterConfigByAllowedMixins(v.config, allowedMixins)
     }
 
     // Add viewlet configurations.
@@ -74,7 +99,10 @@
       if (pref.config.length > 0) {
         const vl = configurationRaw.find((it) => it._id === pref.attachedTo)
         if (vl !== undefined) {
-          newConfigurations[vl.attachTo] = mergePreferenceConfig(pref.config, vl.config)
+          newConfigurations[vl.attachTo] = filterConfigByAllowedMixins(
+            mergePreferenceConfig(pref.config, vl.config),
+            allowedMixins
+          )
         }
       }
     }
@@ -85,7 +113,7 @@
   $: fetchConfigurations(viewlet)
   $: fetchPreferences(configurationRaw)
 
-  $: updateConfiguration(configurationRaw, preference)
+  $: updateConfiguration(configurationRaw, preference, allowedMixins)
 
   // 3F — Mescla config salva pelo usuário com o config base do viewlet.
   // O gear menu não persiste `presenter`/`props`, então preferências salvas antes
@@ -120,8 +148,8 @@
 
   $: config = (() => {
     const pref = preference.find((it) => it.attachedTo === viewlet._id)
-    if (pref === undefined) return viewlet.config
-    return mergePreferenceConfig(pref.config, viewlet.config)
+    const base = pref === undefined ? viewlet.config : mergePreferenceConfig(pref.config, viewlet.config)
+    return filterConfigByAllowedMixins(base, allowedMixins)
   })()
 </script>
 
