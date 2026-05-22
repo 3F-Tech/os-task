@@ -262,13 +262,13 @@ services:
       - BRANDING_URL=https://3ftasks.3fventure.tech/branding.json
       - STREAM_URL=http://stream:1080/recording
       - PAYMENT_URL=http://payment:3040
-      - COMMUNICATION_API_ENABLED=true
+      # Communication API desabilitada — depende do hulylake (não publicado no Docker Hub)
+      - COMMUNICATION_API_ENABLED=false
       - BACKUP_URL=http://backup-api:4039/api/backup,
       - EXCLUDED_APPLICATIONS_FOR_ANONYMOUS=[]
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - PULSE_URL=wss://3ftasks.3fventure.tech/_pulse/ws
       - DATALAKE_URL=https://3ftasks.3fventure.tech/files
-      - HULYLAKE_URL=http://hulylake:8096
       - EXPORT_URL=http://export:4009
       - LINK_PREVIEW_URL=http://link-preview:4041
       - LOVE_ENDPOINT=https://3ftasks.3fventure.tech/_love
@@ -312,9 +312,12 @@ services:
       - RATE_LIMIT_MAX=250
       - RATE_LIMIT_WINDOW=30000
       - FILES_URL=https://3ftasks.3fventure.tech/files/blob/:workspace/:blobId/:filename
-      - COMMUNICATION_API_ENABLED=true
+      # Communication API desabilitada — depende do hulylake (não publicado no Docker Hub)
+      - COMMUNICATION_API_ENABLED=false
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
-      - HYLYLAKE_URL=http://hulylake:8096
+      # URL pública do calendar service — necessária para o trigger OnEvent enviar
+      # eventos do Huly para o Google Calendar via pod-calendar (/event endpoint).
+      - CALENDAR_URL=https://3ftasks.3fventure.tech/_calendar
     restart: unless-stopped
   github:
     image: hardcoreeng/github:3f-local
