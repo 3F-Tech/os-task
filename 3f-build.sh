@@ -17,6 +17,7 @@
 #   ./3f-build.sh --pod workspace     # reconstrói só o workspace_cockroach
 #   ./3f-build.sh --pod preview           # reconstrói só o preview
 #   ./3f-build.sh --pod github            # reconstrói só o github service
+#   ./3f-build.sh --pod mail              # reconstrói só o mail service
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
 #   ./3f-build.sh --vps --clean --no-cache  # rebuild completo na VPS
@@ -201,6 +202,12 @@ if [[ "$PODS" == *"github"* ]]; then
   rushx bundle || fail "bundle github"
 fi
 
+if [[ "$PODS" == *"mail"* ]]; then
+  info "Bundlando mail service..."
+  cd "$ROOT_DIR/services/mail/pod-mail"
+  rushx bundle || fail "bundle mail"
+fi
+
 done_step $T
 
 # ── Passo 4: Docker build ─────────────────────────────────────────────────────
@@ -257,6 +264,12 @@ if [[ "$PODS" == *"github"* ]]; then
   DOCKER_VERSION=3f-local bash ../../../common/scripts/docker_build.sh hardcoreeng/github || fail "docker build github"
 fi
 
+if [[ "$PODS" == *"mail"* ]]; then
+  info "Buildando imagem: hardcoreeng/mail:3f-local"
+  cd "$ROOT_DIR/services/mail/pod-mail"
+  DOCKER_VERSION=3f-local bash ../../../common/scripts/docker_build.sh hardcoreeng/mail || fail "docker build mail"
+fi
+
 done_step $T
 
 # ── Passo 5: Restart dos containers ──────────────────────────────────────────
@@ -274,6 +287,7 @@ SERVICES=""
 [[ "$PODS" == *"workspace"*    ]] && SERVICES="$SERVICES workspace_cockroach"
 [[ "$PODS" == *"preview"*      ]] && SERVICES="$SERVICES preview"
 [[ "$PODS" == *"github"*       ]] && SERVICES="$SERVICES github"
+[[ "$PODS" == *"mail"*         ]] && SERVICES="$SERVICES mail"
 
 info "Serviços: $SERVICES"
 

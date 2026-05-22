@@ -135,6 +135,23 @@ services:
       - 6379:6379
     restart: unless-stopped
 
+  mail:
+    image: hardcoreeng/mail:3f-local
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    env_file:
+      - .env.secrets
+    environment:
+      - PORT=8092
+      - SOURCE=${MAIL_FROM}
+      - REPLY_TO=${MAIL_REPLY_TO}
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USERNAME=${GMAIL_USER}
+      - SMTP_PASSWORD=${GMAIL_APP_PASSWORD}
+      - SMTP_TLS_MODE=upgrade
+    restart: unless-stopped
+
   account:
     image: hardcoreeng/account:3f-local
     extra_hosts:
@@ -157,7 +174,7 @@ services:
       # Pass only one region to disallow selection for new workspaces.
       - REGION_INFO=cockroach|CockroachDB
       - TRANSACTOR_URL=ws://localhost:3332;;cockroach,
-      - MAIL_URL=
+      - MAIL_URL=http://mail:8092
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=http://localhost:8087
       - LAST_NAME_FIRST=true
@@ -207,7 +224,7 @@ services:
       - BRANDING_PATH=/var/cfg/branding.json
       - BACKUP_STORAGE=${BACKUP_STORAGE_CONFIG}
       - BACKUP_BUCKET=${BACKUP_BUCKET_NAME}
-      - MAIL_URL=
+      - MAIL_URL=http://mail:8092
       # - INIT_WORKSPACE=staging-dev
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
@@ -309,7 +326,7 @@ services:
       - METRICS_FILE=metrics.txt
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=http://localhost:8087
-      - MAIL_URL=''
+      - MAIL_URL=http://mail:8092
       - ACCOUNTS_URL=http://account:3000
       - LAST_NAME_FIRST=true
       - BRANDING_PATH=/var/cfg/branding.json
