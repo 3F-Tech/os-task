@@ -36,7 +36,16 @@ export function createModel (builder: Builder): void {
     isAsync: true,
     txMatch: {
       objectClass: tracker.class.Issue,
-      _class: { $in: [core.class.TxCreateDoc, core.class.TxRemoveDoc] }
+      _class: { $in: [core.class.TxCreateDoc, core.class.TxRemoveDoc, core.class.TxMixin] }
+    }
+  })
+
+  builder.createDoc(serverCore.class.Trigger, core.space.Model, {
+    trigger: serverGithub.trigger.OnTechIssueCompletionCheck,
+    isAsync: false,
+    txMatch: {
+      objectClass: tracker.class.Issue,
+      _class: core.class.TxUpdateDoc
     }
   })
 

@@ -1406,6 +1406,19 @@ export class PlatformWorker {
         )
       }
     })
+
+    this.app.webhooks.on('push', async ({ payload, name, id }: any) => {
+      const repoWorker = this.getWorker(payload.installation?.id)
+      if (repoWorker !== undefined) {
+        catchEventError(
+          this.ctx.with(name, {}, (ctx) => repoWorker.handlePushEvent(ctx, payload)),
+          'push',
+          name,
+          id,
+          payload.repository?.name ?? ''
+        )
+      }
+    })
   }
 
   public async revokeUserAuth (ctx: MeasureContext, record: GithubUserRecord): Promise<void> {

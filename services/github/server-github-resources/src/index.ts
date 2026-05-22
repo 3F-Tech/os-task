@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import chunter from '@hcengineering/chunter'
 import core, {
+  ClassifierKind,
   Doc,
   DocumentUpdate,
   Hierarchy,
@@ -23,7 +24,8 @@ import core, {
 import github, { DocSyncInfo, GithubProject } from '@hcengineering/github'
 import { TriggerControl } from '@hcengineering/server-core'
 import time, { ToDo } from '@hcengineering/time'
-import tracker, { type Issue, type Project } from '@hcengineering/tracker'
+import task from '@hcengineering/task'
+import tracker, { type Issue, type IssueStatus, type Project } from '@hcengineering/tracker'
 
 /**
  * @public
@@ -152,6 +154,53 @@ function sanitizeBranchName (title: string): string {
     .substring(0, 200)
 }
 
+function getNomeDoProjetoFromMixinTx (control: TriggerControl, mixin: Ref<Class<Doc>>, attributes: Record<string, any>): string | undefined {
+  try {
+    const attrs = control.hierarchy.getAllAttributes(mixin)
+    for (const [attrName, attr] of attrs) {
+      if (!(attr as any).isCustom) continue
+      const labelStr = attr.label as string
+      if (labelStr.includes('Nome do Projeto')) {
+        // TxMixin attributes can be stored with or without mixin prefix: "<mixin>.<attrName>" or "<attrName>"
+        const value = attributes[`${mixin}.${attrName}`] ?? attributes[attrName]
+        if (typeof value === 'string' && value.trim() !== '') {
+          return value.trim()
+        }
+      }
+    }
+  } catch {
+    // mixin not in hierarchy
+  }
+  return undefined
+}
+
+function getCustomFieldValue (control: TriggerControl, issue: Issue, labelFragment: string): string | undefined {
+  const hierarchy = control.hierarchy
+  const descendants = hierarchy.getDescendants(tracker.class.Issue)
+  for (const mixin of descendants) {
+    try {
+      if (hierarchy.getClass(mixin).kind !== ClassifierKind.MIXIN) continue
+      if (!hierarchy.hasMixin(issue, mixin)) continue
+      const attrs = hierarchy.getOwnAttributes(mixin)
+      for (const [attrName, attr] of attrs) {
+        if (!(attr as any).isCustom) continue
+        if (!(attr.label as string).includes(labelFragment)) continue
+        const mixinData = hierarchy.as<Issue, any>(issue, mixin)
+        const value = mixinData[attrName]
+        if (typeof value === 'string' && value.trim() !== '') {
+          return value.trim()
+        }
+      }
+    } catch { /* mixin not in hierarchy */ }
+  }
+  return undefined
+}
+
+function buildBranchName (tipo: string | undefined, title: string): string {
+  const slug = sanitizeBranchName(title)
+  return tipo !== undefined ? `${tipo.toLowerCase()}/${slug}` : slug
+}
+
 /**
  * @public
  */
@@ -166,25 +215,48 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
         _id: createTx.objectSpace as Ref<Project>
       })
       const project = projects[0]
-      control.ctx.info('OnTechIssueChange: issue created', { projectIdentifier: project?.identifier, issueId: tx.objectId })
-      if (project?.identifier !== 'TECH_') {
-        control.ctx.info('OnTechIssueChange: skipping — not TECH_ project', { projectIdentifier: project?.identifier })
-        continue
-      }
+      if (project?.identifier !== 'TECH_') continue
 
       const issue = TxProcessor.createDoc2Doc(createTx) as Issue
-      control.ctx.info('OnTechIssueChange: TECH_ issue', { title: issue.title, clientName: issue.clientName })
-      if (!issue.clientName) {
-        control.ctx.warn('OnTechIssueChange: skipping — clientName (Nome do Projeto) is empty')
-        continue
-      }
+      if (!issue.clientName) continue
 
       const branchName = sanitizeBranchName(issue.title)
-      control.ctx.info('OnTechIssueChange: creating GithubBranchRequest', { repo: issue.clientName, branchName })
       result.push(
         control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, tx.objectSpace, {
           issueId: tx.objectId as Ref<Issue>,
           repo: issue.clientName,
+          branchName,
+          action: 'create',
+          status: 'pending'
+        })
+      )
+    }
+
+    if (tx._class === core.class.TxMixin) {
+      const mixinTx = tx as unknown as { mixin: Ref<Class<Doc>>, attributes: Record<string, any>, objectSpace: Ref<Space> }
+      const repoName = getNomeDoProjetoFromMixinTx(control, mixinTx.mixin, mixinTx.attributes)
+      if (repoName === undefined) continue
+
+      const issues = await control.findAll(control.ctx, tracker.class.Issue, { _id: tx.objectId as Ref<Issue> })
+      const issue = issues[0]
+      if (issue === undefined) continue
+
+      const projects = await control.findAll(control.ctx, tracker.class.Project, { _id: issue.space as Ref<Project> })
+      const project = projects[0]
+      if (project?.identifier !== 'TECH_') continue
+
+      const existing = await control.findAll(control.ctx, github.class.GithubBranchRequest, {
+        issueId: tx.objectId as Ref<Issue>,
+        action: 'create'
+      })
+      if (existing.length > 0) continue
+
+      const tipo = getCustomFieldValue(control, issue, 'Tipo')
+      const branchName = buildBranchName(tipo, issue.title)
+      result.push(
+        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, issue.space, {
+          issueId: tx.objectId as Ref<Issue>,
+          repo: repoName,
           branchName,
           action: 'create',
           status: 'pending'
@@ -198,11 +270,9 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
         action: 'create',
         status: 'done'
       })
-      control.ctx.info('OnTechIssueChange: issue removed', { issueId: tx.objectId, branchRequestsFound: requests.length })
       if (requests.length === 0) continue
 
       const req = requests[0]
-      control.ctx.info('OnTechIssueChange: creating delete GithubBranchRequest', { repo: req.repo, branchName: req.branchName })
       result.push(
         control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, tx.objectSpace, {
           issueId: tx.objectId as Ref<Issue>,
@@ -217,13 +287,60 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
   return result
 }
 
+/**
+ * @public
+ */
+export async function OnTechIssueCompletionCheck (txes: TxCUD<Doc>[], control: TriggerControl): Promise<Tx[]> {
+  const result: Tx[] = []
+  for (const tx of txes) {
+    if (tx._class !== core.class.TxUpdateDoc) continue
+    if (!control.hierarchy.isDerived(tx.objectClass, tracker.class.Issue)) continue
+
+    const updateTx = tx as TxUpdateDoc<Issue>
+    const newStatusId = updateTx.operations.status
+    if (newStatusId == null) continue
+
+    const [newStatus] = await control.findAll(control.ctx, tracker.class.IssueStatus, { _id: newStatusId }, { limit: 1 })
+    if (newStatus == null || newStatus.category !== task.statusCategory.Won) continue
+
+    // Fetch issue pre-tx state (status is still the previous value at this point)
+    const [issue] = await control.findAll(control.ctx, tracker.class.Issue, { _id: tx.objectId as Ref<Issue> }, { limit: 1 })
+    if (issue == null) continue
+    const previousStatus = issue.status
+    if (previousStatus === newStatusId) continue
+
+    const [project] = await control.findAll(control.ctx, tracker.class.Project, { _id: issue.space as Ref<Project> }, { limit: 1 })
+    if (project?.identifier !== 'TECH_') continue
+
+    const branchRequests = await control.findAll(control.ctx, github.class.GithubBranchRequest, {
+      issueId: tx.objectId as Ref<Issue>,
+      action: 'create',
+      status: 'done'
+    })
+    if (branchRequests.length === 0) continue
+    if (branchRequests.some((r) => r.hasCommits === true)) continue
+
+    control.ctx.warn('OnTechIssueCompletionCheck: blocking — branch has no commits', { issueId: tx.objectId })
+    result.push(
+      control.txFactory.createTxUpdateDoc<Issue>(
+        tracker.class.Issue,
+        tx.objectSpace,
+        tx.objectId as Ref<Issue>,
+        { status: previousStatus }
+      )
+    )
+  }
+  return result
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default async () => ({
   trigger: {
     OnProjectChanges,
     OnProjectRemove,
     OnGithubBroadcast,
-    OnTechIssueChange
+    OnTechIssueChange,
+    OnTechIssueCompletionCheck
   },
   functions: {
     TodoDoneTester

@@ -13,7 +13,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { AttachedData, Ref, WithLookup } from '@hcengineering/core'
+  import { AttachedData, Class, Doc, Ref, WithLookup } from '@hcengineering/core'
   import { getClient } from '@hcengineering/presentation'
   import { getTaskTypeStates } from '@hcengineering/task'
   import task from '@hcengineering/task'
@@ -79,7 +79,22 @@
 
     const hierarchy = client.getHierarchy()
     const project = await client.findOne(tracker.class.Project, { _id: issue.space })
-    if (!project || !hierarchy.hasMixin(project, tracker.mixin.IssueCompletionConfig)) return []
+    if (!project) return []
+
+    // Checagem específica para projeto TECH_: branch deve ter commits
+    if (project.identifier === 'TECH_') {
+      const GITHUB_BRANCH_REQUEST = 'github:class:GithubBranchRequest' as Ref<Class<Doc>>
+      const branchRequests = await client.findAll(GITHUB_BRANCH_REQUEST as any, {
+        issueId: issue._id,
+        action: 'create',
+        status: 'done'
+      })
+      if (branchRequests.length > 0 && !branchRequests.some((r: any) => r.hasCommits === true)) {
+        return [{ labelId: 'github:string:BranchHasNoCommits' }]
+      }
+    }
+
+    if (!hierarchy.hasMixin(project, tracker.mixin.IssueCompletionConfig)) return []
 
     const config = hierarchy.as<Project, IssueCompletionConfig>(project, tracker.mixin.IssueCompletionConfig)
     const isSubIssue = (issue.parents?.length ?? 0) > 0

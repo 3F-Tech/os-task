@@ -39842,6 +39842,9 @@ importers:
       '@hcengineering/server-github':
         specifier: workspace:^0.7.0
         version: link:../server-github
+      '@hcengineering/task':
+        specifier: workspace:^0.7.0
+        version: link:../../../plugins/task
       '@hcengineering/time':
         specifier: workspace:^0.7.0
         version: link:../../../plugins/time

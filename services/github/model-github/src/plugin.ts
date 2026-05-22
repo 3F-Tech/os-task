@@ -53,7 +53,9 @@ export default mergeIds(githubId, github, {
     GithubUser: '' as IntlString,
 
     PullRequestMergeState: '' as IntlString,
-    PullRequestReviewDecision: '' as IntlString
+    PullRequestReviewDecision: '' as IntlString,
+    HasCommits: '' as IntlString,
+    BranchHasNoCommits: '' as IntlString
   },
   viewlet: {
     PullRequests: '' as Ref<Viewlet>

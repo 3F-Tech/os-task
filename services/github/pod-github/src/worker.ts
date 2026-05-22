@@ -924,7 +924,7 @@ export class GithubWorker implements IntegrationManager {
           for (const t of tx) {
             if (TxProcessor.isExtendsCUD(t._class)) {
               const cud = t as TxCUD<Doc>
-              if (cud.objectClass === github.class.DocSyncInfo) {
+              if (cud.objectClass === github.class.DocSyncInfo || cud.objectClass === github.class.GithubBranchRequest) {
                 this.triggerSync()
                 break
               }
@@ -1272,6 +1272,27 @@ export class GithubWorker implements IntegrationManager {
           status: alreadyExists ? 'done' : 'error',
           error: alreadyExists ? undefined : (err.message ?? String(err))
         })
+      }
+    }
+  }
+
+  async handlePushEvent (ctx: MeasureContext, payload: any): Promise<void> {
+    const ref: string = payload.ref ?? ''
+    if (!ref.startsWith('refs/heads/')) return
+    const branchName = ref.replace('refs/heads/', '')
+    const repoName: string = payload.repository?.name ?? ''
+    if (repoName === '' || branchName === '') return
+
+    const requests = await this._client.findAll(github.class.GithubBranchRequest, {
+      repo: repoName,
+      branchName,
+      action: 'create',
+      status: 'done'
+    })
+    for (const req of requests) {
+      if (!req.hasCommits) {
+        await this._client.updateDoc(req._class, req.space, req._id, { hasCommits: true })
+        ctx.info('GithubBranchRequest: hasCommits set', { repo: repoName, branchName, issueId: req.issueId })
       }
     }
   }

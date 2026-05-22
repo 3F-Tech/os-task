@@ -89,6 +89,8 @@
     "UnlinkInstallationTitle": "Desinstalar aplicativo Github",
     "UnlinkInstallation": "Tem certeza de que deseja desinstalar o aplicativo GitHub? A sincronização será desabilitada.",
     "RemoveInstallation": "Desinstalar",
-    "Suspended": "Suspendeder"
+    "Suspended": "Suspendeder",
+    "HasCommits": "Possui Commits",
+    "BranchHasNoCommits": "A branch desta task não possui commits. Faça pelo menos um commit antes de concluir."
   }
 }

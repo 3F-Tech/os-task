@@ -579,6 +579,10 @@ export class TGithubBranchRequest extends TDoc implements GithubBranchRequest {
 
   @Prop(TypeString(), getEmbeddedLabel('Error'))
     error?: string
+
+  @Prop(TypeBoolean(), github.string.HasCommits)
+  @Hidden()
+    hasCommits?: boolean
 }
 
 export function createModel (builder: Builder): void {

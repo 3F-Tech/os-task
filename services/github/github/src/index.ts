@@ -475,6 +475,7 @@ export interface GithubBranchRequest extends Doc {
   action: 'create' | 'delete'
   status: 'pending' | 'done' | 'error'
   error?: string
+  hasCommits?: boolean
 }
 
 export interface GithubPullRequestReviewThread extends Doc {

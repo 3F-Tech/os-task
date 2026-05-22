@@ -89,6 +89,8 @@
     "UnlinkInstallationTitle": "Uninstall Github App",
     "UnlinkInstallation": "Are you sure you want to uninstall the GitHub App? Synchronization will be disabled.",
     "RemoveInstallation": "Uninstall",
-    "Suspended": "Suspended"
+    "Suspended": "Suspended",
+    "HasCommits": "Has Commits",
+    "BranchHasNoCommits": "This task's branch has no commits. Make at least one commit before completing."
   }
 }
