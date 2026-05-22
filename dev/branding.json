@@ -39,6 +39,13 @@
     "language": "en",
     "lastNameFirst": "true"
   },
+  "3ftasks.3fventure.tech": {
+    "key": "3ftasks",
+    "title": "3F Tasks",
+    "protocol": "https",
+    "language": "en",
+    "lastNameFirst": "true"
+  },
   "example.localhost": {
     "key": "example",
     "title": "Example",
