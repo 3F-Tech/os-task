@@ -252,6 +252,7 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
       if (existing.length > 0) continue
 
       const tipo = getCustomFieldValue(control, issue, 'Tipo')
+      if (tipo?.toLowerCase() === 'strategic') continue
       const branchName = buildBranchName(tipo, issue.title)
       result.push(
         control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, issue.space, {
