@@ -143,12 +143,8 @@ services:
       - .env.secrets
     environment:
       - PORT=8092
-      - SOURCE=${MAIL_FROM}
-      - REPLY_TO=${MAIL_REPLY_TO}
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=587
-      - SMTP_USERNAME=${GMAIL_USER}
-      - SMTP_PASSWORD=${GMAIL_APP_PASSWORD}
       - SMTP_TLS_MODE=upgrade
     restart: unless-stopped
 
