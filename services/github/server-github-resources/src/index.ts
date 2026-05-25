@@ -206,11 +206,8 @@ function buildBranchName (tipo: string | undefined, title: string): string {
  */
 export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerControl): Promise<Tx[]> {
   const result: Tx[] = []
-  console.log('[OnTechIssueChange] triggered, tx count:', txes.length)
-  control.ctx.info('OnTechIssueChange: triggered', { count: txes.length })
   for (const tx of txes) {
     if (!control.hierarchy.isDerived(tx.objectClass, tracker.class.Issue)) continue
-    control.ctx.info('OnTechIssueChange: tx', { _class: tx._class, objectClass: tx.objectClass, objectId: tx.objectId })
 
     if (tx._class === core.class.TxCreateDoc) {
       const createTx = tx as TxCreateDoc<Issue>
@@ -218,7 +215,6 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
         _id: createTx.objectSpace as Ref<Project>
       })
       const project = projects[0]
-      control.ctx.info('OnTechIssueChange: TxCreateDoc', { identifier: project?.identifier })
       if (project?.identifier !== 'TECH_') continue
 
       const issue = TxProcessor.createDoc2Doc(createTx) as Issue
@@ -238,9 +234,7 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
 
     if (tx._class === core.class.TxMixin) {
       const mixinTx = tx as unknown as { mixin: Ref<Class<Doc>>, attributes: Record<string, any>, objectSpace: Ref<Space> }
-      control.ctx.info('OnTechIssueChange: TxMixin', { mixin: mixinTx.mixin, attrKeys: Object.keys(mixinTx.attributes) })
       const repoName = getNomeDoProjetoFromMixinTx(control, mixinTx.mixin, mixinTx.attributes)
-      control.ctx.info('OnTechIssueChange: repoName', { repoName })
       if (repoName === undefined) continue
 
       const issues = await control.findAll(control.ctx, tracker.class.Issue, { _id: tx.objectId as Ref<Issue> })
@@ -249,7 +243,6 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
 
       const projects = await control.findAll(control.ctx, tracker.class.Project, { _id: issue.space as Ref<Project> })
       const project = projects[0]
-      control.ctx.info('OnTechIssueChange: TxMixin project', { identifier: project?.identifier })
       if (project?.identifier !== 'TECH_') continue
 
       const existing = await control.findAll(control.ctx, github.class.GithubBranchRequest, {
