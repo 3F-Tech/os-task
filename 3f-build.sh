@@ -161,6 +161,12 @@ if [[ "$PODS" == *"server"* ]]; then
   rushx bundle || fail "bundle transactor"
 fi
 
+if [[ "$PODS" == *"account"* ]]; then
+  info "Bundlando account..."
+  cd "$ROOT_DIR/pods/account"
+  rushx bundle || fail "bundle account"
+fi
+
 if [[ "$PODS" == *"worker"* ]]; then
   info "Bundlando worker (time-machine)..."
   cd "$ROOT_DIR/services/worker"
