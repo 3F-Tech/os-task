@@ -22,6 +22,7 @@
   } from '@hcengineering/ui'
   import { ToDo, WorkSlot } from '@hcengineering/time'
   import time from '../plugin'
+  import { findPrimaryCalendar } from '../utils'
   import IconSun from './icons/Sun.svelte'
 
   export let dragItem: ToDo | null = null
@@ -49,7 +50,12 @@
 
   const myAcc = getCurrentAccount()
   const socialStrings = myAcc.socialIds
-  const personalCalendar = `${myAcc.uuid}_calendar` as Ref<Calendar>
+  // Why: usa findPrimaryCalendar para refletir a preferência do usuário (Settings → Calendar)
+  // no preview/ghost durante drag. O save em PlanView.drop() já usa findPrimaryCalendar().
+  let personalCalendar: Ref<Calendar> = `${myAcc.uuid}_calendar` as Ref<Calendar>
+  void findPrimaryCalendar().then((c) => {
+    personalCalendar = c
+  })
 
   const calendarsQ = createQuery()
 

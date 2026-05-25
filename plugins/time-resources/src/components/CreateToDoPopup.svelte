@@ -19,7 +19,7 @@
   import calendar from '@hcengineering/calendar-resources/src/plugin'
   import { getCurrentEmployee } from '@hcengineering/contact'
   import core, { AttachedData, Doc, Ref, SortingOrder, generateId, getCurrentAccount } from '@hcengineering/core'
-  import { SpaceSelector, createQuery, getClient } from '@hcengineering/presentation'
+  import { SpaceSelector, getClient } from '@hcengineering/presentation'
   import tagsPlugin, { TagReference } from '@hcengineering/tags'
   import task, { makeRank } from '@hcengineering/task'
   import { StyledTextBox } from '@hcengineering/text-editor-resources'
@@ -27,6 +27,7 @@
   import { Button, Component, EditBox, IconClose, Label, Scroller } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
   import time from '../plugin'
+  import { findPrimaryCalendar } from '../utils'
   import DueDateEditor from './DueDateEditor.svelte'
   import PriorityEditor from './PriorityEditor.svelte'
   import Workslots from './Workslots.svelte'
@@ -116,13 +117,11 @@
     dispatch('close', true)
   }
 
+  // Why: respeita a preferência PrimaryCalendar do usuário (Settings → Calendar).
+  // Fallback (interno 3ftasks) só se nenhum calendário primário for resolvido.
   let _calendar: Ref<Calendar> = `${myAccount.uuid}_calendar` as Ref<Calendar>
-
-  const q = createQuery()
-  q.query(calendar.class.ExternalCalendar, { default: true, hidden: false, user: myAccount.primarySocialId }, (res) => {
-    if (res.length > 0) {
-      _calendar = res[0]._id
-    }
+  void findPrimaryCalendar().then((c) => {
+    _calendar = c
   })
 
   let slots: WorkSlot[] = []

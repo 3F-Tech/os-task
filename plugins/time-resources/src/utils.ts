@@ -65,10 +65,12 @@ export function calculateEventsDuration (events: WorkSlot[]): number {
 
 export async function findPrimaryCalendar (): Promise<Ref<Calendar>> {
   const acc = getCurrentAccount()
-  const primary = acc.primarySocialId
   const client = getClient()
+  // Why: usa $in: socialIds (não só primarySocialId) para encontrar ExternalCalendars
+  // conectadas via OAuth com socialId diferente do primário — caso contrário a preferência
+  // PrimaryCalendar apontando para o Google é ignorada e cai no fallback interno.
   const calendars = await client.findAll(calendarPlugin.class.Calendar, {
-    user: primary,
+    user: { $in: acc.socialIds },
     hidden: false,
     access: { $in: [AccessLevel.Owner, AccessLevel.Writer] }
   })
