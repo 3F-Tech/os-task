@@ -226,7 +226,7 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
 
       const branchName = sanitizeBranchName(issue.title)
       result.push(
-        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, tx.objectSpace, {
+        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, core.space.Configuration, {
           issueId: tx.objectId as Ref<Issue>,
           repo: issue.clientName,
           branchName,
@@ -263,7 +263,7 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
       const branchName = buildBranchName(tipo, issue.title)
       control.ctx.info('OnTechIssueChange: creating GithubBranchRequest', { repo: repoName, branchName, issueId: tx.objectId })
       result.push(
-        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, issue.space, {
+        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, core.space.Configuration, {
           issueId: tx.objectId as Ref<Issue>,
           repo: repoName,
           branchName,
@@ -283,7 +283,7 @@ export async function OnTechIssueChange (txes: TxCUD<Doc>[], control: TriggerCon
 
       const req = requests[0]
       result.push(
-        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, tx.objectSpace, {
+        control.txFactory.createTxCreateDoc(github.class.GithubBranchRequest, core.space.Configuration, {
           issueId: tx.objectId as Ref<Issue>,
           repo: req.repo,
           branchName: req.branchName,
