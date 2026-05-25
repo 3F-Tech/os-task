@@ -1223,7 +1223,9 @@ export class GithubWorker implements IntegrationManager {
   }
 
   async processBranchRequests (): Promise<void> {
-    const requests = await this._client.findAll(github.class.GithubBranchRequest, { status: 'pending' })
+    const allRequests = await this._client.findAll(github.class.GithubBranchRequest, {})
+    this.ctx.info('processBranchRequests:all', { total: allRequests.length, classId: github.class.GithubBranchRequest, statuses: allRequests.map((r) => r.status) })
+    const requests = allRequests.filter((r) => r.status === 'pending')
     if (requests.length > 0) {
       this.ctx.info('processBranchRequests: found pending requests', { count: requests.length })
     }
