@@ -33,10 +33,9 @@ export function createModel (builder: Builder): void {
 
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: serverGithub.trigger.OnTechIssueChange,
-    isAsync: true,
+    isAsync: false,
     txMatch: {
-      objectClass: tracker.class.Issue,
-      _class: { $in: [core.class.TxCreateDoc, core.class.TxRemoveDoc, core.class.TxMixin] }
+      objectClass: tracker.class.Issue
     }
   })
 
