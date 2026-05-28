@@ -372,6 +372,28 @@
     }
     return true
   }
+
+  function isEmptyValue (val: any): boolean {
+    if (val == null) return true
+    if (typeof val === 'string' && val.trim() === '') return true
+    if (Array.isArray(val) && val.length === 0) return true
+    return false
+  }
+
+  function overflowTooltip (node: HTMLElement): { destroy: () => void } {
+    function update (): void {
+      const child = node.firstElementChild as HTMLElement | null
+      if (child !== null && child.scrollWidth > node.clientWidth) {
+        node.title = node.textContent?.trim() ?? ''
+      } else {
+        node.removeAttribute('title')
+      }
+    }
+    const observer = new ResizeObserver(update)
+    observer.observe(node)
+    update()
+    return { destroy: () => { observer.disconnect() } }
+  }
 </script>
 
 {#if !model || isBuildingModel}
@@ -385,6 +407,7 @@
     class="antiTable"
     class:metaColumn={enableChecking || showNotification}
     class:highlightRows
+    style:--col-count={model.filter((m) => !m.displayProps?.grow).length}
   >
     {#if !hiddenHeader}
       <thead class="scroller-thead">
@@ -489,6 +512,7 @@
               {#if row < rowLimit}
                 {#each model.filter((m) => !m.displayProps?.grow) as attribute, cell}
                   <td
+                    use:overflowTooltip
                     class:align-left={attribute.displayProps?.align === 'left'}
                     class:align-center={attribute.displayProps?.align === 'center'}
                     class:align-right={attribute.displayProps?.align === 'right'}
@@ -513,21 +537,25 @@
                         />
                       </div>
                     {:else}
-                      <svelte:component
-                        this={attribute.presenter}
-                        value={getValue(attribute, object)}
-                        onChange={getOnChange(object, attribute)}
-                        label={attribute.label}
-                        attribute={attribute.attribute}
-                        {...joinProps(
-                          attribute,
-                          object,
-                          readonly ||
-                            $restrictionStore.readonly ||
-                            !canChangeAttr(object, attribute.attribute, $permissionsStore),
-                          canEditObject
-                        )}
-                      />
+                      {#if isEmptyValue(getValue(attribute, object))}
+                        <span class="antiTable-cells__emptyCell">—</span>
+                      {:else}
+                        <svelte:component
+                          this={attribute.presenter}
+                          value={getValue(attribute, object)}
+                          onChange={getOnChange(object, attribute)}
+                          label={attribute.label}
+                          attribute={attribute.attribute}
+                          {...joinProps(
+                            attribute,
+                            object,
+                            readonly ||
+                              $restrictionStore.readonly ||
+                              !canChangeAttr(object, attribute.attribute, $permissionsStore),
+                            canEditObject
+                          )}
+                        />
+                      {/if}
                     {/if}
                   </td>
                 {/each}

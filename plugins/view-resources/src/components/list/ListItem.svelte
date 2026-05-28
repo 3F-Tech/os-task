@@ -22,6 +22,7 @@
   import view from '../../plugin'
   import GrowPresenter from './GrowPresenter.svelte'
   import ListPresenter from './ListPresenter.svelte'
+  import FixedColumn from '../FixedColumn.svelte'
 
   export let docObject: Doc
   export let model: AttributeModel[]
@@ -101,88 +102,112 @@
   on:drop
   on:dragstart
 >
-  <div class="draggable-container">
-    <div class="draggable-mark">
-      <IconCircles size={'small'} />
-    </div>
-  </div>
-  <div class="flex-center relative mr-1" use:tooltip={{ label: view.string.Select, direction: 'bottom' }}>
-    <div class="antiList-cells__notifyCell">
-      <div class="antiList-cells__checkCell">
-        <CheckBox
-          {checked}
-          size={'medium'}
-          on:value={(event) => {
-            dispatch('check', { docs: [docObject], value: event.detail })
-          }}
-        />
+  <!-- STICKY LEFT: drag handle + checkbox + NOME apenas (estilo ClickUp) -->
+  <div class="list-sticky-left">
+    <div class="draggable-container">
+      <div class="draggable-mark">
+        <IconCircles size={'small'} />
       </div>
-      <Component
-        is={notification.component.NotificationPresenter}
-        showLoading={false}
-        props={{ value: docObject, kind: 'table' }}
-      />
     </div>
+    <FixedColumn key="list_icon_checkbox" justify="left">
+      <div class="flex-center relative" use:tooltip={{ label: view.string.Select, direction: 'bottom' }}>
+        <div class="antiList-cells__notifyCell">
+          <div class="antiList-cells__checkCell">
+            <CheckBox
+              {checked}
+              size={'medium'}
+              on:value={(event) => {
+                dispatch('check', { docs: [docObject], value: event.detail })
+              }}
+            />
+          </div>
+          <Component
+            is={notification.component.NotificationPresenter}
+            showLoading={false}
+            props={{ value: docObject, kind: 'table' }}
+          />
+        </div>
+      </div>
+    </FixedColumn>
+    {#each model.filter((p) => !p.displayProps?.grow && !(p.displayProps?.optional === true || p.displayProps?.compression === true || p.displayProps?.suffix === true)) as attributeModel, i}
+      {@const displayProps = attributeModel.displayProps}
+      {#if !groupByKey || displayProps?.excludeByKey !== groupByKey}
+        {#if displayProps?.hideLabel}
+          <!-- Ícone sem label (priority, status): FixedColumn para sincronizar largura com header -->
+          <FixedColumn key={`list_icon_${displayProps.key}`} justify="left">
+            <ListPresenter
+              {docObject}
+              {attributeModel}
+              {props}
+              {readonly}
+              value={getObjectValue(attributeModel.key, docObject)}
+              onChange={getOnChange(docObject, attributeModel)}
+              hideDivider={true}
+              {compactMode}
+            />
+          </FixedColumn>
+        {:else}
+          <ListPresenter
+            {docObject}
+            {attributeModel}
+            {props}
+            {readonly}
+            value={getObjectValue(attributeModel.key, docObject)}
+            onChange={getOnChange(docObject, attributeModel)}
+            hideDivider={i === 0}
+            {compactMode}
+          />
+        {/if}
+      {/if}
+    {/each}
   </div>
-  {#each model.filter((p) => !(p.displayProps?.optional === true || p.displayProps?.compression === true || p.displayProps?.suffix === true)) as attributeModel, i}
+  <!-- SCROLLABLE RIGHT: grow item → suffix + espaçador + compression-bar + opcionais -->
+  {#each model.filter((p) => p.displayProps?.grow === true && !(p.displayProps?.optional === true || p.displayProps?.compression === true || p.displayProps?.suffix === true)) as attributeModel}
     {@const displayProps = attributeModel.displayProps}
     {#if !groupByKey || displayProps?.excludeByKey !== groupByKey}
-      {#if displayProps?.grow}
-        {#if !(compactMode && mobile)}
-          {#each model.filter((p) => p.displayProps?.suffix === true) as attrModel}
+      {#if !(compactMode && mobile)}
+        {#each model.filter((p) => p.displayProps?.suffix === true) as attrModel}
+          <ListPresenter
+            {docObject}
+            attributeModel={attrModel}
+            {props}
+            {readonly}
+            {compactMode}
+            value={getObjectValue(attrModel.key, docObject)}
+            onChange={getOnChange(docObject, attrModel)}
+          />
+        {/each}
+      {/if}
+      <GrowPresenter />
+      {#if !compactMode}
+        <div class="compression-bar" style:min-width={`${minWidth}px`}>
+          {#each model.filter((p) => p.displayProps?.compression === true) as attrModel, index}
             <ListPresenter
               {docObject}
               attributeModel={attrModel}
               {props}
-              {readonly}
-              {compactMode}
               value={getObjectValue(attrModel.key, docObject)}
               onChange={getOnChange(docObject, attrModel)}
-            />
-          {/each}
-        {/if}
-        <GrowPresenter />
-        {#if !compactMode}
-          <div class="compression-bar" style:min-width={`${minWidth}px`}>
-            {#each model.filter((p) => p.displayProps?.compression === true) as attrModel, index}
-              <ListPresenter
-                {docObject}
-                attributeModel={attrModel}
-                {props}
-                value={getObjectValue(attrModel.key, docObject)}
-                onChange={getOnChange(docObject, attrModel)}
-                {readonly}
-                hideDivider={index === 0}
-                on:resize={(e) => {
-                  if (e.detail == null) return
-                  sizes.set(index, e.detail)
-                  calcSizes()
-                }}
-              />
-            {/each}
-          </div>
-          {#each model.filter((p) => p.displayProps?.optional === true) as attrModel}
-            <ListPresenter
-              {docObject}
-              attributeModel={attrModel}
               {readonly}
-              {props}
-              value={getObjectValue(attrModel.key, docObject)}
-              onChange={getOnChange(docObject, attrModel)}
+              hideDivider={index === 0}
+              on:resize={(e) => {
+                if (e.detail == null) return
+                sizes.set(index, e.detail)
+                calcSizes()
+              }}
             />
           {/each}
-        {/if}
-      {:else}
-        <ListPresenter
-          {docObject}
-          {attributeModel}
-          {props}
-          {readonly}
-          value={getObjectValue(attributeModel.key, docObject)}
-          onChange={getOnChange(docObject, attributeModel)}
-          hideDivider={i === 0}
-          {compactMode}
-        />
+        </div>
+        {#each model.filter((p) => p.displayProps?.optional === true && p.displayProps?.compression !== true) as attrModel}
+          <ListPresenter
+            {docObject}
+            attributeModel={attrModel}
+            {readonly}
+            {props}
+            value={getObjectValue(attrModel.key, docObject)}
+            onChange={getOnChange(docObject, attrModel)}
+          />
+        {/each}
       {/if}
     {/if}
   {/each}

@@ -51,18 +51,29 @@
 
   // Filtramos as colunas que têm compression: true (ficam dentro da compression-bar)
   $: compressionCols = model.filter((m: any) => m.displayProps?.compression === true)
-  
+
   // Colunas fixas fora da compression-bar (ex: assignee)
   $: fixedRightCols = model.filter((m: any) => m.displayProps?.fixed && !m.displayProps?.compression)
+
+  // Ícones sem label (priority, status) — precisam de placeholder para alinhar com linhas de dados
+  $: iconCols = model.filter((m: any) => m.displayProps?.hideLabel === true && !m.displayProps?.compression && !m.displayProps?.grow && !m.displayProps?.optional)
   
 </script>
 
 <div class="listGrid row header-row">
-  <!-- Placeholder do checkbox area (mesma largura do flex-center.relative.mr-1) -->
-  <div class="flex-center relative mr-1 header-checkbox-placeholder"></div>
-
-  <!-- NOME / Título -->
-  <span class="col-label nome-label">NOME</span>
+  <!-- STICKY LEFT: checkbox placeholder + ícones (priority/status) + NOME -->
+  <div class="list-sticky-left">
+    <FixedColumn key="list_icon_checkbox" justify="left">
+      <!-- vazio: recebe min-width do fixedWidthStore preenchido pelas linhas de dados -->
+    </FixedColumn>
+    <!-- Placeholders para ícones sem label — largura sincronizada via fixedWidthStore -->
+    {#each iconCols as col}
+      <FixedColumn key={`list_icon_${col.displayProps.key}`} justify="left">
+        <!-- vazio: apenas reserva a mesma largura que o ícone ocupa nas linhas de dados -->
+      </FixedColumn>
+    {/each}
+    <span class="col-label nome-label">NOME</span>
+  </div>
 
   <!-- GrowPresenter clone (mesmo CSS) -->
   <div class="grow-container"></div>
@@ -87,9 +98,9 @@
     {/each}
   </div>
 
-  <!-- Colunas Fixas (ex: Assignee) fora da compression-bar -->
-  {#each fixedRightCols as col, i}
-    {#if col.displayProps?.dividerBefore === true && i > 0}
+  <!-- Colunas opcionais fora da compression-bar (optional: true, fixed: 'left') -->
+  {#each fixedRightCols as col}
+    {#if col.displayProps?.dividerBefore === true}
       <span class="header-divider" />
     {/if}
     <FixedColumn key={`list_item_${col.displayProps.key}`} justify={col.displayProps.fixed || 'left'}>
@@ -112,12 +123,7 @@
     margin-top: 0.5rem;
     user-select: none;
     pointer-events: none;
-  }
-
-  .header-checkbox-placeholder {
-    width: 2.375rem;
-    flex-shrink: 0;
-    visibility: hidden;
+    gap: 0.5rem; /* espelha flex-gap-2 do ListItem para alinhar compression-bar em scroll */
   }
 
   .grow-container {
@@ -129,7 +135,13 @@
   }
 
   .nome-label {
-    margin-left: 0.25rem;
+    margin-left: 0;
+    padding-left: 0;
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .col-label {

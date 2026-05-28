@@ -105,8 +105,8 @@ export function issueConfig (
       label: tracker.string.Title,
       presenter: tracker.component.TitlePresenter,
       props: compact
-        ? { shouldUseMargin: true, showParent: false, minWidth: '5rem' }
-        : { minWidth: '5rem' },
+        ? { shouldUseMargin: true, showParent: false, minWidth: '10rem' }
+        : { minWidth: '10rem' },
       displayProps: { key: key + 'title' }
     },
     { key: '', displayProps: { grow: true } },
@@ -158,6 +158,61 @@ export function issueConfig (
       presenter: tracker.component.DueDatePresenter,
       displayProps: { key: key + 'dueDate', compression: true, fixed: 'left', dividerBefore: true },
       props: { kind: 'list' }
+    },
+    {
+      key: 'identifier',
+      label: task.string.Identifier,
+      displayProps: { key: key + 'identifier', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'kind',
+      presenter: task.component.TaskTypePresenter,
+      label: task.string.TaskType,
+      props: { kind: 'list', size: 'small' },
+      displayProps: { key: key + 'kind', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'space',
+      presenter: tracker.component.ProjectPresenter,
+      label: tracker.string.Project,
+      displayProps: { key: key + 'space', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'startDate',
+      presenter: view.component.DatePresenter,
+      label: task.string.StartDate,
+      props: { kind: 'list' },
+      displayProps: { key: key + 'startDate', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'createdOn',
+      presenter: view.component.DatePresenter,
+      label: core.string.CreatedDate,
+      displayProps: { key: key + 'createdOn', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'completedDate',
+      presenter: view.component.DatePresenter,
+      label: tracker.string.CompletedDate,
+      props: { kind: 'list' },
+      displayProps: { key: key + 'completedDate', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'modifiedOn',
+      presenter: tracker.component.ModificationDatePresenter,
+      label: core.string.ModifiedDate,
+      displayProps: { key: key + 'modifiedOn', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'pdcaCycleActive',
+      presenter: view.component.BooleanPresenter,
+      label: tracker.string.PdcaCycleActive,
+      displayProps: { key: key + 'pdcaCycleActive', optional: true, compression: true, fixed: 'left', dividerBefore: true }
+    },
+    {
+      key: 'pdcaCycleFrequency',
+      label: tracker.string.PdcaCycleFrequency,
+      displayProps: { key: key + 'pdcaCycleFrequency', optional: true, compression: true, fixed: 'left', dividerBefore: true }
     }
   ]
 }
@@ -197,7 +252,8 @@ export function defineViewlets (builder: Builder): void {
           'remainingTime',
           'attachedTo',
           'createdBy',
-          'modifiedBy'
+          'modifiedBy',
+          'pdcaCycleResetStatus'
         ]
       },
       config: issueConfig()

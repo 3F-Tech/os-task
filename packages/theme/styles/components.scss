@@ -1784,6 +1784,9 @@
   }
 
   td {
+    overflow: hidden;
+    min-width: calc(60cqw / max(var(--col-count, 4), 1));
+    max-width: max(6rem, calc(80cqw / max(var(--col-count, 4), 1)));
     &.align-left { text-align: left; }
     &.align-center { text-align: center; }
     &.align-right { text-align: right; }
@@ -1823,9 +1826,16 @@
       align-items: center;
     }
     &__checkCell { visibility: hidden; }
+    &__emptyCell {
+      color: var(--theme-dark-color);
+      opacity: 0.4;
+      font-size: .875rem;
+    }
     &__firstCell {
       display: flex;
       align-items: center;
+      min-width: 0;
+      overflow: hidden;
 
       &-menuRow {
         visibility: hidden;
@@ -2254,14 +2264,14 @@
 
 /* ListView */
 .listGrid {
-  overflow: hidden;
+  overflow: clip;
   position: relative;
   display: flex;
   align-items: center;
-  padding: 0 2.5rem 0 0.75rem;
+  padding: 0 2.5rem 0 0;
   width: 100%;
   height: 2.75rem;
-  min-width: 100%;
+  min-width: max-content;
   min-height: 2.75rem;
   color: var(--theme-caption-color);
   background-color: var(--theme-list-row-color);
@@ -2488,6 +2498,7 @@
     justify-content: flex-end;
     align-items: center;
     flex-grow: 1;
+    flex-shrink: 0;
     border-radius: 1.625rem;
     transition: flex-shrink 0.25s cubic-bezier(0.38, 0.01, 0.33, 1) 0s;
 
@@ -2504,6 +2515,49 @@
   }
   .panel-trigger > * { pointer-events: none; }
 }
+// Sticky left column in horizontal-scrollable list rows (estilo ClickUp)
+.list-sticky-left {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.75rem;
+  width: 320px;
+  max-width: 320px;
+  flex-shrink: 0;
+  overflow: hidden;
+  // height: 100% preenche toda a altura do row (listGrid tem 2.75rem fixo)
+  // evita espaço vazio acima/abaixo onde conteúdo rolante ficaria visível
+  height: 100%;
+  // Cor explícita (não inherit) para garantir fundo opaco durante scroll
+  background-color: var(--theme-list-row-color);
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.15);
+  // Título (presenter-label) preenche o espaço restante dentro do sticky
+  .presenter-label {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 1rem;
+  }
+}
+// Estados de hover/selected/checking para o sticky — fundo sempre opaco
+.listGrid.hoverable:hover .list-sticky-left,
+.listGrid.mListGridSelected .list-sticky-left {
+  background-color: var(--highlight-hover);
+}
+.listGrid.checking .list-sticky-left {
+  background-color: var(--highlight-select);
+}
+.listGrid.checking.hoverable:hover .list-sticky-left,
+.listGrid.checking.mListGridSelected .list-sticky-left {
+  background-color: var(--highlight-select-hover);
+}
+// GrowPresenter mínimo no list: garante espaço entre nome e colunas mesmo em scroll
+.list-container .listGrid .grow-container { min-width: 2rem; }
 // Custom on the ListView
 .list-container .listGrid .yesno-container { flex-shrink: 0; }
 // Labels on the ListView

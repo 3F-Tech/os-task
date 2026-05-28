@@ -132,7 +132,11 @@
       if (k != null && k !== '') baseByKey.set(k, b)
     }
     return prefConfig.map((p) => {
-      if (typeof p === 'string') return p
+      if (typeof p === 'string') {
+        const base = baseByKey.get(p)
+        if (base !== undefined) return { ...base }
+        return p
+      }
       const k = p.displayProps?.key ?? p.key
       const base = k != null ? baseByKey.get(k) : undefined
       if (base === undefined) return p

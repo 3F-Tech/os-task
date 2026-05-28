@@ -53,6 +53,8 @@
 <style lang="scss">
   .presenter-label {
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     display: inline-flex;
     align-items: center;
     flex-shrink: 1;

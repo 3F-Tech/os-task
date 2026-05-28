@@ -24,7 +24,7 @@ import {
 import { DOMAIN_PREFERENCE } from '@hcengineering/preference'
 import view, { type Filter, type FilteredView, type ViewletPreference, viewId } from '@hcengineering/view'
 import { getSocialIdFromOldAccount, getSocialKeyByOldAccount, getUniqueAccounts } from '@hcengineering/model-core'
-import core, { type AccountUuid, type PersonId } from '@hcengineering/core'
+import core, { DOMAIN_MODEL_TX, type AccountUuid, type PersonId, type Ref, type Class, type Doc } from '@hcengineering/core'
 
 import { DOMAIN_VIEW } from '.'
 
@@ -243,6 +243,63 @@ async function migrateAccsInSavedFilters (client: MigrationClient): Promise<void
   client.logger.log('finished processing view filtered view accounts in filters ', {})
 }
 
+async function cleanStaleCustomAttributePrefs (client: MigrationClient): Promise<void> {
+  const hierarchy = client.hierarchy
+
+  // Build set of valid custom attribute names from current hierarchy state.
+  // We query DOMAIN_MODEL_TX for all TxCreateDoc that created custom Attributes,
+  // then verify each still exists in the hierarchy (not deleted afterwards).
+  const validCustomAttrNames = new Set<string>()
+
+  const customAttrTxs = await client.find(DOMAIN_MODEL_TX, {
+    objectClass: core.class.Attribute,
+    'attributes.isCustom': true
+  })
+
+  for (const tx of customAttrTxs) {
+    const attrs = (tx as any).attributes as { name?: string; attributeOf?: string } | undefined
+    const attrName = attrs?.name
+    const classId = attrs?.attributeOf
+    if (attrName == null || !attrName.startsWith('custom') || classId == null) continue
+    if (hierarchy.findAttribute(classId as Ref<Class<Doc>>, attrName) !== undefined) {
+      validCustomAttrNames.add(attrName)
+    }
+  }
+
+  const allPrefs = await client.find<ViewletPreference>(DOMAIN_PREFERENCE, {
+    _class: view.class.ViewletPreference
+  })
+
+  for (const pref of allPrefs) {
+    const cleanConfig = pref.config.filter((entry) => {
+      const key =
+        typeof entry === 'string'
+          ? entry
+          : ((entry as any).key ?? (entry as any).displayProps?.key ?? '')
+
+      if (key === '') return true
+
+      // Extract the attribute name (segment after the last dot, or the whole key)
+      const lastDot = key.lastIndexOf('.')
+      const attrName = lastDot >= 0 ? key.slice(lastDot + 1) : key
+
+      // Not a custom-attribute key — always keep
+      if (!attrName.startsWith('custom')) return true
+
+      // Keep only if the custom attribute still exists in the model
+      return validCustomAttrNames.has(attrName)
+    })
+
+    if (cleanConfig.length !== pref.config.length) {
+      client.logger.log('cleanStaleCustomAttributePrefs: removing stale keys from preference', {
+        prefId: pref._id,
+        removed: pref.config.length - cleanConfig.length
+      })
+      await client.update(DOMAIN_PREFERENCE, { _id: pref._id }, { config: cleanConfig })
+    }
+  }
+}
+
 export const viewOperation: MigrateOperation = {
   async migrate (client: MigrationClient, mode): Promise<void> {
     await tryMigrate(mode, client, viewId, [
@@ -270,6 +327,11 @@ export const viewOperation: MigrateOperation = {
         state: 'accs-in-saved-filters',
         mode: 'upgrade',
         func: migrateAccsInSavedFilters
+      },
+      {
+        state: 'clean-stale-custom-attribute-prefs',
+        mode: 'upgrade',
+        func: cleanStaleCustomAttributePrefs
       }
     ])
   },
