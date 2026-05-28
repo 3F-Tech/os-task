@@ -1295,45 +1295,7 @@ export class GithubWorker implements IntegrationManager {
         await this._client.updateDoc(req._class, req.space, req._id, { hasCommits: true })
         ctx.info('GithubBranchRequest: hasCommits set', { repo: repoName, branchName, issueId: req.issueId })
       }
-      // Fecha a task vinculada
-      await this.closeIssueIfWon(ctx, req.issueId)
     }
-
-    // 2. Fallback: sem BranchRequest — extrai identificadores TECH_-NNN das mensagens de commit
-    if (requests.length === 0) {
-      const commits: any[] = payload.commits ?? []
-      const identifiers = new Set<string>()
-      for (const commit of commits) {
-        const message: string = commit.message ?? ''
-        for (const m of message.matchAll(/TECH_-\d+/g)) identifiers.add(m[0])
-      }
-      if (identifiers.size === 0) {
-        ctx.info('handlePushEvent: nenhum BranchRequest e nenhum TECH_ nos commits', { repo: repoName, branchName })
-        return
-      }
-      ctx.info('handlePushEvent: fechando issues via commit message', { identifiers: [...identifiers] })
-      for (const identifier of identifiers) {
-        const issues = await this._client.findAll(tracker.class.Issue, { identifier } as any)
-        for (const issue of issues) {
-          await this.closeIssueIfWon(ctx, issue._id)
-        }
-      }
-    }
-  }
-
-  private async closeIssueIfWon (ctx: MeasureContext, issueId: Ref<Issue>): Promise<void> {
-    const issues = await this._client.findAll(tracker.class.Issue, { _id: issueId })
-    const issue = issues[0]
-    if (issue === undefined) return
-    const statuses = await this.getStatuses(issue.kind)
-    const wonStatus = statuses.find((s) => s.category === task.statusCategory.Won)
-    if (wonStatus === undefined) {
-      ctx.warn('closeIssueIfWon: status Won não encontrado', { issueId, kind: issue.kind })
-      return
-    }
-    if (issue.status === wonStatus._id) return // já está fechada
-    ctx.info('closeIssueIfWon: fechando issue', { identifier: (issue as any).identifier, issueId, status: wonStatus._id })
-    await this._client.update(issue, { status: wonStatus._id })
   }
 
   async syncAndWait (): Promise<void> {
