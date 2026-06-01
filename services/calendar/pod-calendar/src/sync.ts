@@ -128,18 +128,12 @@ export class IncomingSyncManager {
     user: Token,
     email: GoogleEmail
   ): Promise<{ calendars: number, created: number, updated: number, pushedToGoogle: number }> {
-    ctx.info('reconcile.step', { step: 'getClient.start', email })
     const client = await getClient(user.workspace)
-    ctx.info('reconcile.step', { step: 'getClient.done', email })
     const txOp = new TxOperations(client, user.userId)
     const google = getGoogleClient()
-    ctx.info('reconcile.step', { step: 'lock.start', email })
     const mutex = await lock(`${user.workspace}:${user.userId}:${email}`)
-    ctx.info('reconcile.step', { step: 'lock.acquired', email })
     try {
-      ctx.info('reconcile.step', { step: 'setCredentials.start', email })
       const authSucces = await setCredentials(google.auth, user)
-      ctx.info('reconcile.step', { step: 'setCredentials.done', email, ok: authSucces })
       if (!authSucces) {
         ctx.warn('Reconcile aborted — invalid grant', {
           workspace: user.workspace,
@@ -149,10 +143,7 @@ export class IncomingSyncManager {
         throw new Error('invalid_grant — please reconnect Google Calendar')
       }
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
-      ctx.info('reconcile.step', { step: 'reconcileAllCalendars.start', email })
-      const result = await syncManager.reconcileAllCalendars()
-      ctx.info('reconcile.step', { step: 'reconcileAllCalendars.done', email, ...result })
-      return result
+      return await syncManager.reconcileAllCalendars()
     } finally {
       mutex()
       await txOp.close()

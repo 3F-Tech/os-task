@@ -142,10 +142,7 @@ export class CalendarController {
 
     this.ctx.info('Force reconcile user', {
       workspace,
-      integrations: userTokens.length,
-      userSocialIds: socialIds.map((s) => ({ id: s._id, type: s.type, value: s.value })),
-      allTokensCount: allTokens.length,
-      allTokensSocialIds: allTokens.map((t) => t.socialId)
+      integrations: userTokens.length
     })
 
     let calendars = 0
@@ -156,7 +153,6 @@ export class CalendarController {
 
     for (const t of userTokens) {
       const parsedToken = JSON.parse(t.secret)
-      this.ctx.info('Force reconcile — invoking', { email: parsedToken.email })
       try {
         // Why: timeout de 90s — reconcile pode demorar mais que sync incremental
         // (lista completa de eventos no Google + comparações). Nginx default é
@@ -174,7 +170,6 @@ export class CalendarController {
         created += result.created
         updated += result.updated
         pushedToGoogle += result.pushedToGoogle
-        this.ctx.info('Force reconcile — done', { email: parsedToken.email, ...result })
       } catch (err: any) {
         errors++
         this.ctx.error('Force reconcile — error', {
