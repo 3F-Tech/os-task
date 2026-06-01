@@ -287,6 +287,7 @@ export const contactPlugin = plugin(contactId, {
     Telegram: '' as Ref<ChannelProvider>,
     GitHub: '' as Ref<ChannelProvider>,
     Facebook: '' as Ref<ChannelProvider>,
+    Instagram: '' as Ref<ChannelProvider>,
     Homepage: '' as Ref<ChannelProvider>,
     Whatsapp: '' as Ref<ChannelProvider>,
     Skype: '' as Ref<ChannelProvider>,

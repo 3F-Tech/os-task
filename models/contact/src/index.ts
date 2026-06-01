@@ -805,6 +805,18 @@ export function createModel (builder: Builder): void {
     contact.class.ChannelProvider,
     core.space.Model,
     {
+      label: contact.string.Instagram,
+      icon: contact.icon.Instagram,
+      placeholder: contact.string.InstagramPlaceholder,
+      action: contact.action.OpenChannel
+    },
+    contact.channelProvider.Instagram
+  )
+
+  builder.createDoc(
+    contact.class.ChannelProvider,
+    core.space.Model,
+    {
       label: contact.string.Homepage,
       icon: contact.icon.Homepage,
       placeholder: contact.string.HomepagePlaceholder,

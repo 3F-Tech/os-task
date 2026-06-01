@@ -43,6 +43,8 @@
     "AtPlaceHolder": "@username",
     "FacebookPlaceholder": "https://fb.com/username",
     "Facebook": "Facebook",
+    "Instagram": "Instagram",
+    "InstagramPlaceholder": "https://instagram.com/username",
     "HomepagePlaceholder": "https://mns.com",
     "Homepage": "Home page",
     "SocialLinks": "Link social",
