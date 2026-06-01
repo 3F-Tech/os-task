@@ -50,7 +50,7 @@ import contact from '@hcengineering/contact'
 import { deleteObjects } from '@hcengineering/view-resources'
 import { eventTitleProvider, configureCalDavAccess } from './utils'
 import { type Integration } from '@hcengineering/account-client'
-import { disconnect, disconnectAll } from './api'
+import { disconnect, disconnectAll, forceSyncCalendars } from './api'
 
 export {
   EventElement,
@@ -63,7 +63,8 @@ export {
   VisibilityEditor,
   CalendarSelector,
   EventPresenter,
-  ScheduleNavSection
+  ScheduleNavSection,
+  forceSyncCalendars
 }
 
 export type {

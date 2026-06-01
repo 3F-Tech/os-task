@@ -1,6 +1,6 @@
 <script lang="ts">
   import calendar, { AccessLevel, Calendar, Event, generateEventId, getAllEvents } from '@hcengineering/calendar'
-  import { DayCalendar, calendarByIdStore, hidePrivateEvents } from '@hcengineering/calendar-resources'
+  import { DayCalendar, calendarByIdStore, forceSyncCalendars, hidePrivateEvents } from '@hcengineering/calendar-resources'
   import { getCurrentEmployee } from '@hcengineering/contact'
   import { Ref, SortingOrder, Timestamp, getCurrentAccount } from '@hcengineering/core'
   import { IntlString, getEmbeddedLabel } from '@hcengineering/platform'
@@ -11,6 +11,7 @@
     ButtonIcon,
     IconChevronLeft,
     IconChevronRight,
+    IconRedo,
     Label,
     areDatesEqual,
     showPopup,
@@ -179,6 +180,22 @@
     showPopup(createComponent, { date, withTime }, 'top')
   }
 
+  let syncing = false
+  async function handleForceSync (): Promise<void> {
+    if (syncing) return
+    syncing = true
+    try {
+      const result = await forceSyncCalendars()
+      if (!result?.ok) {
+        console.error('Calendar sync failed', result?.error)
+      }
+    } catch (err) {
+      console.error('Calendar sync error', err)
+    } finally {
+      syncing = false
+    }
+  }
+
   $: isToday = areDatesEqual(currentDate, new Date($ticker))
 </script>
 
@@ -194,6 +211,14 @@
       <Label label={time.string.Schedule} />: <Label label={getTitle(currentDate, $ticker)} />
     </div>
     <svelte:fragment slot="actions">
+      <ButtonIcon
+        icon={IconRedo}
+        kind={'secondary'}
+        size={'small'}
+        loading={syncing}
+        disabled={syncing}
+        on:click={handleForceSync}
+      />
       <ButtonIcon
         icon={IconChevronLeft}
         kind={'secondary'}

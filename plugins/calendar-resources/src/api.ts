@@ -66,3 +66,19 @@ export async function getIntegrationClient (): Promise<IntegrationClient> {
   }
   return getIntegrationClientRaw(accountsUrl, token, calendarIntegrationKind, 'calendar')
 }
+
+// Disparado pelo botão de refresh no Planner. Bloqueia até o pod-calendar
+// terminar o ciclo de WorkspaceClient.run (incoming + outgoing pendentes).
+export async function forceSyncCalendars (): Promise<{ ok: boolean, durationMs?: number, error?: string }> {
+  const url = getMetadata(calendar.metadata.CalendarServiceURL)
+  const token = getMetadata(presentation.metadata.Token)
+  if (url === undefined || token === undefined) {
+    throw new Error('Calendar service URL or token is not defined')
+  }
+  return await request({
+    baseUrl: url,
+    path: '/sync',
+    method: 'POST',
+    token
+  })
+}

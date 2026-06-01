@@ -112,6 +112,15 @@ export class CalendarController {
     }
   }
 
+  // Triggered by the user-facing "refresh" button. Runs a full WorkspaceClient
+  // cycle which does incoming sync (Google→Huly) and pushes pending Huly events
+  // back to Google. Awaits completion so the caller can display result.
+  async forceSyncWorkspace (workspace: WorkspaceUuid): Promise<void> {
+    this.ctx.info('Force sync workspace', { workspace })
+    await WorkspaceClient.run(this.ctx, this.accountClient, workspace)
+    this.ctx.info('Force sync workspace finished', { workspace })
+  }
+
   private async runAll (groups: Map<WorkspaceUuid, Integration[]>): Promise<void> {
     const ids = [...groups.keys()]
     if (ids.length === 0) return
