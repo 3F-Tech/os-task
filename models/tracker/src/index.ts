@@ -36,6 +36,8 @@ import { definePresenters } from './presenters'
 import { definePermissions } from './permissions'
 import {
   DOMAIN_TRACKER,
+  TAutomationScript,
+  TAutomationScriptStep,
   TClassicProjectTypeData,
   TComponent,
   TIssue,
@@ -443,7 +445,9 @@ export function createModel (builder: Builder): void {
     TRelatedIssueTarget,
     TTypeEstimation,
     TTypeRemainingTime,
-    TProjectTargetPreference
+    TProjectTargetPreference,
+    TAutomationScript,
+    TAutomationScriptStep
   )
 
   builder.mixin(tracker.class.Project, core.class.Class, activity.mixin.ActivityDoc, {})

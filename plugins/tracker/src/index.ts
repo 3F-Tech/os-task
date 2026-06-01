@@ -54,10 +54,12 @@ export * from './analytics'
  * @public
  */
 export enum PdcaFrequency {
+  Daily = 'daily',
   Weekly = 'weekly',
   Biweekly = 'biweekly',
   Monthly = 'monthly',
-  Quarterly = 'quarterly'
+  Quarterly = 'quarterly',
+  Custom = 'custom'
 }
 
 /**
@@ -274,6 +276,7 @@ export interface Issue extends Task {
   pdcaCycleResetStatus?: Ref<IssueStatus>
   pdcaNextCycleDate?: Timestamp
   pdcaCycleDueDays?: number[]
+  pdcaCycleCustomWeekdays?: number[]
   pdcaCycleDuplicate?: boolean
 
   clientName: string
@@ -310,6 +313,7 @@ export interface IssueDraft {
   pdcaCycleFrequency?: PdcaFrequency
   pdcaCycleResetStatus?: Ref<IssueStatus>
   pdcaCycleDueDays?: number[]
+  pdcaCycleCustomWeekdays?: number[]
   pdcaCycleDuplicate?: boolean
 
   template?: {
@@ -344,6 +348,7 @@ export interface IssueTemplateData {
   pdcaCycleFrequency?: PdcaFrequency
   pdcaCycleResetStatus?: Ref<IssueStatus>
   pdcaCycleDueDays?: number[]
+  pdcaCycleCustomWeekdays?: number[]
   pdcaCycleDuplicate?: boolean
 
   clientName?: string
@@ -434,6 +439,39 @@ export interface Component extends Doc {
 
 /**
  * @public
+ *
+ * User-editable automation script (e.g. "Onboarding Seed"). Each script has a list of variant
+ * options that are rendered as toggles in the runner wizard; steps may opt-in via requireAll
+ * or opt-out via requireNone against the active variant set.
+ */
+export interface AutomationScript extends Doc {
+  name: string
+  description?: string
+  variantOptions?: string[]
+  steps: CollectionSize<AutomationScriptStep>
+}
+
+/**
+ * @public
+ *
+ * One step of an AutomationScript: creates an Issue from a template inside a project.
+ * Filtered at runtime: included iff (requireAll ⊆ active) && (requireNone ∩ active = ∅).
+ */
+export interface AutomationScriptStep extends AttachedDoc {
+  attachedTo: Ref<AutomationScript>
+  attachedToClass: Ref<Class<AutomationScript>>
+
+  project: Ref<Project>
+  template: Ref<IssueTemplate>
+  order: number
+  requireAll?: string[]
+  requireNone?: string[]
+  /** Dias a partir da execução do script para definir dueDate da issue raiz. */
+  dueInDays?: number
+}
+
+/**
+ * @public
  */
 export const trackerId = 'tracker' as Plugin
 export * from './analytics'
@@ -453,7 +491,9 @@ const pluginState = plugin(trackerId, {
     TypeEstimation: '' as Ref<Class<Type<number>>>,
     TypeRemainingTime: '' as Ref<Class<Type<number>>>,
     RelatedIssueTarget: '' as Ref<Class<RelatedIssueTarget>>,
-    ProjectTargetPreference: '' as Ref<Class<ProjectTargetPreference>>
+    ProjectTargetPreference: '' as Ref<Class<ProjectTargetPreference>>,
+    AutomationScript: '' as Ref<Class<AutomationScript>>,
+    AutomationScriptStep: '' as Ref<Class<AutomationScriptStep>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,

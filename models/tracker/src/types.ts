@@ -58,6 +58,8 @@ import tags, { type TagElement } from '@hcengineering/tags'
 import time, { type ToDo } from '@hcengineering/time'
 import {
   type ProjectTargetPreference,
+  type AutomationScript,
+  type AutomationScriptStep,
   type Component,
   type Issue,
   type IssueChildInfo,
@@ -84,6 +86,7 @@ import { type TaskType } from '@hcengineering/task'
 import preference, { TPreference } from '@hcengineering/model-preference'
 
 export const DOMAIN_TRACKER = 'tracker' as Domain
+export const DOMAIN_AUTOMATION = 'automation' as Domain
 
 @Model(tracker.class.IssueStatus, core.class.Status)
 @UX(tracker.string.IssueStatus, undefined, undefined, 'rank', 'name')
@@ -299,6 +302,10 @@ export class TIssue extends TTask implements Issue {
   @Hidden()
     pdcaCycleDueDays?: number[]
 
+  @Prop(ArrOf(TypeNumber()), tracker.string.PdcaCustomWeekdays)
+  @Hidden()
+    pdcaCycleCustomWeekdays?: number[]
+
   @Prop(TypeBoolean(), tracker.string.PdcaDuplicate)
   @Hidden()
     pdcaCycleDuplicate?: boolean
@@ -384,6 +391,10 @@ export class TIssueTemplate extends TDoc implements IssueTemplate {
   @Prop(ArrOf(TypeNumber()), tracker.string.PdcaDueWeekday)
   @Hidden()
     pdcaCycleDueDays?: number[]
+
+  @Prop(ArrOf(TypeNumber()), tracker.string.PdcaCustomWeekdays)
+  @Hidden()
+    pdcaCycleCustomWeekdays?: number[]
 
   @Prop(TypeBoolean(), tracker.string.PdcaDuplicate)
   @Hidden()
@@ -507,3 +518,46 @@ export class TClassicProjectTypeData extends TProject implements RolesAssignment
 @Mixin(tracker.mixin.IssueTypeData, tracker.class.Issue)
 @UX(getEmbeddedLabel('Issue'), tracker.icon.Issue)
 export class TIssueTypeData extends TIssue {}
+
+@Model(tracker.class.AutomationScript, core.class.Doc, DOMAIN_AUTOMATION)
+@UX(tracker.string.AutomationScripts, tracker.icon.Issue, 'AUTOSCRIPT', 'name')
+export class TAutomationScript extends TDoc implements AutomationScript {
+  @Prop(TypeString(), tracker.string.AutomationScriptName)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeString(), tracker.string.AutomationScriptDescriptionField)
+    description?: string
+
+  @Prop(ArrOf(TypeString()), tracker.string.AutomationVariants)
+    variantOptions?: string[]
+
+  @Prop(Collection(tracker.class.AutomationScriptStep), tracker.string.AutomationScriptSteps)
+    steps!: number
+}
+
+@Model(tracker.class.AutomationScriptStep, core.class.AttachedDoc, DOMAIN_AUTOMATION)
+@UX(tracker.string.AutomationScriptSteps)
+export class TAutomationScriptStep extends TAttachedDoc implements AutomationScriptStep {
+  declare attachedTo: Ref<AutomationScript>
+
+  @Prop(TypeRef(tracker.class.Project), tracker.string.Project)
+  @Index(IndexKind.Indexed)
+    project!: Ref<Project>
+
+  @Prop(TypeRef(tracker.class.IssueTemplate), tracker.string.ScriptStepTemplate)
+  @Index(IndexKind.Indexed)
+    template!: Ref<IssueTemplate>
+
+  @Prop(TypeNumber(), tracker.string.Number)
+    order!: number
+
+  @Prop(ArrOf(TypeString()), tracker.string.RequireAll)
+    requireAll?: string[]
+
+  @Prop(ArrOf(TypeString()), tracker.string.RequireNone)
+    requireNone?: string[]
+
+  @Prop(TypeNumber(), tracker.string.DueInDays)
+    dueInDays?: number
+}

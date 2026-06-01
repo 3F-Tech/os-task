@@ -3,35 +3,51 @@
 // Licensed under the Eclipse Public License, Version 2.0
 -->
 <script lang="ts">
-  import { Breadcrumb, Button, Header, Label, showPopup } from '@hcengineering/ui'
+  import { type Ref } from '@hcengineering/core'
+  import { createQuery, getClient } from '@hcengineering/presentation'
+  import type { AutomationScript } from '@hcengineering/tracker'
+  import { Breadcrumb, Button, Header, IconAdd, IconDelete, IconEdit, Label, showPopup } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
+  import EditAutomationScript from './EditAutomationScript.svelte'
   import NewClientOnboardingModal from './NewClientOnboardingModal.svelte'
+  import RunAutomationScript from './RunAutomationScript.svelte'
   import { type BU, type SmVariant, type BommaScenario } from './onboarding-config'
 
   interface HistoryEntry {
     date: string
-    clientName: string
-    bu: BU
-    variant?: SmVariant
-    cenario?: BommaScenario
+    label: string
+    detail?: string
     count: number
   }
 
   let historico: HistoryEntry[] = []
+  let scripts: AutomationScript[] = []
+
+  const scriptQuery = createQuery()
+  $: scriptQuery.query(
+    tracker.class.AutomationScript,
+    {},
+    (res) => {
+      scripts = res
+    },
+    { sort: { name: 1 } }
+  )
+
+  const client = getClient()
 
   function formatDate (): string {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  function buLabel (entry: HistoryEntry): string {
-    const sm = entry.variant === 'com SM' ? 'com SM' : entry.variant === 'sem SM' ? 'sem SM' : undefined
-    if (entry.bu === 'Bomma') {
-      const cen = entry.cenario === '3' ? 'Cen. 3' : 'Cen. 1e2'
+  function buLabel (bu: BU, variant?: SmVariant, cenario?: BommaScenario): string {
+    const sm = variant === 'com SM' ? 'com SM' : variant === 'sem SM' ? 'sem SM' : undefined
+    if (bu === 'Bomma') {
+      const cen = cenario === '3' ? 'Cen. 3' : 'Cen. 1e2'
       return `Bomma ${sm ?? ''} / ${cen}`.replace(/\s+/g, ' ').trim()
     }
-    return sm !== undefined ? `${entry.bu} ${sm}` : entry.bu
+    return sm !== undefined ? `${bu} ${sm}` : bu
   }
 
   function openOnboardingModal (): void {
@@ -40,13 +56,63 @@
       {
         onComplete: (entry: { clientName: string, bu: BU, variant?: SmVariant, cenario?: BommaScenario, count: number }) => {
           historico = [
-            { date: formatDate(), clientName: entry.clientName, bu: entry.bu, variant: entry.variant, cenario: entry.cenario, count: entry.count },
+            {
+              date: formatDate(),
+              label: entry.clientName,
+              detail: buLabel(entry.bu, entry.variant, entry.cenario),
+              count: entry.count
+            },
             ...historico
           ]
         }
       },
       'top'
     )
+  }
+
+  function openNewScript (): void {
+    showPopup(EditAutomationScript, {}, 'top')
+  }
+
+  function openEditScript (script: AutomationScript): void {
+    showPopup(EditAutomationScript, { script }, 'top')
+  }
+
+  function openRunScript (script: AutomationScript): void {
+    showPopup(
+      RunAutomationScript,
+      {
+        scriptId: script._id,
+        onComplete: (entry: { scriptName: string, clientName: string, count: number }) => {
+          historico = [
+            {
+              date: formatDate(),
+              label: entry.clientName,
+              detail: entry.scriptName,
+              count: entry.count
+            },
+            ...historico
+          ]
+        }
+      },
+      'top'
+    )
+  }
+
+  async function deleteScript (script: AutomationScript): Promise<void> {
+    if (!window.confirm(`${script.name}\n\nExcluir este script e todas as suas etapas?`)) return
+    const steps = await client.findAll(tracker.class.AutomationScriptStep, { attachedTo: script._id })
+    for (const step of steps) {
+      await client.removeCollection(
+        tracker.class.AutomationScriptStep,
+        step.space,
+        step._id,
+        script._id,
+        tracker.class.AutomationScript,
+        'steps'
+      )
+    }
+    await client.removeDoc(tracker.class.AutomationScript, script.space, script._id)
   }
 </script>
 
@@ -60,21 +126,84 @@
       <Label label={tracker.string.AutomationScriptsDescription} />
     </p>
 
-    <section class="script-card">
-      <div class="script-info">
-        <h3 class="script-title"><Label label={tracker.string.ClientOnboarding} /></h3>
-        <p class="script-description">
-          <Label label={tracker.string.ClientOnboardingDescription} />
-        </p>
+    <section class="legacy-section">
+      <h3 class="section-title"><Label label={tracker.string.LegacyOnboardingSection} /></h3>
+      <div class="script-card">
+        <div class="script-info">
+          <h4 class="script-title"><Label label={tracker.string.ClientOnboarding} /></h4>
+          <p class="script-description">
+            <Label label={tracker.string.ClientOnboardingDescription} />
+          </p>
+        </div>
+        <div class="script-action">
+          <Button
+            label={tracker.string.NewClientOnboarding}
+            kind="primary"
+            size="medium"
+            on:click={openOnboardingModal}
+          />
+        </div>
       </div>
-      <div class="script-action">
+    </section>
+
+    <div class="divider" />
+
+    <section class="custom-section">
+      <div class="custom-header">
+        <h3 class="section-title"><Label label={tracker.string.CustomScripts} /></h3>
         <Button
-          label={tracker.string.NewClientOnboarding}
-          kind="primary"
-          size="medium"
-          on:click={openOnboardingModal}
+          label={tracker.string.NewScript}
+          icon={IconAdd}
+          kind="regular"
+          size="small"
+          on:click={openNewScript}
         />
       </div>
+
+      {#if scripts.length === 0}
+        <p class="empty-message">
+          <Label label={tracker.string.NoCustomScripts} />
+        </p>
+      {:else}
+        <ul class="script-list">
+          {#each scripts as script (script._id)}
+            <li class="script-row">
+              <div class="script-row-info">
+                <span class="script-row-name">{script.name}</span>
+                {#if script.description !== undefined && script.description !== ''}
+                  <span class="script-row-desc">{script.description}</span>
+                {/if}
+                <span class="script-row-meta">
+                  <Label label={tracker.string.ScriptStepsCount} params={{ count: script.steps ?? 0 }} />
+                </span>
+              </div>
+              <div class="script-row-actions">
+                <Button
+                  label={tracker.string.RunScript}
+                  kind="primary"
+                  size="small"
+                  disabled={(script.steps ?? 0) === 0}
+                  on:click={() => openRunScript(script)}
+                />
+                <Button
+                  icon={IconEdit}
+                  kind="ghost"
+                  size="small"
+                  showTooltip={{ label: tracker.string.EditScript }}
+                  on:click={() => openEditScript(script)}
+                />
+                <Button
+                  icon={IconDelete}
+                  kind="ghost"
+                  size="small"
+                  showTooltip={{ label: tracker.string.DeleteScript }}
+                  on:click={() => deleteScript(script)}
+                />
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     </section>
 
     <div class="divider" />
@@ -91,9 +220,11 @@
             <li class="history-row">
               <span class="history-icon">✅</span>
               <span class="history-date">{entry.date}</span>
-              <span class="history-client">{entry.clientName}</span>
-              <span class="history-sep">—</span>
-              <span class="history-bu">{buLabel(entry)}</span>
+              <span class="history-client">{entry.label}</span>
+              {#if entry.detail !== undefined}
+                <span class="history-sep">—</span>
+                <span class="history-bu">{entry.detail}</span>
+              {/if}
               <span class="history-count">
                 {entry.count}
                 <Label label={tracker.string.OnboardingTasksCount} />
@@ -119,6 +250,30 @@
     margin: 0;
     color: var(--theme-dark-color);
     font-size: 0.875rem;
+  }
+
+  .legacy-section,
+  .custom-section,
+  .history-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .custom-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .section-title {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--theme-caption-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .script-card {
@@ -161,19 +316,68 @@
     background-color: var(--theme-divider-color);
   }
 
-  .history-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+  .empty-message {
+    margin: 0;
+    padding: 1rem;
+    color: var(--theme-dark-color);
+    font-size: 0.8125rem;
+    border: 1px dashed var(--theme-divider-color);
+    border-radius: 0.375rem;
+    text-align: center;
   }
 
-  .section-title {
+  .script-list {
+    list-style: none;
     margin: 0;
-    font-size: 0.75rem;
-    font-weight: 600;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .script-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--theme-divider-color);
+    border-radius: 0.5rem;
+    background-color: var(--theme-comp-header-color);
+  }
+
+  .script-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .script-row-name {
+    font-weight: 500;
     color: var(--theme-caption-color);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 0.875rem;
+  }
+
+  .script-row-desc {
+    color: var(--theme-content-color);
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .script-row-meta {
+    color: var(--theme-dark-color);
+    font-size: 0.75rem;
+  }
+
+  .script-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
   }
 
   .empty-history {
