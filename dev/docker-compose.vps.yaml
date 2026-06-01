@@ -546,7 +546,7 @@ services:
     restart: unless-stopped
 
   calendar:
-    image: hardcoreeng/calendar:v0.7.413
+    image: hardcoreeng/calendar:3f-local
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:
@@ -565,6 +565,9 @@ services:
       - KVS_URL=http://hulykvs:8094
       - WATCH_URL=https://3ftasks.3fventure.tech/_calendar
       - SERVICE_ID=calendar-service
+      # Safety-net periodic sync (minutos). Captura eventos que escaparam do push
+      # notification do Google. 0 desativa. Padrão do código é 30.
+      - PERIODIC_SYNC_INTERVAL=30
     restart: unless-stopped
   livekit:
     image: livekit/livekit-server:latest

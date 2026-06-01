@@ -69,6 +69,7 @@ export const main = async (): Promise<void> => {
   await calendarController.startAll()
   ctx.info('Calendar controller started')
   watchController.startCheck()
+  calendarController.startPeriodicSync()
   const endpoints: Endpoint[] = [
     {
       endpoint: '/signin',
@@ -186,6 +187,7 @@ export const main = async (): Promise<void> => {
   const shutdown = (): void => {
     server.close(() => {
       watchController.stop()
+      calendarController.stopPeriodicSync()
       process.exit()
     })
   }

@@ -33,6 +33,8 @@ interface WorkspaceStateInfo {
 
 export class CalendarController {
   protected static _instance: CalendarController
+  private periodicSyncTimer: NodeJS.Timeout | undefined
+  private periodicSyncRunning = false
 
   private constructor (
     private readonly ctx: MeasureContext,
@@ -67,6 +69,46 @@ export class CalendarController {
       void this.runAll(groups)
     } catch (err: any) {
       this.ctx.error('Failed to start existing integrations', err)
+    }
+  }
+
+  // Periodic safety-net sync: re-runs startAll() on an interval to catch events
+  // missed when Google push notifications fail to reach the webhook. The
+  // per-user mutex in IncomingSyncManager prevents overlap with push-driven syncs.
+  startPeriodicSync (): void {
+    if (config.PeriodicSyncInterval <= 0) {
+      this.ctx.info('Periodic sync disabled (PERIODIC_SYNC_INTERVAL=0)')
+      return
+    }
+    const intervalMs = config.PeriodicSyncInterval * 60 * 1000
+    this.ctx.info('Periodic sync enabled', { intervalMinutes: config.PeriodicSyncInterval })
+    this.periodicSyncTimer = setInterval(() => {
+      void this.runPeriodicSync()
+    }, intervalMs)
+  }
+
+  stopPeriodicSync (): void {
+    if (this.periodicSyncTimer !== undefined) {
+      clearInterval(this.periodicSyncTimer)
+      this.periodicSyncTimer = undefined
+    }
+  }
+
+  private async runPeriodicSync (): Promise<void> {
+    if (this.periodicSyncRunning) {
+      this.ctx.info('Periodic sync skipped — previous run still in progress')
+      return
+    }
+    this.periodicSyncRunning = true
+    const started = Date.now()
+    try {
+      this.ctx.info('Periodic sync started')
+      await this.startAll()
+      this.ctx.info('Periodic sync finished', { durationMs: Date.now() - started })
+    } catch (err: any) {
+      this.ctx.error('Periodic sync error', { err: err?.message ?? String(err) })
+    } finally {
+      this.periodicSyncRunning = false
     }
   }
 
