@@ -36,12 +36,13 @@ export async function getClient (
   workspace: WorkspaceUuid,
   token: string = getWorkspaceToken(workspace)
 ): Promise<Client> {
-  // Why: getTransactorEndpoint faz HTTP no account, createClient abre
-  // WebSocket pro transactor. Ambos podem travar (issues vistos:
-  // "client websocket error: 1..11"). Timeouts evitam request pendurada.
+  // Why: 'internal' usa o hostname Docker do transactor (ws://transactor_cockroach:3332)
+  // em vez do domínio público com TLS. Conexão fica dentro da rede Docker,
+  // sem hairpin routing (sair pra internet pra voltar). Resolve os
+  // "client websocket error" e timeouts no createClient.
   let endpoint = endpoints.get(workspace)
   if (endpoint === undefined) {
-    endpoint = await withTimeout(getTransactorEndpoint(token, 'external'), 10_000, 'getTransactorEndpoint')
+    endpoint = await withTimeout(getTransactorEndpoint(token, 'internal'), 10_000, 'getTransactorEndpoint')
     endpoints.set(workspace, endpoint)
   }
   setMetadata(client.metadata.FilterModel, 'client')

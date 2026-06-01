@@ -152,7 +152,12 @@ services:
       - WORKSPACE_LIMIT_PER_USER=10000
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
       - REGION_INFO=cockroach|CockroachDB
-      - TRANSACTOR_URL=wss://3ftasks.3fventure.tech:3332;;cockroach,
+      # Formato: internal;external;region — internal usado por serviços
+      # dentro do Docker (ws plain, hostname interno), external usado por
+      # browsers (wss público). Evita hairpin routing: calendar/github/etc
+      # falavam wss://3ftasks.3fventure.tech:3332 saindo do container pra
+      # voltar pelo mesmo host, dando timeout no WebSocket.
+      - TRANSACTOR_URL=ws://transactor_cockroach:3332;wss://3ftasks.3fventure.tech:3332;cockroach,
       - MAIL_URL=http://mail:8092
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - FRONT_URL=https://3ftasks.3fventure.tech
