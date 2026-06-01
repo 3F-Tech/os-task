@@ -468,6 +468,8 @@ export interface AutomationScriptStep extends AttachedDoc {
   requireNone?: string[]
   /** Dias a partir da execução do script para definir dueDate da issue raiz. */
   dueInDays?: number
+  /** Mapeamento childId (IssueTemplateChild.id) → dias até vencimento da sub-issue. */
+  childDueInDays?: Record<string, number>
 }
 
 /**

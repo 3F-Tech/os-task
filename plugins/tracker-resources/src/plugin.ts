@@ -388,7 +388,10 @@ export default mergeIds(trackerId, tracker, {
     DueInDays: '' as IntlString,
     DueInDaysHint: '' as IntlString,
     DueInDaysPlaceholder: '' as IntlString,
-    DueInDaysSuffix: '' as IntlString
+    DueInDaysSuffix: '' as IntlString,
+    SubtasksSection: '' as IntlString,
+    SubtaskDueInDays: '' as IntlString,
+    NoSubtasksInTemplate: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,

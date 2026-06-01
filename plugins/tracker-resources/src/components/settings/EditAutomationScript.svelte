@@ -38,6 +38,7 @@
     requireAll: string[]
     requireNone: string[]
     dueInDays?: number
+    childDueInDays: Record<string, number>
   }
 
   interface ProjectGroup {
@@ -90,7 +91,8 @@
         order: s.order,
         requireAll: [...(s.requireAll ?? [])],
         requireNone: [...(s.requireNone ?? [])],
-        dueInDays: s.dueInDays
+        dueInDays: s.dueInDays,
+        childDueInDays: { ...(s.childDueInDays ?? {}) }
       }))
     } catch (err) {
       console.error('EditAutomationScript load failed:', err)
@@ -172,7 +174,8 @@
         order: maxOrder + 10,
         requireAll: [],
         requireNone: [],
-        dueInDays: undefined
+        dueInDays: undefined,
+        childDueInDays: {}
       }
     ]
   }
@@ -243,6 +246,35 @@
     steps = [...steps]
   }
 
+  function getStepChildren (step: StepDraft): Array<{ id: string, title: string }> {
+    if (step.template === undefined) return []
+    const tpl = templateMap.get(step.template)
+    const children = ((tpl as any)?.children ?? []) as Array<{ id: string, title: string }>
+    return children
+  }
+
+  function getChildDueString (step: StepDraft, childId: string): string {
+    const v = step.childDueInDays[childId]
+    return v === undefined ? '' : String(v)
+  }
+
+  function setChildDueFromInput (step: StepDraft, childId: string, raw: string): void {
+    const trimmed = raw.trim()
+    const next = { ...step.childDueInDays }
+    if (trimmed === '') {
+      delete next[childId]
+    } else {
+      const n = parseInt(trimmed, 10)
+      if (Number.isFinite(n) && n >= 0) {
+        next[childId] = n
+      } else {
+        delete next[childId]
+      }
+    }
+    step.childDueInDays = next
+    steps = [...steps]
+  }
+
   function toggleRequire (step: StepDraft, list: 'requireAll' | 'requireNone', variant: string): void {
     const current = step[list]
     if (current.includes(variant)) {
@@ -298,13 +330,15 @@
 
     for (const step of steps) {
       if (step.project === undefined || step.template === undefined) continue
+      const childDueKeys = Object.keys(step.childDueInDays)
       const payload = {
         project: step.project,
         template: step.template,
         order: step.order,
         requireAll: step.requireAll.length > 0 ? step.requireAll : undefined,
         requireNone: step.requireNone.length > 0 ? step.requireNone : undefined,
-        dueInDays: step.dueInDays !== undefined && step.dueInDays >= 0 ? step.dueInDays : undefined
+        dueInDays: step.dueInDays !== undefined && step.dueInDays >= 0 ? step.dueInDays : undefined,
+        childDueInDays: childDueKeys.length > 0 ? step.childDueInDays : undefined
       }
       if (step._id === undefined) {
         await client.addCollection(
@@ -492,6 +526,41 @@
                           <span class="due-suffix"><Label label={tracker.string.DueInDaysSuffix} /></span>
                         </div>
                       </div>
+
+                      {#if step.template !== undefined}
+                        {@const stepChildren = getStepChildren(step)}
+                        <div class="template-field">
+                          <span class="field-label">
+                            <Label label={tracker.string.SubtasksSection} />
+                            {#if stepChildren.length > 0}
+                              <span class="hint">({stepChildren.length})</span>
+                            {/if}
+                          </span>
+                          {#if stepChildren.length === 0}
+                            <p class="subtask-empty"><Label label={tracker.string.NoSubtasksInTemplate} /></p>
+                          {:else}
+                            <ul class="subtask-list">
+                              {#each stepChildren as child (child.id)}
+                                <li class="subtask-row">
+                                  <span class="subtask-title">{child.title}</span>
+                                  <div class="subtask-due">
+                                    <input
+                                      type="number"
+                                      class="due-input"
+                                      min="0"
+                                      step="1"
+                                      placeholder="—"
+                                      value={getChildDueString(step, child.id)}
+                                      on:input={(e) => setChildDueFromInput(step, child.id, e.currentTarget.value)}
+                                    />
+                                    <span class="due-suffix-mini">d</span>
+                                  </div>
+                                </li>
+                              {/each}
+                            </ul>
+                          {/if}
+                        </div>
+                      {/if}
 
                       {#if variantOptions.length > 0}
                         <div class="template-field">
@@ -787,6 +856,66 @@
   .due-suffix {
     font-size: 0.75rem;
     color: var(--theme-dark-color);
+  }
+
+  .due-suffix-mini {
+    font-size: 0.6875rem;
+    color: var(--theme-dark-color);
+  }
+
+  .subtask-empty {
+    margin: 0;
+    padding: 0.375rem 0.5rem;
+    color: var(--theme-dark-color);
+    font-size: 0.75rem;
+    border: 1px dashed var(--theme-divider-color);
+    border-radius: 0.25rem;
+  }
+
+  .subtask-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.375rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border: 1px solid var(--theme-divider-color);
+    border-radius: 0.25rem;
+    background-color: var(--theme-bg-color);
+    max-height: 14rem;
+    overflow-y: auto;
+  }
+
+  .subtask-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.8125rem;
+  }
+
+  .subtask-title {
+    color: var(--theme-caption-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .subtask-due {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+
+    .due-input {
+      width: 3.5rem;
+      padding: 0.125rem 0.375rem;
+      font-size: 0.75rem;
+    }
   }
 
   .add-template-row {

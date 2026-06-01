@@ -560,4 +560,7 @@ export class TAutomationScriptStep extends TAttachedDoc implements AutomationScr
 
   @Prop(TypeNumber(), tracker.string.DueInDays)
     dueInDays?: number
+
+  @Prop(TypeRecord(), tracker.string.DueInDays)
+    childDueInDays?: Record<string, number>
 }

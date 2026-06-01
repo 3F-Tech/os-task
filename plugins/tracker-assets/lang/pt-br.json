@@ -379,7 +379,10 @@
     "DueInDays": "Vencimento a partir de",
     "DueInDaysHint": "Dias após a execução do script. Em branco = sem vencimento.",
     "DueInDaysPlaceholder": "Ex: 7",
-    "DueInDaysSuffix": "dia(s) após executar"
+    "DueInDaysSuffix": "dia(s) após executar",
+    "SubtasksSection": "Subtarefas",
+    "SubtaskDueInDays": "Vencimento",
+    "NoSubtasksInTemplate": "Este template não possui subtarefas."
   },
   "status": {}
 }

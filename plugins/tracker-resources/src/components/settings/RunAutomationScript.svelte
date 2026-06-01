@@ -354,6 +354,12 @@
 
         const childLabels = (child.labels ?? []) as Ref<TagElement>[]
         const childAssignee = pickAssignee(childLabels) ?? child.assignee ?? null
+        const childId = (child as any).id as string | undefined
+        const childDueDays = childId !== undefined ? step.childDueInDays?.[childId] : undefined
+        const childDueDate =
+          childDueDays !== undefined && childDueDays >= 0
+            ? Date.now() + childDueDays * 86_400_000
+            : null
 
         const subId = await client.addCollection(
           tracker.class.Issue,
@@ -372,7 +378,8 @@
             estimation: child.estimation ?? 0,
             assignee: childAssignee,
             clientName: cliente,
-            clientStage
+            clientStage,
+            dueDate: childDueDate
           } as any
         )
 
