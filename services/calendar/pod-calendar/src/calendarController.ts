@@ -115,57 +115,82 @@ export class CalendarController {
     }
   }
 
-  // Triggered by the "refresh" button no Planner. Sincroniza só os calendários
-  // do usuário autenticado, não do workspace inteiro — evita esperar todos os
-  // outros usuários quando alguém quer só atualizar o próprio.
+  // Triggered by the "refresh" button no Planner. Faz full reconciliation
+  // bidirecional (Google ↔ Huly) só das integrações do usuário autenticado.
+  // Diferente do sync incremental, busca a lista COMPLETA dos dois lados e
+  // reconcilia por eventId — pega criações/atualizações/inserções que
+  // escaparam do push notification ou do trigger.
   async forceSyncUser (
     userToken: string,
     workspace: WorkspaceUuid
-  ): Promise<{ calendars: number, durationMs: number }> {
+  ): Promise<{
+    integrations: number
+    calendars: number
+    created: number
+    updated: number
+    pushedToGoogle: number
+    errors: number
+    durationMs: number
+  }> {
     const started = Date.now()
-    // AccountClient autenticado COM o token do usuário → getSocialIds retorna
-    // os socialIds dele (não do serviço).
     const userAccountClient = getAccountClient(userToken)
-    const socialIds = await userAccountClient.getSocialIds(true) // includeDeleted=true para não perder OAuth socialIds
+    const socialIds = await userAccountClient.getSocialIds(true)
     const ids = new Set(socialIds.map((s) => s._id))
 
     const allTokens = await getWorkspaceTokens(this.accountClient, workspace)
     const userTokens = allTokens.filter((t) => ids.has(t.socialId))
 
-    this.ctx.info('Force sync user', {
+    this.ctx.info('Force reconcile user', {
       workspace,
-      calendars: userTokens.length,
-      userSocialIds: socialIds.map((s) => ({ id: s._id, type: s.type, value: s.value })),
-      allTokensCount: allTokens.length,
-      allTokensSocialIds: allTokens.map((t) => t.socialId)
+      integrations: userTokens.length
     })
+
+    let calendars = 0
+    let created = 0
+    let updated = 0
+    let pushedToGoogle = 0
+    let errors = 0
 
     for (const t of userTokens) {
       const parsedToken = JSON.parse(t.secret)
-      this.ctx.info('Force sync user — invoking sync', { email: parsedToken.email })
+      this.ctx.info('Force reconcile — invoking', { email: parsedToken.email })
       try {
-        // Why: protege contra IncomingSyncManager.sync travar (ex: getClient
-        // websocket hang, mutex preso por outro fluxo, Google API sem timeout).
-        // 45s deixa folga pro nginx (timeout default 60s) responder antes do 504.
-        await Promise.race([
-          IncomingSyncManager.sync(this.ctx, this.accountClient, parsedToken, parsedToken.email),
-          new Promise<void>((_, reject) =>
+        // Why: timeout de 90s — reconcile pode demorar mais que sync incremental
+        // (lista completa de eventos no Google + comparações). Nginx default é
+        // 60s; o usuário fica com 504 mas o trabalho termina no background.
+        // Para calendar com 1000+ eventos pode passar disso.
+        const result = await Promise.race([
+          IncomingSyncManager.reconcile(this.ctx, this.accountClient, parsedToken, parsedToken.email),
+          new Promise<never>((_, reject) =>
             setTimeout(() => {
-              reject(new Error('Sync timeout after 45s'))
-            }, 45_000)
+              reject(new Error('Reconcile timeout after 90s'))
+            }, 90_000)
           )
         ])
-        this.ctx.info('Force sync user — sync returned', { email: parsedToken.email })
+        calendars += result.calendars
+        created += result.created
+        updated += result.updated
+        pushedToGoogle += result.pushedToGoogle
+        this.ctx.info('Force reconcile — done', { email: parsedToken.email, ...result })
       } catch (err: any) {
-        this.ctx.error('Force sync user — sync error', {
+        errors++
+        this.ctx.error('Force reconcile — error', {
           email: t.key,
           err: err?.message ?? String(err)
         })
       }
     }
 
-    const result = { calendars: userTokens.length, durationMs: Date.now() - started }
-    this.ctx.info('Force sync user finished', { workspace, ...result })
+    const result = {
+      integrations: userTokens.length,
+      calendars,
+      created,
+      updated,
+      pushedToGoogle,
+      errors,
+      durationMs: Date.now() - started
+    }
+    this.ctx.info('Force reconcile user finished', { workspace, ...result })
     return result
   }
 

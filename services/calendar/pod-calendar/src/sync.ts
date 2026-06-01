@@ -45,6 +45,7 @@ import { deepEqual } from 'fast-equals'
 import { calendar_v3 } from 'googleapis'
 import { getClient } from './client'
 import { getCalendarsSyncHistory, getEventHistory, setCalendarsSyncHistory, setEventHistory } from './kvsUtils'
+import { OutcomingClient } from './outcomingClient'
 import { lock } from './mutex'
 import { getRateLimitter, RateLimiter } from './rateLimiter'
 import { GoogleEmail, Token, User } from './types'
@@ -115,6 +116,158 @@ export class IncomingSyncManager {
       mutex()
       await txOp.close()
     }
+  }
+
+  // Full bidirectional reconciliation: fetches ALL events from both Google and
+  // Huly (no syncToken), compares by eventId, and brings them into agreement.
+  // Used by the manual "refresh" button when incremental sync may have missed
+  // changes (push notification failures, hulykvs reset, etc).
+  static async reconcile (
+    ctx: MeasureContext,
+    accountClient: AccountClient,
+    user: Token,
+    email: GoogleEmail
+  ): Promise<{ calendars: number, created: number, updated: number, pushedToGoogle: number }> {
+    const client = await getClient(user.workspace)
+    const txOp = new TxOperations(client, user.userId)
+    const google = getGoogleClient()
+    const mutex = await lock(`${user.workspace}:${user.userId}:${email}`)
+    try {
+      const authSucces = await setCredentials(google.auth, user)
+      if (!authSucces) {
+        removeUserByEmail(user, user.email)
+        await removeIntegrationSecret(ctx, accountClient, {
+          socialId: user.userId,
+          kind: calendarIntegrationKind,
+          workspaceUuid: user.workspace,
+          key: user.email
+        })
+        throw new Error('Invalid grant')
+      }
+      const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
+      return await syncManager.reconcileAllCalendars()
+    } finally {
+      mutex()
+      await txOp.close()
+    }
+  }
+
+  async reconcileAllCalendars (): Promise<{ calendars: number, created: number, updated: number, pushedToGoogle: number }> {
+    await this.getMyCalendars()
+    const totals = { calendars: 0, created: 0, updated: 0, pushedToGoogle: 0 }
+    for (const cal of this.calendars) {
+      if (cal.externalId === undefined || cal.hidden) continue
+      totals.calendars++
+      try {
+        const r = await this.reconcileCalendar(cal)
+        totals.created += r.created
+        totals.updated += r.updated
+        totals.pushedToGoogle += r.pushedToGoogle
+      } catch (err: any) {
+        this.ctx.error('reconcileCalendar error', {
+          calendarId: cal.externalId,
+          err: err?.message ?? String(err)
+        })
+      }
+    }
+    this.ctx.info('Reconcile finished', {
+      workspace: this.user.workspace,
+      user: this.user.userId,
+      email: this.email,
+      ...totals
+    })
+    return totals
+  }
+
+  private async reconcileCalendar (cal: ExternalCalendar): Promise<{ created: number, updated: number, pushedToGoogle: number }> {
+    if (cal.externalId === undefined) return { created: 0, updated: 0, pushedToGoogle: 0 }
+    const calendarId = cal.externalId
+    this.ctx.info('Reconcile calendar', {
+      calendarId,
+      workspace: this.user.workspace,
+      user: this.user.userId,
+      email: this.email
+    })
+
+    // 1. Fetch ALL Google events (paginated, no syncToken — full state)
+    const googleEvents = await this.fetchAllGoogleEvents(calendarId)
+
+    // 2. Fetch ALL Huly events for this calendar
+    const hulyEvents = (await this.client.findAll(calendar.class.Event, { calendar: cal._id })) as Event[]
+    const hulyByEventId = new Map<string, Event>()
+    for (const e of hulyEvents) {
+      hulyByEventId.set(e.eventId, e)
+    }
+
+    // 3. Google → Huly: para cada evento Google, cria ou atualiza no Huly
+    let created = 0
+    let updated = 0
+    const googleIds = new Set<string>()
+    for (const ge of googleEvents) {
+      if (ge.id == null) continue
+      googleIds.add(ge.id)
+      const existing = hulyByEventId.get(ge.id)
+      try {
+        if (existing === undefined) {
+          await this.saveExtEvent(ge, cal.access ?? 'reader', cal)
+          created++
+        } else {
+          // updateExtEvent só atualiza se houver diff real
+          await this.updateExtEvent(ge, existing)
+          updated++
+        }
+      } catch (err: any) {
+        this.ctx.error('reconcile sync event error', {
+          eventId: ge.id,
+          calendarId,
+          err: err?.message ?? String(err)
+        })
+      }
+    }
+
+    // 4. Huly → Google: para cada evento Huly que NÃO existe no Google,
+    // empurra via OutcomingClient (a função já cuida de auth/owner/etc).
+    let pushedToGoogle = 0
+    for (const he of hulyEvents) {
+      if (googleIds.has(he.eventId)) continue
+      // Só faz sentido empurrar eventos owner/writer
+      if (he.access !== 'owner' && he.access !== 'writer') continue
+      try {
+        await OutcomingClient.push(this.ctx, this.accountClient, this.user.workspace, he, 'create')
+        pushedToGoogle++
+      } catch (err: any) {
+        this.ctx.error('reconcile push event error', {
+          eventId: he.eventId,
+          calendarId,
+          err: err?.message ?? String(err)
+        })
+      }
+    }
+
+    return { created, updated, pushedToGoogle }
+  }
+
+  private async fetchAllGoogleEvents (calendarId: string): Promise<calendar_v3.Schema$Event[]> {
+    const all: calendar_v3.Schema$Event[] = []
+    let pageToken: string | undefined
+    while (true) {
+      await this.rateLimiter.take(1)
+      const res = await this.googleClient.events.list({
+        calendarId,
+        maxResults: 2500,
+        pageToken,
+        eventTypes: ['default'],
+        showDeleted: false,
+        singleEvents: false
+      })
+      if (res.data.items != null) all.push(...res.data.items)
+      if (res.data.nextPageToken != null) {
+        pageToken = res.data.nextPageToken
+      } else {
+        break
+      }
+    }
+    return all
   }
 
   private async fillParticipants (): Promise<void> {
