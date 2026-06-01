@@ -135,14 +135,16 @@ export class IncomingSyncManager {
     try {
       const authSucces = await setCredentials(google.auth, user)
       if (!authSucces) {
-        removeUserByEmail(user, user.email)
-        await removeIntegrationSecret(ctx, accountClient, {
-          socialId: user.userId,
-          kind: calendarIntegrationKind,
-          workspaceUuid: user.workspace,
-          key: user.email
+        // Why: diferente de sync(), NÃO deletamos a integração no reconcile.
+        // O usuário disparou a ação manualmente — se tem invalid_grant, melhor
+        // ele saber via mensagem de erro e reconectar pelo UI do que perder a
+        // integração silenciosamente.
+        ctx.warn('Reconcile aborted — invalid grant', {
+          workspace: user.workspace,
+          user: user.userId,
+          email
         })
-        throw new Error('Invalid grant')
+        throw new Error('invalid_grant — please reconnect Google Calendar')
       }
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
       return await syncManager.reconcileAllCalendars()

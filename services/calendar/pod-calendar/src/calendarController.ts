@@ -142,7 +142,10 @@ export class CalendarController {
 
     this.ctx.info('Force reconcile user', {
       workspace,
-      integrations: userTokens.length
+      integrations: userTokens.length,
+      userSocialIds: socialIds.map((s) => ({ id: s._id, type: s.type, value: s.value })),
+      allTokensCount: allTokens.length,
+      allTokensSocialIds: allTokens.map((t) => t.socialId)
     })
 
     let calendars = 0
