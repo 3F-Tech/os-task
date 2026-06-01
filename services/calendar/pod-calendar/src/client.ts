@@ -21,12 +21,29 @@ import { getWorkspaceToken } from './utils'
 
 const endpoints = new Map<WorkspaceUuid, string>()
 
+function withTimeout<T> (promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => {
+        reject(new Error(`${label} timeout after ${ms}ms`))
+      }, ms)
+    )
+  ])
+}
+
 export async function getClient (
   workspace: WorkspaceUuid,
   token: string = getWorkspaceToken(workspace)
 ): Promise<Client> {
-  const endpoint = endpoints.get(workspace) ?? (await getTransactorEndpoint(token, 'external'))
-  endpoints.set(workspace, endpoint)
+  // Why: getTransactorEndpoint faz HTTP no account, createClient abre
+  // WebSocket pro transactor. Ambos podem travar (issues vistos:
+  // "client websocket error: 1..11"). Timeouts evitam request pendurada.
+  let endpoint = endpoints.get(workspace)
+  if (endpoint === undefined) {
+    endpoint = await withTimeout(getTransactorEndpoint(token, 'external'), 10_000, 'getTransactorEndpoint')
+    endpoints.set(workspace, endpoint)
+  }
   setMetadata(client.metadata.FilterModel, 'client')
-  return await createClient(endpoint, token)
+  return await withTimeout(createClient(endpoint, token), 15_000, 'createClient')
 }
