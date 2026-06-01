@@ -142,8 +142,20 @@ export class CalendarController {
 
     for (const t of userTokens) {
       const parsedToken = JSON.parse(t.secret)
+      this.ctx.info('Force sync user — invoking sync', { email: parsedToken.email })
       try {
-        await IncomingSyncManager.sync(this.ctx, this.accountClient, parsedToken, parsedToken.email)
+        // Why: protege contra IncomingSyncManager.sync travar (ex: getClient
+        // websocket hang, mutex preso por outro fluxo, Google API sem timeout).
+        // 45s deixa folga pro nginx (timeout default 60s) responder antes do 504.
+        await Promise.race([
+          IncomingSyncManager.sync(this.ctx, this.accountClient, parsedToken, parsedToken.email),
+          new Promise<void>((_, reject) =>
+            setTimeout(() => {
+              reject(new Error('Sync timeout after 45s'))
+            }, 45_000)
+          )
+        ])
+        this.ctx.info('Force sync user — sync returned', { email: parsedToken.email })
       } catch (err: any) {
         this.ctx.error('Force sync user — sync error', {
           email: t.key,
