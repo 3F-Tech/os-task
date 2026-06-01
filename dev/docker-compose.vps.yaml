@@ -560,8 +560,11 @@ services:
     command: node /app/server.js
     volumes:
       - ../services/hulykvs/server.js:/app/server.js
+      # Persiste syncTokens/watches do calendar service para sobreviver a restart.
+      - /opt/apps/os-tasks/data/hulykvs:/data
     environment:
       - PORT=8094
+      - STORE_PATH=/data/store.json
     restart: unless-stopped
 
   calendar:
