@@ -97,17 +97,34 @@ export const main = async (): Promise<void> => {
       type: 'get',
       handler: async (req, res) => {
         const code = req.query.code as string
+        let state: State
         try {
-          const state = JSON.parse(decode64(req.query.state as string)) as unknown as State
-          try {
-            await AuthController.createAndSync(ctx, accountClient, integrationClient, state, code)
-            res.redirect(state.redirectURL)
-          } catch (err) {
-            ctx.error('signin code error', { message: (err as any).message })
-          }
+          state = JSON.parse(decode64(req.query.state as string)) as State
         } catch (err) {
           ctx.error('signin code state parse error', { message: (err as any).message })
+          res.status(400).send('Invalid OAuth state')
+          return
         }
+        try {
+          // Why: AuthController.createAndSync pode travar em getClient
+          // (websocket pra transactor falhando) ou em mutex preso por OAuth
+          // anterior. Timeout de 30s evita o browser ficar carregando
+          // infinitamente. A integração já foi salva em authorize() antes
+          // do hang, então o usuário vê como conectada.
+          await Promise.race([
+            AuthController.createAndSync(ctx, accountClient, integrationClient, state, code),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => {
+                reject(new Error('OAuth createAndSync timeout after 30s'))
+              }, 30_000)
+            )
+          ])
+        } catch (err) {
+          ctx.error('signin code error', { message: (err as any).message })
+        }
+        // Why: sempre redireciona, mesmo em erro. Bug upstream original deixava
+        // o browser pendurado quando o handler não respondia.
+        res.redirect(state.redirectURL)
       }
     },
     {
