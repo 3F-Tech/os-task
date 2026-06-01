@@ -22,8 +22,11 @@ import {
   isActiveMode,
   isDeletingMode
 } from '@hcengineering/core'
+import { getAccountClient } from '@hcengineering/server-client'
 import config from './config'
 import { getIntegrations } from './integrations'
+import { IncomingSyncManager } from './sync'
+import { getWorkspaceTokens } from './tokens'
 import { WorkspaceClient } from './workspaceClient'
 
 interface WorkspaceStateInfo {
@@ -112,13 +115,40 @@ export class CalendarController {
     }
   }
 
-  // Triggered by the user-facing "refresh" button. Runs a full WorkspaceClient
-  // cycle which does incoming sync (Google→Huly) and pushes pending Huly events
-  // back to Google. Awaits completion so the caller can display result.
-  async forceSyncWorkspace (workspace: WorkspaceUuid): Promise<void> {
-    this.ctx.info('Force sync workspace', { workspace })
-    await WorkspaceClient.run(this.ctx, this.accountClient, workspace)
-    this.ctx.info('Force sync workspace finished', { workspace })
+  // Triggered by the "refresh" button no Planner. Sincroniza só os calendários
+  // do usuário autenticado, não do workspace inteiro — evita esperar todos os
+  // outros usuários quando alguém quer só atualizar o próprio.
+  async forceSyncUser (
+    userToken: string,
+    workspace: WorkspaceUuid
+  ): Promise<{ calendars: number, durationMs: number }> {
+    const started = Date.now()
+    // AccountClient autenticado COM o token do usuário → getSocialIds retorna
+    // os socialIds dele (não do serviço).
+    const userAccountClient = getAccountClient(userToken)
+    const socialIds = await userAccountClient.getSocialIds()
+    const ids = new Set(socialIds.map((s) => s._id))
+
+    const allTokens = await getWorkspaceTokens(this.accountClient, workspace)
+    const userTokens = allTokens.filter((t) => ids.has(t.socialId))
+
+    this.ctx.info('Force sync user', { workspace, calendars: userTokens.length })
+
+    for (const t of userTokens) {
+      const parsedToken = JSON.parse(t.secret)
+      try {
+        await IncomingSyncManager.sync(this.ctx, this.accountClient, parsedToken, parsedToken.email)
+      } catch (err: any) {
+        this.ctx.error('Force sync user — sync error', {
+          email: t.key,
+          err: err?.message ?? String(err)
+        })
+      }
+    }
+
+    const result = { calendars: userTokens.length, durationMs: Date.now() - started }
+    this.ctx.info('Force sync user finished', { workspace, ...result })
+    return result
   }
 
   private async runAll (groups: Map<WorkspaceUuid, Integration[]>): Promise<void> {

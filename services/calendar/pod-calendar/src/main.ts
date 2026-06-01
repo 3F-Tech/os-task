@@ -181,24 +181,23 @@ export const main = async (): Promise<void> => {
       }
     },
     {
-      // Force bidirectional sync for the authenticated user's workspace.
-      // Triggered by the "refresh" button in the Planner header.
+      // Force incoming sync (Google → Huly) for the authenticated user's
+      // calendars only. Triggered by the "refresh" button in the Planner header.
       endpoint: '/sync',
       type: 'post',
       handler: async (req, res) => {
-        const token = extractToken(req.headers)
-        if (token === undefined) {
+        const userToken = extractToken(req.headers)
+        if (userToken === undefined) {
           res.status(401).send()
           return
         }
         try {
-          const { workspace } = decodeToken(token)
-          const started = Date.now()
-          // WorkspaceClient.run faz init + IncomingSyncManager.sync (Google→Huly)
-          // + getNewEvents (Huly→Google). Mutex em sync.ts:87 protege contra
-          // colisão com push notifications acontecendo em paralelo.
-          await CalendarController.getCalendarController(ctx, accountClient).forceSyncWorkspace(workspace)
-          res.status(200).json({ ok: true, durationMs: Date.now() - started })
+          const { workspace } = decodeToken(userToken)
+          const result = await CalendarController.getCalendarController(ctx, accountClient).forceSyncUser(
+            userToken,
+            workspace
+          )
+          res.status(200).json({ ok: true, ...result })
         } catch (err: any) {
           ctx.error('Force sync error', { message: err?.message ?? String(err) })
           res.status(500).json({ ok: false, error: err?.message ?? String(err) })
