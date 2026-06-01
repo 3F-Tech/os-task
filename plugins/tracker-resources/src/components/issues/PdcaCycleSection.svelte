@@ -14,14 +14,18 @@
 -->
 <script lang="ts">
   import { type Ref } from '@hcengineering/core'
+  import type { IntlString } from '@hcengineering/platform'
   import { getClient } from '@hcengineering/presentation'
   import { getTaskTypeStates } from '@hcengineering/task'
   import { taskTypeStore } from '@hcengineering/task-resources'
   import { type Issue, type IssueStatus, PdcaFrequency } from '@hcengineering/tracker'
 
-  function calcNextCycleDate (frequency: PdcaFrequency, from: number): number {
+  function calcNextCycleDate (frequency: PdcaFrequency, from: number, customWeekdays?: number[]): number {
     const date = new Date(from)
-    if (frequency === PdcaFrequency.Weekly) {
+    if (frequency === PdcaFrequency.Daily) {
+      date.setDate(date.getDate() + 1)
+      date.setHours(0, 0, 0, 0)
+    } else if (frequency === PdcaFrequency.Weekly) {
       const daysUntilMonday = ((8 - date.getDay()) % 7) || 7
       date.setDate(date.getDate() + daysUntilMonday)
       date.setHours(0, 0, 0, 0)
@@ -34,6 +38,24 @@
     } else if (frequency === PdcaFrequency.Quarterly) {
       date.setMonth(date.getMonth() + 3, 1)
       date.setHours(0, 0, 0, 0)
+    } else if (frequency === PdcaFrequency.Custom) {
+      if (customWeekdays != null && customWeekdays.length > 0) {
+        const sorted = [...customWeekdays].sort((a, b) => a - b)
+        const currentDow = date.getDay()
+        let nextDow = sorted.find((d) => d > currentDow)
+        let daysAhead: number
+        if (nextDow !== undefined) {
+          daysAhead = nextDow - currentDow
+        } else {
+          daysAhead = 7 - currentDow + sorted[0]
+        }
+        date.setDate(date.getDate() + daysAhead)
+        date.setHours(0, 0, 0, 0)
+      } else {
+        // No weekdays selected → cannot schedule; fallback to +7 days
+        date.setDate(date.getDate() + 7)
+        date.setHours(0, 0, 0, 0)
+      }
     }
     return date.getTime()
   }
@@ -62,10 +84,22 @@
   $: statuses = getTaskTypeStates(issue.kind, $taskTypeStore, $statusStore.byId)
 
   const frequencyItems: DropdownIntlItem[] = [
+    { id: PdcaFrequency.Daily, label: tracker.string.PdcaCycleDaily },
     { id: PdcaFrequency.Weekly, label: tracker.string.PdcaCycleWeekly },
     { id: PdcaFrequency.Biweekly, label: tracker.string.PdcaCycleBiweekly },
     { id: PdcaFrequency.Monthly, label: tracker.string.PdcaCycleMonthly },
-    { id: PdcaFrequency.Quarterly, label: tracker.string.PdcaCycleQuarterly }
+    { id: PdcaFrequency.Quarterly, label: tracker.string.PdcaCycleQuarterly },
+    { id: PdcaFrequency.Custom, label: tracker.string.PdcaCycleCustom }
+  ]
+
+  const customWeekdayItems: Array<{ id: number, label: IntlString }> = [
+    { id: 1, label: tracker.string.PdcaWeekdayMon },
+    { id: 2, label: tracker.string.PdcaWeekdayTue },
+    { id: 3, label: tracker.string.PdcaWeekdayWed },
+    { id: 4, label: tracker.string.PdcaWeekdayThu },
+    { id: 5, label: tracker.string.PdcaWeekdayFri },
+    { id: 6, label: tracker.string.PdcaWeekdaySat },
+    { id: 0, label: tracker.string.PdcaWeekdaySun }
   ]
 
   // IDs as strings to avoid type mismatch in DropdownLabelsIntl
@@ -80,18 +114,25 @@
     { id: '0', label: tracker.string.PdcaWeekdaySun }
   ]
 
+  function canActivate (frequency: PdcaFrequency | undefined, customWeekdays: number[] | undefined): boolean {
+    if (frequency == null) return false
+    if (frequency === PdcaFrequency.Custom && (customWeekdays == null || customWeekdays.length === 0)) return false
+    return true
+  }
+
   async function toggleActive (val: boolean): Promise<void> {
+    const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
     if (issue._id && issue._class) {
-      if (val && issue.pdcaCycleFrequency != null && issue.pdcaCycleResetStatus != null) {
-        const nextDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency, Date.now())
+      if (val && canActivate(issue.pdcaCycleFrequency, customWeekdays) && issue.pdcaCycleResetStatus != null) {
+        const nextDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency as PdcaFrequency, Date.now(), customWeekdays)
         await client.update(issue, { pdcaCycleActive: true, pdcaNextCycleDate: nextDate } as any)
       } else {
         await client.update(issue, { pdcaCycleActive: val })
       }
     } else {
       issue.pdcaCycleActive = val
-      if (val && issue.pdcaCycleFrequency != null && issue.pdcaCycleResetStatus != null) {
-        ;(issue as any).pdcaNextCycleDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency, Date.now())
+      if (val && canActivate(issue.pdcaCycleFrequency, customWeekdays) && issue.pdcaCycleResetStatus != null) {
+        ;(issue as any).pdcaNextCycleDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency as PdcaFrequency, Date.now(), customWeekdays)
       }
     }
   }
@@ -117,6 +158,18 @@
       await client.update(issue, { pdcaCycleDueDays: days } as any)
     } else {
       ;(issue as any).pdcaCycleDueDays = days
+    }
+  }
+
+  async function toggleCustomWeekday (day: number): Promise<void> {
+    const current = ((issue as any).pdcaCycleCustomWeekdays as number[] | undefined) ?? []
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b)
+    if (issue._id && issue._class) {
+      await client.update(issue, { pdcaCycleCustomWeekdays: next } as any)
+    } else {
+      ;(issue as any).pdcaCycleCustomWeekdays = next
     }
   }
 
@@ -180,6 +233,7 @@
   $: resetStatusName = statuses.find((s) => s._id === issue.pdcaCycleResetStatus)?.name ?? '—'
   $: dueDays = (issue as any).pdcaCycleDueDays as number[] | undefined
   $: selectedWeekday = String(dueDays?.[0] ?? 5) // default: Friday
+  $: customWeekdays = ((issue as any).pdcaCycleCustomWeekdays as number[] | undefined) ?? []
   $: isDuplicate = (issue as any).pdcaCycleDuplicate === true
 </script>
 
@@ -292,6 +346,28 @@
               on:blur={handleMonthDay2}
               on:keydown={handleMonthDayKey}
             />
+          </div>
+        </div>
+      {/if}
+
+      {#if selectedFrequency === PdcaFrequency.Custom}
+        <div class="pdca-row pdca-row-wrap">
+          <span class="pdca-label">
+            <Label label={tracker.string.PdcaCustomWeekdays} />
+          </span>
+          <div class="pdca-weekday-chips">
+            {#each customWeekdayItems as item}
+              <button
+                type="button"
+                class="pdca-chip"
+                class:selected={customWeekdays.includes(item.id)}
+                class:disabled={readonly}
+                disabled={readonly}
+                on:click={() => { void toggleCustomWeekday(item.id) }}
+              >
+                <Label label={item.label} />
+              </button>
+            {/each}
           </div>
         </div>
       {/if}
@@ -443,5 +519,46 @@
     border-top: 1px solid var(--theme-divider-color);
     color: var(--theme-caption-color);
     font-size: 0.75rem;
+  }
+
+  .pdca-row-wrap {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .pdca-weekday-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: flex-end;
+    max-width: 70%;
+  }
+
+  .pdca-chip {
+    font-size: 0.75rem;
+    color: var(--theme-content-color);
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--theme-divider-color);
+    border-radius: var(--medium-focus-BorderRadius, 6px);
+    background: var(--theme-bg-color);
+    cursor: pointer;
+    outline: none;
+
+    &:hover:not(.disabled) {
+      background: var(--theme-button-hovered);
+      border-color: var(--theme-content-color);
+    }
+
+    &.selected {
+      background: var(--theme-button-pressed, var(--theme-button-hovered));
+      border-color: var(--theme-content-color);
+      color: var(--theme-caption-color);
+      font-weight: 500;
+    }
+
+    &.disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
   }
 </style>

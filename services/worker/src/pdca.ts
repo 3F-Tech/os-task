@@ -39,15 +39,33 @@ interface TimeMachineMessage {
   data?: any
 }
 
-function calculateNextCycleDate (frequency: PdcaFrequency, from: number): number {
+function calculateNextCycleDate (frequency: PdcaFrequency, from: number, customWeekdays?: number[]): number {
   const date = new Date(from)
-  if (frequency === 'weekly') {
+  if (frequency === 'daily') {
+    date.setDate(date.getDate() + 1)
+    date.setHours(0, 0, 0, 0)
+  } else if (frequency === 'weekly') {
     const daysUntilMonday = ((8 - date.getDay()) % 7) || 7
     date.setDate(date.getDate() + daysUntilMonday)
     date.setHours(0, 0, 0, 0)
   } else if (frequency === 'biweekly') {
     date.setDate(date.getDate() + 14)
     date.setHours(0, 0, 0, 0)
+  } else if (frequency === 'quarterly') {
+    date.setMonth(date.getMonth() + 3, 1)
+    date.setHours(0, 0, 0, 0)
+  } else if (frequency === 'custom') {
+    if (customWeekdays != null && customWeekdays.length > 0) {
+      const sorted = [...customWeekdays].sort((a, b) => a - b)
+      const currentDow = date.getDay()
+      const nextDow = sorted.find((d) => d > currentDow)
+      const daysAhead = nextDow !== undefined ? nextDow - currentDow : 7 - currentDow + sorted[0]
+      date.setDate(date.getDate() + daysAhead)
+      date.setHours(0, 0, 0, 0)
+    } else {
+      date.setDate(date.getDate() + 7)
+      date.setHours(0, 0, 0, 0)
+    }
   } else {
     date.setMonth(date.getMonth() + 1, 1)
     date.setHours(0, 0, 0, 0)
@@ -55,9 +73,32 @@ function calculateNextCycleDate (frequency: PdcaFrequency, from: number): number
   return date.getTime()
 }
 
-function calculateDueDate (frequency: PdcaFrequency, dueDays: number[] | undefined): number | null {
-  if (dueDays == null || dueDays.length === 0) return null
+function calculateDueDate (
+  frequency: PdcaFrequency,
+  dueDays: number[] | undefined,
+  customWeekdays?: number[]
+): number | null {
   const now = new Date()
+
+  if (frequency === 'daily') {
+    const due = new Date(now)
+    due.setHours(23, 59, 0, 0)
+    return due.getTime()
+  }
+
+  if (frequency === 'custom') {
+    if (customWeekdays == null || customWeekdays.length === 0) return null
+    const sorted = [...customWeekdays].sort((a, b) => a - b)
+    const currentDow = now.getDay()
+    const nextDow = sorted.find((d) => d > currentDow)
+    const daysAhead = nextDow !== undefined ? nextDow - currentDow : 7 - currentDow + sorted[0]
+    const due = new Date(now)
+    due.setDate(now.getDate() + daysAhead)
+    due.setHours(23, 59, 0, 0)
+    return due.getTime()
+  }
+
+  if (dueDays == null || dueDays.length === 0) return null
 
   if (frequency === 'weekly') {
     const targetWeekday = dueDays[0] // 0=Sun, 1=Mon, ..., 6=Sat
@@ -176,6 +217,7 @@ export async function processPdcaCycleEvent (
     const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
     const resetStatus = (issue as any).pdcaCycleResetStatus as Ref<IssueStatus> | undefined
     const dueDays = (issue as any).pdcaCycleDueDays as number[] | undefined
+    const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
     const shouldDuplicate = (issue as any).pdcaCycleDuplicate === true
 
     if (!isActive || frequency == null || resetStatus == null) {
@@ -183,9 +225,14 @@ export async function processPdcaCycleEvent (
       return
     }
 
-    const dueDate = calculateDueDate(frequency, dueDays)
-    const nextDate = calculateNextCycleDate(frequency, Date.now())
-    ctx.info('PDCA cycle: calculated dates', { issueId, frequency, dueDays, dueDate, nextDate })
+    if (frequency === 'custom' && (customWeekdays == null || customWeekdays.length === 0)) {
+      ctx.info('PDCA cycle: skipping — custom frequency without weekdays', { issueId })
+      return
+    }
+
+    const dueDate = calculateDueDate(frequency, dueDays, customWeekdays)
+    const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays)
+    ctx.info('PDCA cycle: calculated dates', { issueId, frequency, dueDays, customWeekdays, dueDate, nextDate })
 
     // Capture snapshot before any mutation
     const prevStatusDoc = await client.findOne(tracker.class.IssueStatus, { _id: issue.status })
@@ -217,6 +264,7 @@ export async function processPdcaCycleEvent (
         pdcaCycleFrequency: frequency,
         pdcaCycleResetStatus: resetStatus,
         pdcaCycleDueDays: dueDays,
+        pdcaCycleCustomWeekdays: customWeekdays,
         pdcaCycleDuplicate: true,
         pdcaNextCycleDate: nextDate,
         clientName: (issue as any).clientName,
@@ -311,10 +359,12 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
       for (const issue of issues) {
         const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
         const resetStatus = (issue as any).pdcaCycleResetStatus
+        const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
         if (frequency == null || resetStatus == null) continue
+        if (frequency === 'custom' && (customWeekdays == null || customWeekdays.length === 0)) continue
 
         const existingDate = (issue as any).pdcaNextCycleDate as number | undefined
-        const targetDate = existingDate ?? calculateNextCycleDate(frequency, Date.now())
+        const targetDate = existingDate ?? calculateNextCycleDate(frequency, Date.now(), customWeekdays)
 
         if (existingDate == null) {
           await client.update(issue, { pdcaNextCycleDate: targetDate } as any)

@@ -672,15 +672,33 @@ interface TimeMachineMessage {
   data?: any
 }
 
-function calculateNextCycleDate (frequency: PdcaFrequency, from: number): number {
+function calculateNextCycleDate (frequency: PdcaFrequency, from: number, customWeekdays?: number[]): number {
   const date = new Date(from)
-  if (frequency === PdcaFrequency.Weekly) {
+  if (frequency === PdcaFrequency.Daily) {
+    date.setDate(date.getDate() + 1)
+    date.setHours(0, 0, 0, 0)
+  } else if (frequency === PdcaFrequency.Weekly) {
     const daysUntilMonday = ((8 - date.getDay()) % 7) || 7
     date.setDate(date.getDate() + daysUntilMonday)
     date.setHours(0, 0, 0, 0)
   } else if (frequency === PdcaFrequency.Biweekly) {
     date.setDate(date.getDate() + 14)
     date.setHours(0, 0, 0, 0)
+  } else if (frequency === PdcaFrequency.Quarterly) {
+    date.setMonth(date.getMonth() + 3, 1)
+    date.setHours(0, 0, 0, 0)
+  } else if (frequency === PdcaFrequency.Custom) {
+    if (customWeekdays != null && customWeekdays.length > 0) {
+      const sorted = [...customWeekdays].sort((a, b) => a - b)
+      const currentDow = date.getDay()
+      const nextDow = sorted.find((d) => d > currentDow)
+      const daysAhead = nextDow !== undefined ? nextDow - currentDow : 7 - currentDow + sorted[0]
+      date.setDate(date.getDate() + daysAhead)
+      date.setHours(0, 0, 0, 0)
+    } else {
+      date.setDate(date.getDate() + 7)
+      date.setHours(0, 0, 0, 0)
+    }
   } else {
     date.setMonth(date.getMonth() + 1, 1)
     date.setHours(0, 0, 0, 0)
@@ -692,7 +710,9 @@ async function schedulePdcaTimer (issue: Issue, control: TriggerControl): Promis
   if (control.queue == null) return
   const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
   if (frequency == null) return
-  const nextDate = calculateNextCycleDate(frequency, Date.now())
+  const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
+  if (frequency === PdcaFrequency.Custom && (customWeekdays == null || customWeekdays.length === 0)) return
+  const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays)
   const producer = control.queue.getProducer<TimeMachineMessage>(control.ctx, QueueTopic.TimeMachine)
   await producer.send(control.ctx, control.workspace.uuid, [{
     type: 'schedule',
@@ -728,7 +748,8 @@ export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): P
       const touchesCycle =
         Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleActive') ||
         Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleFrequency') ||
-        Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleResetStatus')
+        Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleResetStatus') ||
+        Object.prototype.hasOwnProperty.call(ops, 'pdcaCycleCustomWeekdays')
 
       if (!touchesCycle) continue
 

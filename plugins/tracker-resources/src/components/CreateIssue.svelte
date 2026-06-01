@@ -677,6 +677,7 @@
         pdcaCycleFrequency: object.pdcaCycleFrequency,
         pdcaCycleResetStatus: object.pdcaCycleResetStatus,
         pdcaCycleDueDays: object.pdcaCycleDueDays,
+        pdcaCycleCustomWeekdays: object.pdcaCycleCustomWeekdays,
         pdcaCycleDuplicate: object.pdcaCycleDuplicate
       } as any
 

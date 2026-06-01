@@ -310,6 +310,7 @@ services:
     volumes:
       - ./branding.json:/var/cfg/branding.json
     environment:
+      - TZ=America/Sao_Paulo
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - SERVER_PORT=3332
       - REGION=cockroach
@@ -466,7 +467,25 @@ services:
   # hulygun: disabled — hardcoreeng/hulygun not published to Docker Hub
   # hulypulse: disabled — hardcoreeng/hulypulse not published to Docker Hub
   # process-service: disabled — hardcoreeng/process not published to Docker Hub
-  # time-machine: disabled — hardcoreeng/worker not published to Docker Hub
+  time-machine:
+    image: hardcoreeng/worker
+    extra_hosts:
+      - 'huly.local:host-gateway'
+    depends_on:
+      redpanda:
+        condition: service_started
+      account:
+        condition: service_started
+      cockroach:
+        condition: service_started
+    environment:
+      - TZ=America/Sao_Paulo
+      - DB_URL=${DB_CR_URL}
+      - QUEUE_CONFIG=${QUEUE_CONFIG}
+      - QUEUE_REGION=cockroach
+      - ACCOUNTS_URL=http://account:3000
+      - SECRET=secret
+    restart: unless-stopped
   #  translate:
   #    image: hardcoreeng/translate
   #    extra_hosts:
