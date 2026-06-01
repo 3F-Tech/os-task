@@ -186,15 +186,18 @@ export const main = async (): Promise<void> => {
       endpoint: '/sync',
       type: 'post',
       handler: async (req, res) => {
-        const userToken = extractToken(req.headers)
-        if (userToken === undefined) {
+        // Why: readToken devolve a STRING raw do JWT (necessária para
+        // getAccountClient que faz split(' ') internamente). extractToken
+        // devolve o objeto já decodificado e quebra com "token.split is not a function".
+        const rawToken = readToken(req.headers)
+        if (rawToken === undefined) {
           res.status(401).send()
           return
         }
         try {
-          const { workspace } = decodeToken(userToken)
+          const { workspace } = decodeToken(rawToken)
           const result = await CalendarController.getCalendarController(ctx, accountClient).forceSyncUser(
-            userToken,
+            rawToken,
             workspace
           )
           res.status(200).json({ ok: true, ...result })
