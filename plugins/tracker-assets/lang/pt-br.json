@@ -382,7 +382,12 @@
     "DueInDaysSuffix": "dia(s) após executar",
     "SubtasksSection": "Subtarefas",
     "SubtaskDueInDays": "Vencimento",
-    "NoSubtasksInTemplate": "Este template não possui subtarefas."
+    "NoSubtasksInTemplate": "Este template não possui subtarefas.",
+    "AddVariantGroup": "+ Adicionar grupo",
+    "VariantGroupNamePlaceholder": "Ex: Modalidade",
+    "RemoveVariantGroup": "Remover grupo",
+    "AnyValue": "qualquer",
+    "VariantGroupRequiresHint": "Etapa só roda se a escolha do wizard bater com a opção marcada"
   },
   "status": {}
 }

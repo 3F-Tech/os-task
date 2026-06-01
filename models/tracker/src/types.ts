@@ -532,6 +532,9 @@ export class TAutomationScript extends TDoc implements AutomationScript {
   @Prop(ArrOf(TypeString()), tracker.string.AutomationVariants)
     variantOptions?: string[]
 
+  @Prop(ArrOf(TypeRecord()), tracker.string.AutomationVariants)
+    variantGroups?: Array<{ name: string, options: string[] }>
+
   @Prop(Collection(tracker.class.AutomationScriptStep), tracker.string.AutomationScriptSteps)
     steps!: number
 }

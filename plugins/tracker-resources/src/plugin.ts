@@ -391,7 +391,12 @@ export default mergeIds(trackerId, tracker, {
     DueInDaysSuffix: '' as IntlString,
     SubtasksSection: '' as IntlString,
     SubtaskDueInDays: '' as IntlString,
-    NoSubtasksInTemplate: '' as IntlString
+    NoSubtasksInTemplate: '' as IntlString,
+    AddVariantGroup: '' as IntlString,
+    VariantGroupNamePlaceholder: '' as IntlString,
+    RemoveVariantGroup: '' as IntlString,
+    AnyValue: '' as IntlString,
+    VariantGroupRequiresHint: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,

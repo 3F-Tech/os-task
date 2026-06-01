@@ -12,12 +12,13 @@
   import type {
     AutomationScript,
     AutomationScriptStep,
+    AutomationVariantGroup,
     Issue,
     IssueTemplate,
     PdcaFrequency,
     Project
   } from '@hcengineering/tracker'
-  import { Button, CheckBox, EditBox, Label } from '@hcengineering/ui'
+  import { Button, EditBox, Label } from '@hcengineering/ui'
   import { createEventDispatcher, onMount } from 'svelte'
 
   import tracker from '../../plugin'
@@ -36,7 +37,8 @@
   let loaded = false
 
   let clientName = ''
-  let activeVariants = new Set<string>()
+  // Escolha selecionada em cada grupo de variantes (índice do grupo → valor)
+  let groupChoices: Record<number, string> = {}
   let labelAssignees: Record<string, Ref<Person> | null> = {}
   let executando = false
   let concluido = false
@@ -86,12 +88,32 @@
         labelsById = new Map(fetchedLabels.map((l) => [l._id, l]))
       }
       steps = foundSteps as AutomationScriptStep[]
+      // Inicializa cada grupo com a primeira opção
+      const groups = getVariantGroups(script)
+      const init: Record<number, string> = {}
+      groups.forEach((g, idx) => {
+        if (g.options.length > 0) init[idx] = g.options[0]
+      })
+      groupChoices = init
     } catch (err) {
       console.error('RunAutomationScript load failed:', err)
     } finally {
       loaded = true
     }
   })
+
+  // Migra script legado (variantOptions) para variantGroups in-memory
+  function getVariantGroups (s: AutomationScript | undefined): AutomationVariantGroup[] {
+    if (s === undefined) return []
+    if (s.variantGroups !== undefined && s.variantGroups.length > 0) return s.variantGroups
+    if (s.variantOptions !== undefined && s.variantOptions.length > 0) {
+      return [{ name: 'Variantes', options: s.variantOptions }]
+    }
+    return []
+  }
+
+  $: variantGroups = getVariantGroups(script)
+  $: activeVariants = new Set(Object.values(groupChoices))
 
   // ─── Filtragem por variantes ────────────────────────────────────────────────
   $: filteredSteps = steps.filter((s) => {
@@ -184,11 +206,8 @@
     labelAssignees = next
   }
 
-  function toggleVariant (v: string): void {
-    const next = new Set(activeVariants)
-    if (next.has(v)) next.delete(v)
-    else next.add(v)
-    activeVariants = next
+  function setGroupChoice (groupIdx: number, value: string): void {
+    groupChoices = { ...groupChoices, [groupIdx]: value }
   }
 
   function cancel (): void {
@@ -409,7 +428,6 @@
     })
   }
 
-  $: variantOptions = script?.variantOptions ?? []
 </script>
 
 <Card
@@ -440,18 +458,25 @@
           <EditBox bind:value={clientName} placeholder={tracker.string.ClientNamePlaceholder} kind="default" />
         </section>
 
-        {#if variantOptions.length > 0}
+        {#if variantGroups.length > 0}
           <section class="form-section">
             <h4 class="section-title"><Label label={tracker.string.SelectVariantOptions} /></h4>
-            <div class="variant-row">
-              {#each variantOptions as v (v)}
-                <label class="variant-toggle">
-                  <CheckBox
-                    checked={activeVariants.has(v)}
-                    on:value={() => toggleVariant(v)}
-                  />
-                  <span>{v}</span>
-                </label>
+            <div class="variant-groups">
+              {#each variantGroups as group, gIdx (gIdx)}
+                <div class="variant-group-row">
+                  <span class="variant-group-name">{group.name === '' ? '—' : group.name}:</span>
+                  {#each group.options as opt (opt)}
+                    <label class="radio-option">
+                      <input
+                        type="radio"
+                        name="wizard-group-{gIdx}"
+                        checked={groupChoices[gIdx] === opt}
+                        on:change={() => setGroupChoice(gIdx, opt)}
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  {/each}
+                </div>
               {/each}
             </div>
           </section>
@@ -628,18 +653,32 @@
     color: var(--theme-content-color);
   }
 
-  .variant-row {
+  .variant-groups {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+    flex-direction: column;
+    gap: 0.375rem;
   }
 
-  .variant-toggle {
-    display: inline-flex;
+  .variant-group-row {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.25rem 0.75rem;
     font-size: 0.8125rem;
     color: var(--theme-content-color);
+  }
+
+  .variant-group-name {
+    font-weight: 600;
+    color: var(--theme-caption-color);
+    margin-right: 0.25rem;
+    min-width: 6rem;
+  }
+
+  .radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     cursor: pointer;
   }
 

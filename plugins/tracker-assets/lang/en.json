@@ -400,7 +400,12 @@
     "DueInDaysSuffix": "day(s) after running",
     "SubtasksSection": "Subtasks",
     "SubtaskDueInDays": "Due in",
-    "NoSubtasksInTemplate": "This template has no subtasks."
+    "NoSubtasksInTemplate": "This template has no subtasks.",
+    "AddVariantGroup": "+ Add group",
+    "VariantGroupNamePlaceholder": "e.g. Plan",
+    "RemoveVariantGroup": "Remove group",
+    "AnyValue": "any",
+    "VariantGroupRequiresHint": "Step only runs if the wizard choice matches the selected option"
   },
   "status": {}
 }

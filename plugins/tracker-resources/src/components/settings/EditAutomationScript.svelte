@@ -8,13 +8,13 @@
   import type {
     AutomationScript,
     AutomationScriptStep,
+    AutomationVariantGroup,
     IssueTemplate,
     Project
   } from '@hcengineering/tracker'
   import core from '@hcengineering/core'
   import {
     Button,
-    CheckBox,
     EditBox,
     IconAdd,
     IconClose,
@@ -52,8 +52,18 @@
 
   let name: string = script?.name ?? ''
   let description: string = script?.description ?? ''
-  let variantOptions: string[] = [...(script?.variantOptions ?? [])]
-  let newVariant: string = ''
+  // Migra script legado (apenas variantOptions) para um único grupo "Variantes"
+  let variantGroups: AutomationVariantGroup[] = (() => {
+    if (script?.variantGroups !== undefined && script.variantGroups.length > 0) {
+      return script.variantGroups.map((g) => ({ name: g.name, options: [...g.options] }))
+    }
+    if (script?.variantOptions !== undefined && script.variantOptions.length > 0) {
+      return [{ name: 'Variantes', options: [...script.variantOptions] }]
+    }
+    return []
+  })()
+  // Plano para todas as variants (achatado) — usado pelo step para validar requireAll
+  $: allVariantValues = variantGroups.flatMap((g) => g.options)
   let steps: StepDraft[] = []
   let removedStepIds: Ref<AutomationScriptStep>[] = []
   let saving = false
@@ -128,21 +138,63 @@
     return arr
   })()
 
-  // ─── Variant management ─────────────────────────────────────────────────────
-  function addVariant (): void {
-    const v = newVariant.trim()
-    if (v === '' || variantOptions.includes(v)) return
-    variantOptions = [...variantOptions, v]
-    newVariant = ''
+  // ─── Variant group management ───────────────────────────────────────────────
+  function addVariantGroup (): void {
+    variantGroups = [...variantGroups, { name: '', options: [] }]
   }
 
-  function removeVariant (v: string): void {
-    variantOptions = variantOptions.filter((x) => x !== v)
+  function removeVariantGroup (idx: number): void {
+    const removed = variantGroups[idx]
+    if (removed === undefined) return
+    const removedValues = new Set(removed.options)
+    variantGroups = variantGroups.filter((_, i) => i !== idx)
+    // Limpa valores dos requireAll/requireNone dos steps
     steps = steps.map((s) => ({
       ...s,
-      requireAll: s.requireAll.filter((x) => x !== v),
-      requireNone: s.requireNone.filter((x) => x !== v)
+      requireAll: s.requireAll.filter((x) => !removedValues.has(x)),
+      requireNone: s.requireNone.filter((x) => !removedValues.has(x))
     }))
+  }
+
+  function renameVariantGroup (idx: number, value: string): void {
+    variantGroups[idx].name = value
+    variantGroups = [...variantGroups]
+  }
+
+  function addOptionToGroup (idx: number, raw: string): void {
+    const value = raw.trim()
+    if (value === '') return
+    if (allVariantValues.includes(value)) return // não duplica entre grupos
+    variantGroups[idx].options = [...variantGroups[idx].options, value]
+    variantGroups = [...variantGroups]
+  }
+
+  function removeOptionFromGroup (idx: number, value: string): void {
+    variantGroups[idx].options = variantGroups[idx].options.filter((x) => x !== value)
+    variantGroups = [...variantGroups]
+    // Remove dos requireAll/requireNone dos steps
+    steps = steps.map((s) => ({
+      ...s,
+      requireAll: s.requireAll.filter((x) => x !== value),
+      requireNone: s.requireNone.filter((x) => x !== value)
+    }))
+  }
+
+  // Para um grupo, qual valor (se algum) o step exige?
+  function getStepGroupChoice (step: StepDraft, group: AutomationVariantGroup): string | null {
+    for (const opt of group.options) {
+      if (step.requireAll.includes(opt)) return opt
+    }
+    return null
+  }
+
+  // Define qual valor (ou null = qualquer) o step exige para o grupo
+  function setStepGroupChoice (step: StepDraft, group: AutomationVariantGroup, value: string | null): void {
+    // remove qualquer valor antigo desse grupo do requireAll
+    let next = step.requireAll.filter((x) => !group.options.includes(x))
+    if (value !== null) next = [...next, value]
+    step.requireAll = next
+    steps = [...steps]
   }
 
   // ─── Project group management ───────────────────────────────────────────────
@@ -275,17 +327,6 @@
     steps = [...steps]
   }
 
-  function toggleRequire (step: StepDraft, list: 'requireAll' | 'requireNone', variant: string): void {
-    const current = step[list]
-    if (current.includes(variant)) {
-      step[list] = current.filter((v) => v !== variant)
-    } else {
-      step[list] = [...current, variant]
-      const other = list === 'requireAll' ? 'requireNone' : 'requireAll'
-      step[other] = step[other].filter((v) => v !== variant)
-    }
-    steps = [...steps]
-  }
 
   // ─── Save ───────────────────────────────────────────────────────────────────
   $: canSave =
@@ -297,12 +338,16 @@
     if (!canSave) return
     saving = true
 
+    const cleanGroups = variantGroups
+      .map((g) => ({ name: g.name.trim() === '' ? 'Grupo' : g.name.trim(), options: [...g.options] }))
+      .filter((g) => g.options.length > 0)
+
     let scriptId: Ref<AutomationScript>
     if (isNew) {
       scriptId = await client.createDoc(tracker.class.AutomationScript, core.space.Workspace, {
         name: name.trim(),
         description: description.trim() === '' ? undefined : description.trim(),
-        variantOptions: variantOptions.length > 0 ? variantOptions : undefined,
+        variantGroups: cleanGroups.length > 0 ? cleanGroups : undefined,
         steps: 0
       })
     } else {
@@ -310,7 +355,8 @@
       await client.updateDoc(tracker.class.AutomationScript, script!.space, scriptId, {
         name: name.trim(),
         description: description.trim() === '' ? undefined : description.trim(),
-        variantOptions: variantOptions.length > 0 ? variantOptions : undefined
+        variantGroups: cleanGroups.length > 0 ? cleanGroups : undefined,
+        variantOptions: undefined
       })
     }
 
@@ -392,27 +438,63 @@
     </section>
 
     <section class="form-section">
-      <h4 class="section-title"><Label label={tracker.string.AutomationVariants} /></h4>
-      <div class="chip-row">
-        {#each variantOptions as v (v)}
-          <span class="chip variant-chip">
-            {v}
-            <button class="chip-remove" on:click={() => removeVariant(v)} aria-label="remove">
-              <IconClose size="x-small" />
-            </button>
-          </span>
-        {/each}
-        <div class="variant-add">
-          <EditBox bind:value={newVariant} placeholder={tracker.string.VariantOptionPlaceholder} kind="default" />
-          <Button
-            icon={IconAdd}
-            kind="ghost"
-            size="small"
-            disabled={newVariant.trim() === ''}
-            on:click={addVariant}
-          />
-        </div>
+      <div class="steps-header">
+        <h4 class="section-title"><Label label={tracker.string.AutomationVariants} /></h4>
+        <Button
+          label={tracker.string.AddVariantGroup}
+          icon={IconAdd}
+          kind="regular"
+          size="small"
+          on:click={addVariantGroup}
+        />
       </div>
+      {#each variantGroups as group, gIdx (gIdx)}
+        <div class="variant-group">
+          <div class="variant-group-header">
+            <EditBox
+              value={group.name}
+              placeholder={tracker.string.VariantGroupNamePlaceholder}
+              kind="default"
+              on:value={(e) => renameVariantGroup(gIdx, e.detail ?? '')}
+            />
+            <Button
+              icon={IconDelete}
+              kind="ghost"
+              size="small"
+              showTooltip={{ label: tracker.string.RemoveVariantGroup }}
+              on:click={() => removeVariantGroup(gIdx)}
+            />
+          </div>
+          <div class="chip-row">
+            {#each group.options as opt (opt)}
+              <span class="chip variant-chip">
+                {opt}
+                <button class="chip-remove" on:click={() => removeOptionFromGroup(gIdx, opt)} aria-label="remove">
+                  <IconClose size="x-small" />
+                </button>
+              </span>
+            {/each}
+            <input
+              type="text"
+              class="new-option-input"
+              placeholder="Ex: Com SM"
+              on:keydown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addOptionToGroup(gIdx, e.currentTarget.value)
+                  e.currentTarget.value = ''
+                }
+              }}
+              on:blur={(e) => {
+                if (e.currentTarget.value.trim() !== '') {
+                  addOptionToGroup(gIdx, e.currentTarget.value)
+                  e.currentTarget.value = ''
+                }
+              }}
+            />
+          </div>
+        </div>
+      {/each}
     </section>
 
     <section class="form-section">
@@ -562,21 +644,38 @@
                         </div>
                       {/if}
 
-                      {#if variantOptions.length > 0}
+                      {#if variantGroups.length > 0}
                         <div class="template-field">
                           <span class="field-label">
                             <Label label={tracker.string.RequireAll} />
-                            <span class="hint"><Label label={tracker.string.RequireAllHint} /></span>
+                            <span class="hint"><Label label={tracker.string.VariantGroupRequiresHint} /></span>
                           </span>
-                          <div class="variant-toggle-row">
-                            {#each variantOptions as v (v)}
-                              <label class="variant-toggle">
-                                <CheckBox
-                                  checked={step.requireAll.includes(v)}
-                                  on:value={() => toggleRequire(step, 'requireAll', v)}
-                                />
-                                <span>{v}</span>
-                              </label>
+                          <div class="requires-groups">
+                            {#each variantGroups as group, gIdx (gIdx)}
+                              {@const choice = getStepGroupChoice(step, group)}
+                              <div class="requires-group">
+                                <span class="requires-group-name">{group.name === '' ? '—' : group.name}:</span>
+                                <label class="radio-option">
+                                  <input
+                                    type="radio"
+                                    name="step-{step.order}-group-{gIdx}"
+                                    checked={choice === null}
+                                    on:change={() => setStepGroupChoice(step, group, null)}
+                                  />
+                                  <span class="radio-any"><Label label={tracker.string.AnyValue} /></span>
+                                </label>
+                                {#each group.options as opt (opt)}
+                                  <label class="radio-option">
+                                    <input
+                                      type="radio"
+                                      name="step-{step.order}-group-{gIdx}"
+                                      checked={choice === opt}
+                                      on:change={() => setStepGroupChoice(step, group, opt)}
+                                    />
+                                    <span>{opt}</span>
+                                  </label>
+                                {/each}
+                              </div>
                             {/each}
                           </div>
                         </div>
@@ -683,6 +782,72 @@
     align-items: center;
     gap: 0.25rem;
     min-width: 12rem;
+  }
+
+  .variant-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--theme-divider-color);
+    border-radius: 0.375rem;
+    background-color: var(--theme-comp-header-color);
+  }
+
+  .variant-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .new-option-input {
+    padding: 0.125rem 0.5rem;
+    border: 1px dashed var(--theme-divider-color);
+    border-radius: 999px;
+    background-color: transparent;
+    color: var(--theme-caption-color);
+    font-size: 0.75rem;
+    min-width: 8rem;
+
+    &:focus {
+      outline: none;
+      border-style: solid;
+      border-color: var(--theme-button-focused-border, var(--primary-button-color));
+    }
+  }
+
+  .requires-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .requires-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--theme-content-color);
+  }
+
+  .requires-group-name {
+    font-weight: 600;
+    color: var(--theme-caption-color);
+    margin-right: 0.25rem;
+    min-width: 6rem;
+  }
+
+  .radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+  }
+
+  .radio-any {
+    font-style: italic;
+    color: var(--theme-dark-color);
   }
 
   .empty-steps {

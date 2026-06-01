@@ -439,15 +439,27 @@ export interface Component extends Doc {
 
 /**
  * @public
+ */
+export interface AutomationVariantGroup {
+  name: string
+  options: string[]
+}
+
+/**
+ * @public
  *
- * User-editable automation script (e.g. "Onboarding Seed"). Each script has a list of variant
- * options that are rendered as toggles in the runner wizard; steps may opt-in via requireAll
- * or opt-out via requireNone against the active variant set.
+ * User-editable automation script (e.g. "Onboarding Seed"). Each script defines variant
+ * groups; each group is a mutually-exclusive choice (radio) rendered in the runner wizard.
+ * Steps opt-in to a specific value via requireAll against the active variant set.
+ *
+ * @deprecated variantOptions — old flat list. New scripts should use variantGroups.
  */
 export interface AutomationScript extends Doc {
   name: string
   description?: string
+  /** @deprecated kept for backwards-compat; migrated to variantGroups on load. */
   variantOptions?: string[]
+  variantGroups?: AutomationVariantGroup[]
   steps: CollectionSize<AutomationScriptStep>
 }
 
