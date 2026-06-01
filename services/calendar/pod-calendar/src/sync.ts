@@ -128,17 +128,19 @@ export class IncomingSyncManager {
     user: Token,
     email: GoogleEmail
   ): Promise<{ calendars: number, created: number, updated: number, pushedToGoogle: number }> {
+    ctx.info('reconcile.step', { step: 'getClient.start', email })
     const client = await getClient(user.workspace)
+    ctx.info('reconcile.step', { step: 'getClient.done', email })
     const txOp = new TxOperations(client, user.userId)
     const google = getGoogleClient()
+    ctx.info('reconcile.step', { step: 'lock.start', email })
     const mutex = await lock(`${user.workspace}:${user.userId}:${email}`)
+    ctx.info('reconcile.step', { step: 'lock.acquired', email })
     try {
+      ctx.info('reconcile.step', { step: 'setCredentials.start', email })
       const authSucces = await setCredentials(google.auth, user)
+      ctx.info('reconcile.step', { step: 'setCredentials.done', email, ok: authSucces })
       if (!authSucces) {
-        // Why: diferente de sync(), NÃO deletamos a integração no reconcile.
-        // O usuário disparou a ação manualmente — se tem invalid_grant, melhor
-        // ele saber via mensagem de erro e reconectar pelo UI do que perder a
-        // integração silenciosamente.
         ctx.warn('Reconcile aborted — invalid grant', {
           workspace: user.workspace,
           user: user.userId,
@@ -147,7 +149,10 @@ export class IncomingSyncManager {
         throw new Error('invalid_grant — please reconnect Google Calendar')
       }
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
-      return await syncManager.reconcileAllCalendars()
+      ctx.info('reconcile.step', { step: 'reconcileAllCalendars.start', email })
+      const result = await syncManager.reconcileAllCalendars()
+      ctx.info('reconcile.step', { step: 'reconcileAllCalendars.done', email, ...result })
+      return result
     } finally {
       mutex()
       await txOp.close()
@@ -184,18 +189,31 @@ export class IncomingSyncManager {
   private async reconcileCalendar (cal: ExternalCalendar): Promise<{ created: number, updated: number, pushedToGoogle: number }> {
     if (cal.externalId === undefined) return { created: 0, updated: 0, pushedToGoogle: 0 }
     const calendarId = cal.externalId
+
+    // Why: janela de 3 dias (hoje + 2 dias). Evita reconciliar milhares de
+    // eventos antigos do calendar (que normalmente já estão estáveis) e foca
+    // no que o usuário vê no Planner. Reduz tempo de segundos a minutos
+    // para sub-segundos e drasticamente menos chamadas pra API do Google.
+    const now = new Date()
+    const timeMin = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const timeMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 0, 0, 0, 0)
+
     this.ctx.info('Reconcile calendar', {
       calendarId,
       workspace: this.user.workspace,
       user: this.user.userId,
-      email: this.email
+      email: this.email,
+      window: { from: timeMin.toISOString(), to: timeMax.toISOString() }
     })
 
-    // 1. Fetch ALL Google events (paginated, no syncToken — full state)
-    const googleEvents = await this.fetchAllGoogleEvents(calendarId)
+    // 1. Fetch Google events na janela (paginated, sem syncToken)
+    const googleEvents = await this.fetchAllGoogleEvents(calendarId, timeMin, timeMax)
 
-    // 2. Fetch ALL Huly events for this calendar
-    const hulyEvents = (await this.client.findAll(calendar.class.Event, { calendar: cal._id })) as Event[]
+    // 2. Fetch Huly events na janela (mesmo calendar)
+    const hulyEvents = (await this.client.findAll(calendar.class.Event, {
+      calendar: cal._id,
+      date: { $gte: timeMin.getTime(), $lte: timeMax.getTime() }
+    })) as Event[]
     const hulyByEventId = new Map<string, Event>()
     for (const e of hulyEvents) {
       hulyByEventId.set(e.eventId, e)
@@ -249,7 +267,11 @@ export class IncomingSyncManager {
     return { created, updated, pushedToGoogle }
   }
 
-  private async fetchAllGoogleEvents (calendarId: string): Promise<calendar_v3.Schema$Event[]> {
+  private async fetchAllGoogleEvents (
+    calendarId: string,
+    timeMin?: Date,
+    timeMax?: Date
+  ): Promise<calendar_v3.Schema$Event[]> {
     const all: calendar_v3.Schema$Event[] = []
     let pageToken: string | undefined
     while (true) {
@@ -260,7 +282,12 @@ export class IncomingSyncManager {
         pageToken,
         eventTypes: ['default'],
         showDeleted: false,
-        singleEvents: false
+        // Why: singleEvents=true expande recurring para instâncias no intervalo.
+        // Junto com timeMin/timeMax cria janela limpa — só eventos relevantes
+        // para o dia atual e os próximos 2.
+        singleEvents: timeMin != null || timeMax != null,
+        timeMin: timeMin?.toISOString(),
+        timeMax: timeMax?.toISOString()
       })
       if (res.data.items != null) all.push(...res.data.items)
       if (res.data.nextPageToken != null) {
