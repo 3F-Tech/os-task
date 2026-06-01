@@ -126,13 +126,19 @@ export class CalendarController {
     // AccountClient autenticado COM o token do usuário → getSocialIds retorna
     // os socialIds dele (não do serviço).
     const userAccountClient = getAccountClient(userToken)
-    const socialIds = await userAccountClient.getSocialIds()
+    const socialIds = await userAccountClient.getSocialIds(true) // includeDeleted=true para não perder OAuth socialIds
     const ids = new Set(socialIds.map((s) => s._id))
 
     const allTokens = await getWorkspaceTokens(this.accountClient, workspace)
     const userTokens = allTokens.filter((t) => ids.has(t.socialId))
 
-    this.ctx.info('Force sync user', { workspace, calendars: userTokens.length })
+    this.ctx.info('Force sync user', {
+      workspace,
+      calendars: userTokens.length,
+      userSocialIds: socialIds.map((s) => ({ id: s._id, type: s.type, value: s.value })),
+      allTokensCount: allTokens.length,
+      allTokensSocialIds: allTokens.map((t) => t.socialId)
+    })
 
     for (const t of userTokens) {
       const parsedToken = JSON.parse(t.secret)
