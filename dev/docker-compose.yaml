@@ -169,7 +169,10 @@ services:
       # - DB_NS=account-2
       # Pass only one region to disallow selection for new workspaces.
       - REGION_INFO=cockroach|CockroachDB
-      - TRANSACTOR_URL=ws://localhost:3332;;cockroach,
+      # Formato: internal;external;region — internal usado por serviços dentro
+      # do Docker (worker chama o transactor via hostname interno), external
+      # usado por browsers (localhost mapeado pela porta 3332 publicada).
+      - TRANSACTOR_URL=ws://transactor_cockroach:3332;ws://localhost:3332;cockroach,
       - MAIL_URL=http://mail:8092
       - STORAGE_CONFIG=${STORAGE_CONFIG}
       - FRONT_URL=http://localhost:8087
@@ -181,6 +184,12 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - MAILBOX_DOMAINS=huly.dev.local
       - MAILBOX_MAX_COUNT_PER_ACCOUNT=2
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
   stats:
     image: hardcoreeng/stats
@@ -475,7 +484,7 @@ services:
       redpanda:
         condition: service_started
       account:
-        condition: service_started
+        condition: service_healthy
       cockroach:
         condition: service_started
     environment:
@@ -484,6 +493,7 @@ services:
       - QUEUE_CONFIG=${QUEUE_CONFIG}
       - QUEUE_REGION=cockroach
       - ACCOUNTS_URL=http://account:3000
+      - TRANSACTOR_INTERNAL_URL=ws://transactor_cockroach:3332
       - SECRET=secret
     restart: unless-stopped
   #  translate:

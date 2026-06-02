@@ -22,6 +22,7 @@ export interface Config {
   QueueRegion: string
   QueueConfig: string
   AccountsUrl: string
+  TransactorUrl?: string
   Secret: string
 }
 
@@ -31,6 +32,7 @@ const config: Config = {
   QueueRegion: process.env.QUEUE_REGION ?? '',
   QueueConfig: process.env.QUEUE_CONFIG ?? '',
   AccountsUrl: process.env.ACCOUNTS_URL ?? 'http://localhost:3000',
+  TransactorUrl: process.env.TRANSACTOR_INTERNAL_URL,
   Secret: process.env.SECRET ?? 'secret'
 }
 

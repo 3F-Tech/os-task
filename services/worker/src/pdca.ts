@@ -29,6 +29,7 @@ const SERVICE_NAME = 'pdca-worker'
 export interface PdcaCycleEvent {
   issueId: Ref<Issue>
   workspaceId: WorkspaceUuid
+  retryCount?: number
 }
 
 interface TimeMachineMessage {
@@ -37,6 +38,21 @@ interface TimeMachineMessage {
   targetDate?: number
   topic?: string
   data?: any
+}
+
+const MAX_RETRIES = 3
+const RETRY_BACKOFF_MS = [5 * 60 * 1000, 30 * 60 * 1000, 2 * 60 * 60 * 1000] // 5min, 30min, 2h
+
+function isTransientError (err: any): boolean {
+  const msg = String(err?.message ?? err ?? '').toLowerCase()
+  return (
+    msg.includes('fetch failed') ||
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
+    msg.includes('etimedout') ||
+    msg.includes('socket hang up') ||
+    msg.includes('network')
+  )
 }
 
 function calculateNextCycleDate (frequency: PdcaFrequency, from: number, customWeekdays?: number[]): number {
@@ -193,8 +209,51 @@ async function createWorkspaceClient (workspaceUuid: WorkspaceUuid): Promise<TxO
   if (wsInfo == null || !('endpoint' in wsInfo)) {
     throw new Error(`Could not get workspace info for ${workspaceUuid}`)
   }
-  const transactorUrl = wsInfo.endpoint.replace('ws://', 'http://').replace('wss://', 'https://')
+  const endpoint = config.TransactorUrl ?? wsInfo.endpoint
+  const transactorUrl = endpoint.replace('ws://', 'http://').replace('wss://', 'https://')
   return await createRestTxOperations(transactorUrl, wsInfo.workspace, wsInfo.token, true)
+}
+
+async function rescheduleForRetry (
+  ctx: MeasureMetricsContext,
+  event: PdcaCycleEvent,
+  err: any
+): Promise<void> {
+  const retryCount = event.retryCount ?? 0
+  if (retryCount >= MAX_RETRIES) {
+    ctx.error('PDCA cycle: giving up after retries', {
+      issueId: event.issueId,
+      workspaceId: event.workspaceId,
+      retryCount,
+      err: err?.message ?? String(err)
+    })
+    return
+  }
+  const delayMs = RETRY_BACKOFF_MS[retryCount] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1]
+  const targetDate = Date.now() + delayMs
+  ctx.warn('PDCA cycle: rescheduling after transient error', {
+    issueId: event.issueId,
+    workspaceId: event.workspaceId,
+    retryCount: retryCount + 1,
+    delayMs,
+    err: err?.message ?? String(err)
+  })
+  try {
+    const queue = getPlatformQueue(SERVICE_NAME, config.QueueRegion)
+    const producer = queue.getProducer<TimeMachineMessage>(ctx, QueueTopic.TimeMachine)
+    await producer.send(ctx, event.workspaceId, [{
+      type: 'schedule',
+      id: `pdca_${event.issueId}`,
+      targetDate,
+      topic: QueueTopic.PdcaCycle,
+      data: { issueId: event.issueId, workspaceId: event.workspaceId, retryCount: retryCount + 1 }
+    }])
+  } catch (rescheduleErr: any) {
+    ctx.error('PDCA cycle: failed to reschedule retry', {
+      issueId: event.issueId,
+      err: rescheduleErr?.message ?? String(rescheduleErr)
+    })
+  }
 }
 
 export async function processPdcaCycleEvent (
@@ -248,8 +307,22 @@ export async function processPdcaCycleEvent (
       const wonStatuses = await client.findAll(tracker.class.IssueStatus, {})
       const wonStatus = wonStatuses.find((s: any) => s.category === 'task:category:Won')
 
+      // Bump project sequence to get a unique number + identifier for the new issue.
+      // Without this the duplicated issue has no identifier and shows up as a
+      // "ghost task" in the UI.
+      const project = await client.findOne(tracker.class.Project, { _id: issue.space })
+      if (project == null) {
+        throw new Error(`PDCA duplicate: project not found for space ${String(issue.space)}`)
+      }
+      const inc = await client.update(project, { $inc: { sequence: 1 } } as any, true)
+      const number = ((inc as any)?.object?.sequence) ?? ((project.sequence ?? 0) + 1)
+      const newIdentifier = `${project.identifier}-${number}`
+
       const newIssueData: Record<string, any> = {
         title: issue.title,
+        number,
+        identifier: newIdentifier,
+        rank: '0|hzzzzz:',
         status: resetStatus,
         kind: issue.kind,
         assignee: issue.assignee,
@@ -280,7 +353,7 @@ export async function processPdcaCycleEvent (
         newIssueData as any
       )
       scheduleIssueId = newId as Ref<Issue>
-      ctx.info('PDCA cycle: new issue created as duplicate', { issueId, newIssueId: newId })
+      ctx.info('PDCA cycle: new issue created as duplicate', { issueId, newIssueId: newId, identifier: newIdentifier, number })
 
       // Mark original as done and deactivate its PDCA
       if (wonStatus != null) {
@@ -321,7 +394,15 @@ export async function processPdcaCycleEvent (
       data: { issueId: scheduleIssueId, workspaceId }
     }])
   } catch (err: any) {
-    ctx.error('PDCA cycle processing error', { issueId, workspaceId, err: err.message })
+    ctx.error('PDCA cycle processing error', {
+      issueId,
+      workspaceId,
+      err: err?.message ?? String(err),
+      cause: err?.cause?.message ?? err?.cause?.code ?? String(err?.cause ?? '')
+    })
+    if (isTransientError(err)) {
+      await rescheduleForRetry(ctx, event, err)
+    }
   } finally {
     if (client != null) {
       await client.close()
@@ -381,7 +462,12 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
         ctx.info('PDCA bootstrap: scheduled', { issueId: issue._id, targetDate: new Date(targetDate).toISOString(), workspace: workspaceId })
       }
     } catch (err: any) {
-      ctx.warn('PDCA bootstrap: error for workspace', { workspace: workspaceId, err: err.message })
+      ctx.warn('PDCA bootstrap: error for workspace', {
+        workspace: workspaceId,
+        err: err?.message ?? String(err),
+        cause: err?.cause?.message ?? err?.cause?.code ?? String(err?.cause ?? ''),
+        stack: err?.stack
+      })
     } finally {
       await client?.close()
     }
