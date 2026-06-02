@@ -130,6 +130,7 @@ export class CalendarController {
     updated: number
     pushedToGoogle: number
     errors: number
+    busy: boolean
     durationMs: number
   }> {
     const started = Date.now()
@@ -150,14 +151,11 @@ export class CalendarController {
     let updated = 0
     let pushedToGoogle = 0
     let errors = 0
+    let busy = false
 
     for (const t of userTokens) {
       const parsedToken = JSON.parse(t.secret)
       try {
-        // Why: timeout de 90s — reconcile pode demorar mais que sync incremental
-        // (lista completa de eventos no Google + comparações). Nginx default é
-        // 60s; o usuário fica com 504 mas o trabalho termina no background.
-        // Para calendar com 1000+ eventos pode passar disso.
         const result = await Promise.race([
           IncomingSyncManager.reconcile(this.ctx, this.accountClient, parsedToken, parsedToken.email),
           new Promise<never>((_, reject) =>
@@ -166,10 +164,14 @@ export class CalendarController {
             }, 90_000)
           )
         ])
-        calendars += result.calendars
-        created += result.created
-        updated += result.updated
-        pushedToGoogle += result.pushedToGoogle
+        if (result.busy === true) {
+          busy = true
+        } else {
+          calendars += result.calendars
+          created += result.created
+          updated += result.updated
+          pushedToGoogle += result.pushedToGoogle
+        }
       } catch (err: any) {
         errors++
         this.ctx.error('Force reconcile — error', {
@@ -186,6 +188,7 @@ export class CalendarController {
       updated,
       pushedToGoogle,
       errors,
+      busy,
       durationMs: Date.now() - started
     }
     this.ctx.info('Force reconcile user finished', { workspace, ...result })

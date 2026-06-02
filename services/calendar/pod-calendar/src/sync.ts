@@ -46,7 +46,7 @@ import { calendar_v3 } from 'googleapis'
 import { getClient } from './client'
 import { getCalendarsSyncHistory, getEventHistory, setCalendarsSyncHistory, setEventHistory } from './kvsUtils'
 import { OutcomingClient } from './outcomingClient'
-import { lock } from './mutex'
+import { isLocked, lock } from './mutex'
 import { getRateLimitter, RateLimiter } from './rateLimiter'
 import { GoogleEmail, Token, User } from './types'
 import {
@@ -127,11 +127,23 @@ export class IncomingSyncManager {
     accountClient: AccountClient,
     user: Token,
     email: GoogleEmail
-  ): Promise<{ calendars: number, created: number, updated: number, pushedToGoogle: number }> {
+  ): Promise<{ calendars: number, created: number, updated: number, pushedToGoogle: number, busy?: boolean }> {
+    // Why: se já tem sync rodando pra esse user (boot sync, push notification
+    // handler, periodic sync), retorna busy rápido em vez de pendurar até o
+    // lock liberar (que pode levar minutos). Usuário clica de novo depois.
+    const lockKey = `${user.workspace}:${user.userId}:${email}`
+    if (isLocked(lockKey)) {
+      ctx.info('Reconcile skipped — another sync in progress', {
+        workspace: user.workspace,
+        user: user.userId,
+        email
+      })
+      return { calendars: 0, created: 0, updated: 0, pushedToGoogle: 0, busy: true }
+    }
     const client = await getClient(user.workspace)
     const txOp = new TxOperations(client, user.userId)
     const google = getGoogleClient()
-    const mutex = await lock(`${user.workspace}:${user.userId}:${email}`)
+    const mutex = await lock(lockKey)
     try {
       const authSucces = await setCredentials(google.auth, user)
       if (!authSucces) {

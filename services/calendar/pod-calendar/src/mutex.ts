@@ -28,3 +28,10 @@ export async function lock (key: string): Promise<() => void> {
     releaseFn()
   }
 }
+
+// Checa se uma key está atualmente bloqueada (sem esperar). Útil para
+// fluxos disparados pelo usuário (ex: botão de force sync) que devem
+// responder "busy" rápido em vez de pendurar até o lock liberar.
+export function isLocked (key: string): boolean {
+  return locks.has(key)
+}
