@@ -45,6 +45,7 @@ import CalendarWidget from './components/CalendarWidget.svelte'
 import ScheduleNavSection from './components/ScheduleNavSection.svelte'
 import CalendarSettings from './components/CalendarSettings.svelte'
 import IntegrationState from './components/IntegrationState.svelte'
+import SyncToastNotification from './components/SyncToastNotification.svelte'
 import calendar from './plugin'
 import contact from '@hcengineering/contact'
 import { deleteObjects } from '@hcengineering/view-resources'
@@ -64,6 +65,7 @@ export {
   CalendarSelector,
   EventPresenter,
   ScheduleNavSection,
+  SyncToastNotification,
   forceSyncCalendars
 }
 

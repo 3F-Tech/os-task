@@ -1,6 +1,6 @@
 <script lang="ts">
   import calendar, { AccessLevel, Calendar, Event, generateEventId, getAllEvents } from '@hcengineering/calendar'
-  import { DayCalendar, calendarByIdStore, forceSyncCalendars, hidePrivateEvents } from '@hcengineering/calendar-resources'
+  import { DayCalendar, SyncToastNotification, calendarByIdStore, forceSyncCalendars, hidePrivateEvents } from '@hcengineering/calendar-resources'
   import { getCurrentEmployee } from '@hcengineering/contact'
   import { Ref, SortingOrder, Timestamp, getCurrentAccount } from '@hcengineering/core'
   import { IntlString, getEmbeddedLabel } from '@hcengineering/platform'
@@ -13,6 +13,8 @@
     IconChevronRight,
     IconRedo,
     Label,
+    NotificationSeverity,
+    addNotification,
     areDatesEqual,
     showPopup,
     ticker,
@@ -186,11 +188,52 @@
     syncing = true
     try {
       const result = await forceSyncCalendars()
-      if (!result?.ok) {
-        console.error('Calendar sync failed', result?.error)
+      if (result?.busy === true) {
+        addNotification(
+          'Sincronização em andamento',
+          'Outro sync já está rodando. Tente novamente em alguns minutos.',
+          SyncToastNotification,
+          undefined,
+          NotificationSeverity.Info
+        )
+      } else if (result?.ok === true) {
+        const changed =
+          (result.created ?? 0) + (result.updated ?? 0) + (result.pushedToGoogle ?? 0)
+        if (changed > 0) {
+          addNotification(
+            'Calendário sincronizado',
+            `${result.created ?? 0} criado(s), ${result.updated ?? 0} atualizado(s), ${result.pushedToGoogle ?? 0} enviado(s) ao Google.`,
+            SyncToastNotification,
+            undefined,
+            NotificationSeverity.Success
+          )
+        } else {
+          addNotification(
+            'Calendário sincronizado',
+            'Nenhuma mudança encontrada.',
+            SyncToastNotification,
+            undefined,
+            NotificationSeverity.Info
+          )
+        }
+      } else {
+        addNotification(
+          'Falha na sincronização',
+          result?.error ?? 'Erro desconhecido. Tente novamente.',
+          SyncToastNotification,
+          undefined,
+          NotificationSeverity.Error
+        )
       }
     } catch (err) {
       console.error('Calendar sync error', err)
+      addNotification(
+        'Falha na sincronização',
+        'Não foi possível alcançar o serviço de calendário. Tente novamente.',
+        SyncToastNotification,
+        undefined,
+        NotificationSeverity.Error
+      )
     } finally {
       syncing = false
     }
