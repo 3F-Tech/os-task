@@ -143,6 +143,10 @@ export class AuthController {
       const txOp = new TxOperations(client, authRes.personId)
       await this.setWorkspaceIntegration(authRes, authRes.personId, txOp)
       await setSyncHistory(this.user.workspace, Date.now())
+      // Why: fire-and-forget mas com close garantido no finally. Antes,
+      // o txOp ficava vivo até quando? Cada OAuth callback vazava uma
+      // conexão WebSocket para o transactor. Em pods rodando por horas
+      // isso vai acumulando até OOM/file descriptors.
       void IncomingSyncManager.initSync(
         this.ctx,
         this.accountClient,
@@ -153,7 +157,14 @@ export class AuthController {
         },
         authRes.email,
         this.googleClient
-      )
+      ).finally(() => {
+        void txOp.close().catch((err) => {
+          this.ctx.error('Failed to close txOp after initSync', {
+            workspace: this.user.workspace,
+            err: err?.message ?? String(err)
+          })
+        })
+      })
     }
   }
 

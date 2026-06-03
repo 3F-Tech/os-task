@@ -27,6 +27,7 @@ import { AuthController } from './auth'
 import { decode64 } from './base64'
 import { CalendarController } from './calendarController'
 import config from './config'
+import { getActiveLocks } from './mutex'
 import { OutcomingClient } from './outcomingClient'
 import { PushHandler } from './pushHandler'
 import { createServer, listen } from './server'
@@ -195,6 +196,29 @@ export const main = async (): Promise<void> => {
           ctx.error('Outcoming sync failed', { eventId: event.eventId, workspace, type, error: err.message })
         })
         res.send()
+      }
+    },
+    {
+      // Diagnóstico de locks vivos no mutex sem precisar restartar o pod.
+      // Requer token de serviço (header Authorization). Útil quando o
+      // botão de sync responde busy sem motivo aparente — mostra qual
+      // key:user:workspace travou e há quanto tempo.
+      endpoint: '/admin/locks',
+      type: 'get',
+      handler: async (req, res) => {
+        const token = readToken(req.headers)
+        if (token === undefined) {
+          res.status(401).send()
+          return
+        }
+        try {
+          decodeToken(token)
+        } catch {
+          res.status(401).send()
+          return
+        }
+        const active = getActiveLocks().sort((a, b) => b.heldForMs - a.heldForMs)
+        res.status(200).json({ count: active.length, locks: active })
       }
     },
     {
