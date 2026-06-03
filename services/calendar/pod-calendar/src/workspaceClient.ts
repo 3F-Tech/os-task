@@ -119,8 +119,9 @@ export class WorkspaceClient {
   }
 
   private async close (): Promise<void> {
+    // Why: client é compartilhado via pool em client.ts — não fechar aqui.
+    // Pool é responsável pelo lifecycle (eviction em erro, etc).
     this.clients.clear()
-    await this.client?.close()
   }
 
   // #region Events

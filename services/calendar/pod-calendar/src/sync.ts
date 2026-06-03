@@ -43,7 +43,7 @@ import setting from '@hcengineering/setting'
 import { htmlToMarkup } from '@hcengineering/text'
 import { deepEqual } from 'fast-equals'
 import { calendar_v3 } from 'googleapis'
-import { getClient } from './client'
+import { evictClient, getClient } from './client'
 import { getCalendarsSyncHistory, getEventHistory, setCalendarsSyncHistory, setEventHistory } from './kvsUtils'
 import { OutcomingClient } from './outcomingClient'
 import { isLocked, lock } from './mutex'
@@ -94,6 +94,9 @@ export class IncomingSyncManager {
   }
 
   static async sync (ctx: MeasureContext, accountClient: AccountClient, user: Token, email: GoogleEmail): Promise<void> {
+    // Why: client é compartilhado por workspace (pool em client.ts). NÃO
+    // chamar txOp.close() — fechar o client compartilhado quebra todos os
+    // outros syncs concorrentes do mesmo workspace.
     const client = await getClient(user.workspace)
     const txOp = new TxOperations(client, user.userId)
     const google = getGoogleClient()
@@ -112,9 +115,11 @@ export class IncomingSyncManager {
       }
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
       await syncManager.startSync()
+    } catch (err) {
+      evictClient(user.workspace)
+      throw err
     } finally {
       mutex()
-      await txOp.close()
     }
   }
 
@@ -140,6 +145,7 @@ export class IncomingSyncManager {
       })
       return { calendars: 0, created: 0, updated: 0, pushedToGoogle: 0, busy: true }
     }
+    // Why: client compartilhado por workspace — não fechar txOp aqui.
     const client = await getClient(user.workspace)
     const txOp = new TxOperations(client, user.userId)
     const google = getGoogleClient()
@@ -156,9 +162,11 @@ export class IncomingSyncManager {
       }
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
       return await syncManager.reconcileAllCalendars()
+    } catch (err) {
+      evictClient(user.workspace)
+      throw err
     } finally {
       mutex()
-      await txOp.close()
     }
   }
 

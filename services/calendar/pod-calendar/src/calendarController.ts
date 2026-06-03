@@ -23,6 +23,7 @@ import {
   isDeletingMode
 } from '@hcengineering/core'
 import { getAccountClient } from '@hcengineering/server-client'
+import { evictClient } from './client'
 import config from './config'
 import { getIntegrations } from './integrations'
 import { IncomingSyncManager } from './sync'
@@ -174,6 +175,9 @@ export class CalendarController {
         }
       } catch (err: any) {
         errors++
+        // Why: força reconexão na próxima — se erro foi createClient timeout,
+        // o cliente cacheado tá em estado ruim e precisa ser descartado.
+        evictClient(workspace)
         this.ctx.error('Force reconcile — error', {
           email: t.key,
           err: err?.message ?? String(err)

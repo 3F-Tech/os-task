@@ -26,6 +26,7 @@ import { join } from 'path'
 import { AuthController } from './auth'
 import { decode64 } from './base64'
 import { CalendarController } from './calendarController'
+import { evictClient, getActiveClients } from './client'
 import config from './config'
 import { getActiveLocks } from './mutex'
 import { OutcomingClient } from './outcomingClient'
@@ -219,6 +220,53 @@ export const main = async (): Promise<void> => {
         }
         const active = getActiveLocks().sort((a, b) => b.heldForMs - a.heldForMs)
         res.status(200).json({ count: active.length, locks: active })
+      }
+    },
+    {
+      // Diagnóstico do pool de clients (1 por workspace).
+      endpoint: '/admin/clients',
+      type: 'get',
+      handler: async (req, res) => {
+        const token = readToken(req.headers)
+        if (token === undefined) {
+          res.status(401).send()
+          return
+        }
+        try {
+          decodeToken(token)
+        } catch {
+          res.status(401).send()
+          return
+        }
+        const active = getActiveClients()
+        res.status(200).json({ count: active.length, clients: active })
+      }
+    },
+    {
+      // Força evict de um client cacheado de um workspace. Workaround manual
+      // pra quando suspeitar que o client tá num estado ruim sem precisar
+      // restartar o pod. POST /admin/evict-client?workspace=<uuid>
+      endpoint: '/admin/evict-client',
+      type: 'post',
+      handler: async (req, res) => {
+        const token = readToken(req.headers)
+        if (token === undefined) {
+          res.status(401).send()
+          return
+        }
+        try {
+          decodeToken(token)
+        } catch {
+          res.status(401).send()
+          return
+        }
+        const workspace = req.query.workspace as string
+        if (workspace === undefined || workspace === '') {
+          res.status(400).json({ error: 'workspace query param required' })
+          return
+        }
+        evictClient(workspace as any)
+        res.status(200).json({ ok: true, evicted: workspace })
       }
     },
     {

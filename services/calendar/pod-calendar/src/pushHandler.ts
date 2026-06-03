@@ -16,7 +16,7 @@
 import { AccountClient } from '@hcengineering/account-client'
 import { calendarIntegrationKind } from '@hcengineering/calendar'
 import { MeasureContext, TxOperations } from '@hcengineering/core'
-import { getClient } from './client'
+import { evictClient, getClient } from './client'
 import { IncomingSyncManager } from './sync'
 import { GoogleEmail, Token } from './types'
 import { getGoogleClient, getUserByEmail, removeIntegrationSecret, removeUserByEmail, setCredentials } from './utils'
@@ -45,11 +45,12 @@ export class PushHandler {
               key: token.email
             })
           } else {
+            // Why: client compartilhado via pool — não fechar txOp.
             const txOp = new TxOperations(client, token.userId)
             await IncomingSyncManager.push(this.ctx, this.accountClient, txOp, token, res.google, calendarId)
-            await txOp.close()
           }
         } catch (err) {
+          evictClient(token.workspace)
           this.ctx.error('Push sync error', {
             user: token.userId,
             workspace: token.workspace,
