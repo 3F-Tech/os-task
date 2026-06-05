@@ -726,6 +726,19 @@ export interface ViewletPreference extends Preference {
 }
 
 /**
+ * 3F — Default view config per project, set by Maintainer+ via "Set as project default" button.
+ * Sits between the user's personal localStorage override and the workspace-wide ViewletPreference
+ * in the column-config resolution chain.
+ *
+ * @public
+ */
+export interface ViewletProjectDefault extends Doc {
+  viewlet: Ref<Viewlet>
+  project: Ref<Space>
+  config: (BuildModelKey | string)[]
+}
+
+/**
  * @public
  */
 export type ViewOptions = {

@@ -67,6 +67,7 @@ import {
   Viewlet,
   ViewletDescriptor,
   ViewletPreference,
+  ViewletProjectDefault,
   ViewletViewAction
 } from './types'
 
@@ -125,6 +126,7 @@ const view = plugin(viewId, {
   },
   class: {
     ViewletPreference: '' as Ref<Class<ViewletPreference>>,
+    ViewletProjectDefault: '' as Ref<Class<ViewletProjectDefault>>,
     ViewletDescriptor: '' as Ref<Class<ViewletDescriptor>>,
     Viewlet: '' as Ref<Class<Viewlet>>,
     ViewletViewAction: '' as Ref<Class<ViewletViewAction>>,
@@ -269,7 +271,11 @@ const view = plugin(viewId, {
     ForbidAttributeChanges: '' as IntlString,
     AllowAttributeChanges: '' as IntlString,
     NoCreatePermissionTitle: '' as IntlString,
-    CopyAsMarkdownTable: '' as IntlString
+    CopyAsMarkdownTable: '' as IntlString,
+    SetAsProjectDefault: '' as IntlString,
+    SetAsProjectDefaultTooltip: '' as IntlString,
+    RestoreSystemDefault: '' as IntlString,
+    RestoreSystemDefaultTooltip: '' as IntlString
   },
   icon: {
     Table: '' as Asset,

@@ -13,29 +13,70 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import core, { AnyAttribute, Association, AssociationQuery, Class, Client, Doc, Ref, Type } from '@hcengineering/core'
+  import core, {
+    AnyAttribute,
+    Association,
+    AssociationQuery,
+    Class,
+    Client,
+    Doc,
+    Ref,
+    Space,
+    Type
+  } from '@hcengineering/core'
   import { Asset, getEmbeddedLabel, IntlString } from '@hcengineering/platform'
   import { createQuery, getAttributePresenterClass, getClient, hasResource } from '@hcengineering/presentation'
   import { DropdownLabelsIntl, Loading, resizeObserver } from '@hcengineering/ui'
-  import { BuildModelKey, Viewlet, ViewletPreference } from '@hcengineering/view'
+  import { BuildModelKey, Viewlet, ViewletPreference, ViewletProjectDefault } from '@hcengineering/view'
   import { deepEqual } from 'fast-equals'
   import { createEventDispatcher } from 'svelte'
   import view from '../plugin'
   import { buildConfigLookup, canResolveAttribute, getKeyLabel } from '../utils'
+  import { canEditSpace } from '../visibilityTester'
+  import {
+    clearProjectScopedConfig,
+    getProjectScopedConfig,
+    setProjectScopedConfig,
+    viewletProjectConfigStore
+  } from '../viewletProjectConfig'
   import ViewletClassSettings from './ViewletClassSettings.svelte'
 
   export let viewlet: Viewlet
   export let defaultConfig: (BuildModelKey | string)[] | undefined = undefined
   export let allowedMixins: Set<string> | undefined = undefined
+  // 3F — Quando definido, o popup salva/restaura em uma camada per-project
+  // (localStorage para o usuário + ViewletProjectDefault opcional via "Set as project default")
+  // ao invés de tocar no ViewletPreference workspace-wide.
+  export let projectScope: Ref<Space> | undefined = undefined
 
   const dispatch = createEventDispatcher()
 
+  // 3F — preferences é o array efetivo usado pela UI. Em workspace mode é o doc do DB.
+  // Em projectScope mode é sintetizado a partir das três camadas: localStorage > ViewletProjectDefault > ViewletPreference workspace.
   let preferences: ViewletPreference[] = []
+  let workspacePrefs: ViewletPreference[] = []
+  let projectDefaults: ViewletProjectDefault[] = []
   const preferenceQuery = createQuery()
+  const projectDefaultsQuery = createQuery()
 
   let selected = viewlet._id
 
   let viewlets: Viewlet[] = []
+
+  // 3F — Gate UI do botão "Set as project default". Reusa canEditSpace de visibilityTester
+  // que combina os 3 caminhos: workspace Owner, owner do space (project.owners), ou role
+  // com permissão UpdateSpace/UpdateObject. checkPermission sozinho falharia para Owners
+  // já que owner ≠ role.
+  let canSetProjectDefault = false
+  async function computeCanSetProjectDefault (scope: Ref<Space> | undefined): Promise<boolean> {
+    if (scope === undefined) return false
+    const space = await client.findOne(core.class.Space, { _id: scope })
+    if (space === undefined) return false
+    return await canEditSpace(space)
+  }
+  $: void computeCanSetProjectDefault(projectScope).then((ok) => {
+    canSetProjectDefault = ok
+  })
 
   $: client
     .findAll(view.class.Viewlet, {
@@ -60,13 +101,85 @@
         attachedTo: { $in: Array.from(viewlets.map((it) => it._id)) }
       },
       (res) => {
-        preferences = res
+        workspacePrefs = res
         loading = false
       }
     )
   } else {
     preferenceQuery.unsubscribe()
   }
+
+  $: if (projectScope !== undefined && viewlets.length > 0) {
+    projectDefaultsQuery.query(
+      view.class.ViewletProjectDefault,
+      {
+        project: projectScope,
+        viewlet: { $in: Array.from(viewlets.map((it) => it._id)) }
+      },
+      (res) => {
+        projectDefaults = res
+      }
+    )
+  } else {
+    projectDefaultsQuery.unsubscribe()
+    projectDefaults = []
+  }
+
+  // 3F — Resolve a camada vencedora por viewlet. Em workspace mode usa direto o doc do DB.
+  // Em project mode constrói objetos sintéticos com a forma de ViewletPreference (attachedTo + config)
+  // para reaproveitar o pipeline downstream (getConfig/setStatus/etc). Em project mode NÃO faz
+  // fallback ao workspace pref para não vazar ordem/seleção antiga via "Restore defaults".
+  function buildEffectivePreferences (
+    viewlets: Viewlet[],
+    workspacePrefs: ViewletPreference[],
+    projectDefaults: ViewletProjectDefault[],
+    localOverrides: Map<string, Array<string | BuildModelKey>>,
+    projectScope: Ref<Space> | undefined
+  ): ViewletPreference[] {
+    if (projectScope === undefined) return workspacePrefs
+    const result: ViewletPreference[] = []
+    for (const vl of viewlets) {
+      const localCfg = localOverrides.get(`viewletConfig:${vl._id}:${projectScope}`)
+      if (localCfg !== undefined) {
+        result.push({
+          _id: ('local-' + vl._id) as Ref<ViewletPreference>,
+          _class: view.class.ViewletPreference,
+          space: core.space.Workspace,
+          modifiedOn: 0,
+          modifiedBy: '' as any,
+          createdOn: 0,
+          createdBy: '' as any,
+          attachedTo: vl._id,
+          config: localCfg
+        } as ViewletPreference)
+        continue
+      }
+      const projectDefault = projectDefaults.find((d) => d.viewlet === vl._id)
+      if (projectDefault !== undefined) {
+        result.push({
+          _id: ('project-' + projectDefault._id) as Ref<ViewletPreference>,
+          _class: view.class.ViewletPreference,
+          space: core.space.Workspace,
+          modifiedOn: projectDefault.modifiedOn,
+          modifiedBy: projectDefault.modifiedBy,
+          createdOn: projectDefault.createdOn,
+          createdBy: projectDefault.createdBy,
+          attachedTo: vl._id,
+          config: projectDefault.config
+        } as ViewletPreference)
+      }
+      // Sem fallback ao workspace pref: se nada está definido, downstream usa base config.
+    }
+    return result
+  }
+
+  $: preferences = buildEffectivePreferences(
+    viewlets,
+    workspacePrefs,
+    projectDefaults,
+    $viewletProjectConfigStore,
+    projectScope
+  )
 
   const client = getClient()
   const hierarchy = client.getHierarchy()
@@ -404,14 +517,14 @@
     return !allowedMixins.has(head)
   }
 
-  async function save (viewletId: Ref<Viewlet>, items: Array<Config | AttributeConfig>): Promise<void> {
+  function buildNewConfig (items: Array<Config | AttributeConfig>): Array<string | BuildModelKey> {
     const configValues = items.filter(
       (p) =>
         p.value !== undefined &&
         ((p.type === 'divider' && typeof p.value === 'object' && p.value.displayProps?.grow) ||
           (p.type === 'attribute' && (p as AttributeConfig).enabled))
     )
-    const newConfig = configValues.map((p) => {
+    return configValues.map((p) => {
       const value = p.value as string | BuildModelKey
       const key = typeof value === 'string' ? value : value.key
       if (key?.startsWith('custom')) {
@@ -424,7 +537,20 @@
       }
       return value
     })
-    const preference = preferences.find((p) => p.attachedTo === viewletId)
+  }
+
+  async function save (viewletId: Ref<Viewlet>, items: Array<Config | AttributeConfig>): Promise<void> {
+    const newConfig = buildNewConfig(items)
+
+    // 3F — projectScope ativo: snapshot completo em localStorage, sem tocar no DB.
+    // Cada projeto tem seu bucket isolado, então não há leakage entre projetos e o
+    // workaround isOutOfScopeMixinEntry não é necessário aqui.
+    if (projectScope !== undefined) {
+      setProjectScopedConfig(viewletId, projectScope, newConfig)
+      return
+    }
+
+    const preference = workspacePrefs.find((p) => p.attachedTo === viewletId)
     const preserved = preference !== undefined ? preference.config.filter(isOutOfScopeMixinEntry) : []
     const config = [...newConfig, ...preserved]
     if (preference !== undefined) {
@@ -440,9 +566,61 @@
   }
 
   async function restoreDefault (viewletId: Ref<Viewlet>): Promise<void> {
-    const preference = preferences.find((p) => p.attachedTo === viewletId)
+    // 3F — projectScope ativo: apaga só o override pessoal local; em cascata
+    // a UI volta a refletir ViewletProjectDefault (se existir) ou base config.
+    if (projectScope !== undefined) {
+      clearProjectScopedConfig(viewletId, projectScope)
+      return
+    }
+    const preference = workspacePrefs.find((p) => p.attachedTo === viewletId)
     if (preference !== undefined) {
       await client.remove(preference)
+    }
+  }
+
+  // 3F — Força o config base do código (system default), ignorando project default.
+  // Em projeto: snapshot do viewlet.config no localStorage do usuário — substitui
+  // qualquer override anterior e sobrescreve o project default na cascata.
+  // Fora de projeto: equivalente a restoreDefault (deleta workspace pref → base).
+  async function restoreSystemDefault (viewletId: Ref<Viewlet>): Promise<void> {
+    if (projectScope !== undefined) {
+      const targetViewlet = viewlets.find((v) => v._id === viewletId)
+      if (targetViewlet === undefined) return
+      setProjectScopedConfig(viewletId, projectScope, [...targetViewlet.config])
+      return
+    }
+    const preference = workspacePrefs.find((p) => p.attachedTo === viewletId)
+    if (preference !== undefined) {
+      await client.remove(preference)
+    }
+  }
+
+  // 3F — Promove a configuração atual visível para o default do projeto.
+  // Tira um snapshot do que está sendo mostrado (qualquer camada vencedora hoje) e grava em
+  // ViewletProjectDefault. Limpa o override pessoal do usuário para que ele veja o resultado.
+  async function saveProjectDefault (
+    viewletId: Ref<Viewlet>,
+    items: Array<Config | AttributeConfig>
+  ): Promise<void> {
+    if (projectScope === undefined) return
+    if (!canSetProjectDefault) return
+
+    const newConfig = buildNewConfig(items)
+    const existing = projectDefaults.find((d) => d.viewlet === viewletId)
+    if (existing !== undefined) {
+      await client.update(existing, { config: newConfig })
+    } else {
+      await client.createDoc(view.class.ViewletProjectDefault, core.space.Workspace, {
+        viewlet: viewletId,
+        project: projectScope,
+        config: newConfig
+      })
+    }
+
+    // Limpa override pessoal para que o usuário veja imediatamente o novo default
+    // (o que ele acabou de promover) sem o snapshot anterior atrapalhando.
+    if (getProjectScopedConfig(viewletId, projectScope) !== undefined) {
+      clearProjectScopedConfig(viewletId, projectScope)
     }
   }
 
@@ -504,11 +682,18 @@
           <ViewletClassSettings
             {viewlet}
             items={citems}
+            showSetAsProjectDefault={canSetProjectDefault}
             on:restoreDefaults={() => {
-              restoreDefault(selected)
+              void restoreDefault(selected)
+            }}
+            on:restoreSystemDefault={() => {
+              void restoreSystemDefault(selected)
             }}
             on:save={(evt) => {
               save(selected, evt.detail)
+            }}
+            on:setAsProjectDefault={(evt) => {
+              void saveProjectDefault(selected, evt.detail)
             }}
           />
         {/if}

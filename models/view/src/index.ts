@@ -105,6 +105,7 @@ import {
   type Viewlet,
   type ViewletDescriptor,
   type ViewletPreference,
+  type ViewletProjectDefault,
   type ViewletViewAction
 } from '@hcengineering/view'
 
@@ -318,6 +319,13 @@ export class TViewletPreference extends TPreference implements ViewletPreference
   config!: (BuildModelKey | string)[]
 }
 
+@Model(view.class.ViewletProjectDefault, core.class.Doc, DOMAIN_VIEW)
+export class TViewletProjectDefault extends TDoc implements ViewletProjectDefault {
+  viewlet!: Ref<Viewlet>
+  project!: Ref<Space>
+  config!: (BuildModelKey | string)[]
+}
+
 @Model(view.class.ViewletDescriptor, core.class.Doc, DOMAIN_MODEL)
 export class TViewletDescriptor extends TDoc implements ViewletDescriptor {
   component!: AnyComponent
@@ -498,6 +506,7 @@ export function createModel (builder: Builder): void {
     TSortFuncs,
     TListHeaderExtra,
     TViewletPreference,
+    TViewletProjectDefault,
     TViewletDescriptor,
     TViewlet,
     TViewletViewAction,

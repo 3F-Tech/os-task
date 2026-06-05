@@ -97,7 +97,7 @@
   {modeSelectorProps}
 >
   <svelte:fragment slot="header-tools">
-    <ViewletSettingButton bind:viewOptions bind:viewlet {allowedMixins} />
+    <ViewletSettingButton bind:viewOptions bind:viewlet {allowedMixins} projectScope={space} />
   </svelte:fragment>
 
   <svelte:fragment slot="label_selector">
@@ -131,6 +131,7 @@
     {space}
     {viewOptions}
     {allowedMixins}
+    projectScope={space}
     createItemDialog={CreateIssue}
     createItemLabel={tracker.string.AddIssueTooltip}
     createItemEvent={TrackerEvents.IssuePlusButtonClicked}

@@ -13,7 +13,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { Button, ToggleWithLabel } from '@hcengineering/ui'
+  import { Button, ToggleWithLabel, tooltip } from '@hcengineering/ui'
   import { Viewlet } from '@hcengineering/view'
   import { createEventDispatcher } from 'svelte'
   import view from '../plugin'
@@ -21,6 +21,9 @@
 
   export let viewlet: Viewlet
   export let items: Array<Config | AttributeConfig> = []
+  // 3F — Visível só quando o popup está em project scope e o usuário tem
+  // core.permission.UpdateSpace no projeto. Disparado pelo pai (ViewletSetting).
+  export let showSetAsProjectDefault: boolean = false
 
   const dispatch = createEventDispatcher()
 
@@ -60,7 +63,10 @@
   let selected: number | undefined
 </script>
 
-<div class="flex-row-reverse mb-2 mr-2">
+<!-- 3F — flex-wrap permite os botões caírem em linhas separadas
+quando o popup é estreito (labels longos em pt-br) em vez do primeiro
+ser empurrado para fora pela esquerda pelo flex-row-reverse. -->
+<div class="flex-row-reverse flex-wrap mb-2 mr-2 gap-1">
   <Button
     on:click={() => dispatch('restoreDefaults')}
     label={view.string.RestoreDefaults}
@@ -68,6 +74,26 @@
     kind={'link'}
     noFocus
   />
+  <div use:tooltip={{ label: view.string.RestoreSystemDefaultTooltip, direction: 'top' }}>
+    <Button
+      on:click={() => dispatch('restoreSystemDefault')}
+      label={view.string.RestoreSystemDefault}
+      size={'x-small'}
+      kind={'link'}
+      noFocus
+    />
+  </div>
+  {#if showSetAsProjectDefault}
+    <div use:tooltip={{ label: view.string.SetAsProjectDefaultTooltip, direction: 'top' }}>
+      <Button
+        on:click={() => dispatch('setAsProjectDefault', items)}
+        label={view.string.SetAsProjectDefault}
+        size={'x-small'}
+        kind={'link'}
+        noFocus
+      />
+    </div>
+  {/if}
 </div>
 {#each items as item, i}
   {#if isAttribute(item)}

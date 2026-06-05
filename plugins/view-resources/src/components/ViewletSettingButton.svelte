@@ -13,6 +13,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
+  import { Ref, Space } from '@hcengineering/core'
   import { ButtonIcon, showPopup, closeTooltip } from '@hcengineering/ui'
   import { ViewOptionModel, ViewOptions, Viewlet, type ViewOptionsModel, BuildModelKey } from '@hcengineering/view'
   import view from '../plugin'
@@ -29,6 +30,9 @@
   export let defaultViewOptions: ViewOptions | undefined = undefined
   export let defaultConfig: (BuildModelKey | string)[] | undefined = undefined
   export let allowedMixins: Set<string> | undefined = undefined
+  // 3F — Quando definido, salvar/restaurar colunas opera só sobre este projeto
+  // (camada localStorage por (viewlet, project)) ao invés do ViewletPreference workspace-wide.
+  export let projectScope: Ref<Space> | undefined = undefined
 
   let btn: HTMLButtonElement
   let pressed: boolean = false
@@ -36,7 +40,7 @@
   function clickHandler () {
     pressed = true
     closeTooltip()
-    showPopup(ViewletSetting, { viewlet, defaultConfig, allowedMixins }, btn, () => {
+    showPopup(ViewletSetting, { viewlet, defaultConfig, allowedMixins, projectScope }, btn, () => {
       pressed = false
     })
   }

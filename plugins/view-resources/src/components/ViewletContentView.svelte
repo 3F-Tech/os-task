@@ -3,7 +3,8 @@
   import { IntlString } from '@hcengineering/platform'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { AnySvelteComponent, Component, Loading } from '@hcengineering/ui'
-  import view, { BuildModelKey, ViewOptions, Viewlet, ViewletPreference } from '@hcengineering/view'
+  import view, { BuildModelKey, ViewOptions, Viewlet, ViewletPreference, ViewletProjectDefault } from '@hcengineering/view'
+  import { viewletProjectConfigStore } from '../viewletProjectConfig'
 
   export let viewlet: WithLookup<Viewlet>
   export let _class: Ref<Class<Doc>>
@@ -17,6 +18,9 @@
   export let createItemEvent: string | undefined = undefined
   export let createItemDialogProps = { shouldSaveDraft: true }
   export let allowedMixins: Set<string> | undefined = undefined
+  // 3F — Quando definido, a resolução de colunas usa 3 camadas (localStorage > ViewletProjectDefault > ViewletPreference).
+  // Quando undefined, mantém o comportamento atual (só ViewletPreference workspace).
+  export let projectScope: Ref<Space> | undefined = undefined
 
   const hierarchy = getClient().getHierarchy()
 
@@ -42,11 +46,14 @@
 
   const preferenceQuery = createQuery()
   const objectConfigurations = createQuery()
+  const projectDefaultsQuery = createQuery()
   let preference: ViewletPreference[] = []
+  let projectDefaults: ViewletProjectDefault[] = []
 
   let configurationsLoading = true
   let preferencesLoading = true
-  $: loading = configurationsLoading || preferencesLoading
+  let projectDefaultsLoading = false
+  $: loading = configurationsLoading || preferencesLoading || projectDefaultsLoading
 
   let configurationRaw: Viewlet[] = []
   let configurations: Record<Ref<Class<Doc>>, Viewlet['config']> = {}
@@ -78,14 +85,64 @@
       (res) => {
         preference = res
         preferencesLoading = false
-        loading = configurationsLoading || preferencesLoading
+        loading = configurationsLoading || preferencesLoading || projectDefaultsLoading
       }
     )
+  }
+
+  // 3F — Camada intermediária: defaults definidos por Maintainer+ via "Set as project default".
+  function fetchProjectDefaults (configurationRaw: Viewlet[], scope: Ref<Space> | undefined): void {
+    if (scope === undefined || configurationRaw.length === 0) {
+      projectDefaultsQuery.unsubscribe()
+      projectDefaults = []
+      projectDefaultsLoading = false
+      return
+    }
+    projectDefaultsLoading = projectDefaultsQuery.query(
+      view.class.ViewletProjectDefault,
+      {
+        project: scope,
+        viewlet: { $in: configurationRaw.map((it) => it._id) }
+      },
+      (res) => {
+        projectDefaults = res
+        projectDefaultsLoading = false
+        loading = configurationsLoading || preferencesLoading || projectDefaultsLoading
+      }
+    )
+  }
+
+  // 3F — Resolve a camada vencedora para um viewlet:
+  //   - Em projeto:    localStorage > ViewletProjectDefault > undefined (cai pro base config)
+  //     Pula ViewletPreference workspace: senão preferências antigas (ex: ordem com Priority
+  //     no fim) vazam para projetos via "Restore defaults". O project default cobre o caso
+  //     legítimo de "config compartilhada".
+  //   - Fora de projeto: ViewletPreference workspace > undefined (base config)
+  function resolveEffectiveConfig (
+    vl: Viewlet,
+    preference: ViewletPreference[],
+    projectDefaults: ViewletProjectDefault[],
+    localOverrides: Map<string, Array<string | BuildModelKey>>,
+    scope: Ref<Space> | undefined
+  ): Array<string | BuildModelKey> | undefined {
+    if (scope !== undefined) {
+      const localCfg = localOverrides.get(`viewletConfig:${vl._id}:${scope}`)
+      if (localCfg !== undefined) return localCfg
+      const projDefault = projectDefaults.find((d) => d.viewlet === vl._id)
+      if (projDefault !== undefined) return projDefault.config
+      return undefined
+    }
+    const ws = preference.find((p) => p.attachedTo === vl._id)
+    if (ws !== undefined) return ws.config
+    return undefined
   }
 
   function updateConfiguration (
     configurationRaw: Viewlet[],
     preference: ViewletPreference[],
+    projectDefaults: ViewletProjectDefault[],
+    localOverrides: Map<string, Array<string | BuildModelKey>>,
+    scope: Ref<Space> | undefined,
     allowedMixins: Set<string> | undefined
   ): void {
     const newConfigurations: Record<Ref<Class<Doc>>, Viewlet['config']> = {}
@@ -94,16 +151,14 @@
       newConfigurations[v.attachTo] = filterConfigByAllowedMixins(v.config, allowedMixins)
     }
 
-    // Add viewlet configurations.
-    for (const pref of preference) {
-      if (pref.config.length > 0) {
-        const vl = configurationRaw.find((it) => it._id === pref.attachedTo)
-        if (vl !== undefined) {
-          newConfigurations[vl.attachTo] = filterConfigByAllowedMixins(
-            mergePreferenceConfig(pref.config, vl.config),
-            allowedMixins
-          )
-        }
+    // Aplica a camada vencedora (localStorage > ViewletProjectDefault > ViewletPreference) por viewlet.
+    for (const v of configurationRaw) {
+      const cfg = resolveEffectiveConfig(v, preference, projectDefaults, localOverrides, scope)
+      if (cfg !== undefined && cfg.length > 0) {
+        newConfigurations[v.attachTo] = filterConfigByAllowedMixins(
+          mergePreferenceConfig(cfg, v.config),
+          allowedMixins
+        )
       }
     }
 
@@ -112,8 +167,9 @@
 
   $: fetchConfigurations(viewlet)
   $: fetchPreferences(configurationRaw)
+  $: fetchProjectDefaults(configurationRaw, projectScope)
 
-  $: updateConfiguration(configurationRaw, preference, allowedMixins)
+  $: updateConfiguration(configurationRaw, preference, projectDefaults, $viewletProjectConfigStore, projectScope, allowedMixins)
 
   // 3F — Mescla config salva pelo usuário com o config base do viewlet.
   // O gear menu não persiste `presenter`/`props`, então preferências salvas antes
@@ -151,8 +207,14 @@
   }
 
   $: config = (() => {
-    const pref = preference.find((it) => it.attachedTo === viewlet._id)
-    const base = pref === undefined ? viewlet.config : mergePreferenceConfig(pref.config, viewlet.config)
+    const effective = resolveEffectiveConfig(
+      viewlet,
+      preference,
+      projectDefaults,
+      $viewletProjectConfigStore,
+      projectScope
+    )
+    const base = effective === undefined ? viewlet.config : mergePreferenceConfig(effective, viewlet.config)
     return filterConfigByAllowedMixins(base, allowedMixins)
   })()
 </script>
