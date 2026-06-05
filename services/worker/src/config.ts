@@ -32,6 +32,7 @@ export interface Config {
   DigestMinute: number
   DigestTimezone: string
   DigestUpcomingDays: number
+  DigestSkipWeekend: boolean
 }
 
 const config: Config = {
@@ -49,7 +50,8 @@ const config: Config = {
   DigestHour: process.env.DIGEST_HOUR != null ? Number(process.env.DIGEST_HOUR) : 8,
   DigestMinute: process.env.DIGEST_MINUTE != null ? Number(process.env.DIGEST_MINUTE) : 30,
   DigestTimezone: process.env.DIGEST_TIMEZONE ?? 'America/Sao_Paulo',
-  DigestUpcomingDays: process.env.DIGEST_UPCOMING_DAYS != null ? Number(process.env.DIGEST_UPCOMING_DAYS) : 3
+  DigestUpcomingDays: process.env.DIGEST_UPCOMING_DAYS != null ? Number(process.env.DIGEST_UPCOMING_DAYS) : 3,
+  DigestSkipWeekend: (process.env.DIGEST_SKIP_WEEKEND ?? 'true').toLowerCase() !== 'false'
 }
 
 export default config

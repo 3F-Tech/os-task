@@ -115,16 +115,32 @@ function dateInTz (instant: Date, tz: string): TzDate {
   return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute') }
 }
 
+function isWeekendDate (year: number, month: number, day: number): boolean {
+  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  return dow === 0 || dow === 6 // Sun or Sat
+}
+
 export function calculateNextDigestDate (fromMs: number): number {
   const tz = config.DigestTimezone
   const hour = config.DigestHour
   const minute = config.DigestMinute
   const now = dateInTz(new Date(fromMs), tz)
-  const todayDigestMs = tzWallclockToUtcMs(now.year, now.month, now.day, hour, minute, tz)
-  if (todayDigestMs > fromMs) return todayDigestMs
-  // Use the tz-local day + 1 so we don't trip on the UTC/tz day mismatch.
-  // Date.UTC handles day overflow naturally (e.g. day=32 → next month).
-  return tzWallclockToUtcMs(now.year, now.month, now.day + 1, hour, minute, tz)
+  let day = now.day
+  let candidate = tzWallclockToUtcMs(now.year, now.month, day, hour, minute, tz)
+  if (candidate <= fromMs) {
+    day += 1
+    candidate = tzWallclockToUtcMs(now.year, now.month, day, hour, minute, tz)
+  }
+  if (config.DigestSkipWeekend) {
+    // Bump forward until the candidate lands on a weekday in the tz.
+    for (let safety = 0; safety < 7; safety++) {
+      const local = dateInTz(new Date(candidate), tz)
+      if (!isWeekendDate(local.year, local.month, local.day)) break
+      day += 1
+      candidate = tzWallclockToUtcMs(now.year, now.month, day, hour, minute, tz)
+    }
+  }
+  return candidate
 }
 
 export function startOfTodayMs (nowMs: number): number {
