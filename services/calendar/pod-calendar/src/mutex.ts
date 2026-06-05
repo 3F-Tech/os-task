@@ -14,7 +14,7 @@ const locks = new Map<string, LockEntry>()
 // os syncs futuros daquele user até restart do container. Cap a espera em
 // 2 min — qualquer sync legítimo termina antes — e força evicção do lock
 // stale em vez de pendurar indefinidamente.
-const LOCK_STALE_MS = 2 * 60_000
+export const LOCK_STALE_MS = 2 * 60_000
 
 export async function lock (key: string): Promise<() => void> {
   const current = locks.get(key)

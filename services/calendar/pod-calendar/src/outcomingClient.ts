@@ -461,7 +461,10 @@ export class OutcomingClient {
         }
         await calendarClient.push(event, type)
       } finally {
-        await txOp.close()
+        // Why: client compartilhado por workspace (pool em client.ts) — não
+        // fechar txOp aqui. TxOperations.close() delega para client.close()
+        // e derruba a conexão usada por todos os syncs concorrentes do
+        // workspace. Mesma regra de sync.ts:97 e pushHandler.ts.
         mutex()
       }
     }
