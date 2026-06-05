@@ -23,7 +23,9 @@ export enum QueueTopic {
 
   TimeMachine = 'timeMachine',
 
-  PdcaCycle = 'pdcaCycle'
+  PdcaCycle = 'pdcaCycle',
+
+  DailyDigest = 'dailyDigest'
 }
 
 export interface ConsumerHandle {

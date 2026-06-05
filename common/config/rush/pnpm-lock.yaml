@@ -41946,6 +41946,9 @@ importers:
       '@hcengineering/api-client':
         specifier: workspace:^0.7.25
         version: link:../../foundations/core/packages/api-client
+      '@hcengineering/contact':
+        specifier: workspace:^0.7.0
+        version: link:../../plugins/contact
       '@hcengineering/core':
         specifier: workspace:^0.7.26
         version: link:../../foundations/core/packages/core
@@ -41961,6 +41964,12 @@ importers:
       '@hcengineering/server-token':
         specifier: workspace:^0.7.18
         version: link:../../foundations/core/packages/token
+      '@hcengineering/task':
+        specifier: workspace:^0.7.0
+        version: link:../../plugins/task
+      '@hcengineering/time':
+        specifier: workspace:^0.7.0
+        version: link:../../plugins/time
       '@hcengineering/tracker':
         specifier: workspace:^0.7.0
         version: link:../../plugins/tracker

@@ -20,6 +20,7 @@ import { TimeMachineMessage } from '@hcengineering/server-process'
 import { TimeMachineDB } from './db'
 import { SendTimeEvent } from './activities'
 import { startPdcaConsumer, bootstrapPdcaSchedules } from './pdca'
+import { startDailyDigestConsumer, bootstrapDailyDigestSchedule } from './dailyDigest'
 import config from './config'
 
 export async function runWorker (): Promise<void> {
@@ -67,6 +68,10 @@ export async function runWorker (): Promise<void> {
   startPdcaConsumer(ctx)
 
   void bootstrapPdcaSchedules(ctx, db)
+
+  startDailyDigestConsumer(ctx)
+
+  void bootstrapDailyDigestSchedule(ctx, db)
 
   // Delay first poll so Kafka consumers finish joining (~23s) before
   // any expired events are fired via SendTimeEvent

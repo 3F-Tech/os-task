@@ -24,6 +24,14 @@ export interface Config {
   AccountsUrl: string
   TransactorUrl?: string
   Secret: string
+  MailUrl: string
+  MailApiKey?: string
+  MailSource?: string
+  FrontUrl: string
+  DigestHour: number
+  DigestMinute: number
+  DigestTimezone: string
+  DigestUpcomingDays: number
 }
 
 const config: Config = {
@@ -33,7 +41,15 @@ const config: Config = {
   QueueConfig: process.env.QUEUE_CONFIG ?? '',
   AccountsUrl: process.env.ACCOUNTS_URL ?? 'http://localhost:3000',
   TransactorUrl: process.env.TRANSACTOR_INTERNAL_URL,
-  Secret: process.env.SECRET ?? 'secret'
+  Secret: process.env.SECRET ?? 'secret',
+  MailUrl: process.env.MAIL_URL ?? 'http://mail:8092',
+  MailApiKey: process.env.MAIL_API_KEY,
+  MailSource: process.env.MAIL_SOURCE,
+  FrontUrl: process.env.FRONT_URL ?? 'http://localhost:8087',
+  DigestHour: process.env.DIGEST_HOUR != null ? Number(process.env.DIGEST_HOUR) : 8,
+  DigestMinute: process.env.DIGEST_MINUTE != null ? Number(process.env.DIGEST_MINUTE) : 30,
+  DigestTimezone: process.env.DIGEST_TIMEZONE ?? 'America/Sao_Paulo',
+  DigestUpcomingDays: process.env.DIGEST_UPCOMING_DAYS != null ? Number(process.env.DIGEST_UPCOMING_DAYS) : 3
 }
 
 export default config

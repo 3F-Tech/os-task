@@ -520,6 +520,11 @@ services:
       - ACCOUNTS_URL=http://account:3000
       - TRANSACTOR_INTERNAL_URL=ws://transactor_cockroach:3332
       - SECRET=secret
+      - MAIL_URL=http://mail:8092
+      - FRONT_URL=https://3ftasks.3fventure.tech
+      - DIGEST_HOUR=8
+      - DIGEST_MINUTE=30
+      - DIGEST_TIMEZONE=America/Sao_Paulo
     restart: unless-stopped
   backup-cockroach:
     image: hardcoreeng/backup:v0.7.413

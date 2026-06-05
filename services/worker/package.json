@@ -62,6 +62,9 @@
     "@hcengineering/account-client": "workspace:^0.7.25",
     "@hcengineering/server-token": "workspace:^0.7.18",
     "@hcengineering/tracker": "workspace:^0.7.0",
+    "@hcengineering/contact": "workspace:^0.7.0",
+    "@hcengineering/task": "workspace:^0.7.0",
+    "@hcengineering/time": "workspace:^0.7.0",
     "postgres": "^3.4.7",
     "dotenv": "^16.4.5"
   }
