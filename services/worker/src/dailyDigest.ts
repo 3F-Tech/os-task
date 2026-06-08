@@ -540,7 +540,8 @@ export async function processDailyDigestEvent (
     ctx.error('daily-digest: processing error', {
       workspaceId,
       err: err?.message ?? String(err),
-      cause: err?.cause?.message ?? err?.cause?.code ?? String(err?.cause ?? '')
+      cause: err?.cause?.message ?? err?.cause?.code ?? String(err?.cause ?? ''),
+      stack: err?.stack
     })
     if (isTransientError(err)) {
       await rescheduleForRetry(ctx, event, err)
