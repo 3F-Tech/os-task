@@ -46,7 +46,7 @@ import { calendar_v3 } from 'googleapis'
 import { evictClient, getClient } from './client'
 import { getCalendarsSyncHistory, getEventHistory, setCalendarsSyncHistory, setEventHistory } from './kvsUtils'
 import { OutcomingClient } from './outcomingClient'
-import { isLocked, lock } from './mutex'
+import { evictLock, getLockAge, isLocked, lock, LOCK_STALE_MS } from './mutex'
 import { getRateLimitter, RateLimiter } from './rateLimiter'
 import { GoogleEmail, Token, User } from './types'
 import {
@@ -136,14 +136,35 @@ export class IncomingSyncManager {
     // Why: se já tem sync rodando pra esse user (boot sync, push notification
     // handler, periodic sync), retorna busy rápido em vez de pendurar até o
     // lock liberar (que pode levar minutos). Usuário clica de novo depois.
+    //
+    // Exceção: se o lock está stale (segurado há mais que LOCK_STALE_MS),
+    // o caller anterior travou (Google API pendurou, websocket morto, throw
+    // fora de finally). O stale-evict em lock() só dispara quando alguém
+    // tenta adquirir o mesmo lock — isLocked não faz isso. Sem essa fast-path
+    // o user fica preso em "busy" até alguém else chamar lock() ou restart
+    // do pod. Aqui force-evict e prosseguimos: melhor um sync tardio que
+    // ficar preso. Também derruba o client cacheado (provavelmente zumbi).
     const lockKey = `${user.workspace}:${user.userId}:${email}`
     if (isLocked(lockKey)) {
-      ctx.info('Reconcile skipped — another sync in progress', {
-        workspace: user.workspace,
-        user: user.userId,
-        email
-      })
-      return { calendars: 0, created: 0, updated: 0, pushedToGoogle: 0, busy: true }
+      const heldFor = getLockAge(lockKey)
+      if (heldFor !== null && heldFor > LOCK_STALE_MS) {
+        ctx.warn('Reconcile force-evicting stale lock', {
+          workspace: user.workspace,
+          user: user.userId,
+          email,
+          heldForMs: heldFor
+        })
+        evictLock(lockKey)
+        evictClient(user.workspace)
+      } else {
+        ctx.info('Reconcile skipped — another sync in progress', {
+          workspace: user.workspace,
+          user: user.userId,
+          email,
+          heldForMs: heldFor
+        })
+        return { calendars: 0, created: 0, updated: 0, pushedToGoogle: 0, busy: true }
+      }
     }
     // Why: client compartilhado por workspace — não fechar txOp aqui.
     const client = await getClient(user.workspace)

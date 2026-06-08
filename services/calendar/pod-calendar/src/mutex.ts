@@ -54,6 +54,40 @@ export function isLocked (key: string): boolean {
   return locks.has(key)
 }
 
+// Retorna há quanto tempo o lock dessa key está adquirido, em ms.
+// null se a key não tem lock. Usado para detectar stale sem entrar no
+// race do lock() — útil em handlers de UI que precisam decidir entre
+// "destrava e prossegue" e "responde busy".
+export function getLockAge (key: string): number | null {
+  const entry = locks.get(key)
+  if (entry === undefined) return null
+  return Date.now() - entry.acquiredAt
+}
+
+// Remove um lock à força. Use só quando o caller já decidiu (via getLockAge
+// + threshold) que o lock está stale, ou em handler administrativo. Não
+// resolve a Promise da entry original — quem detinha o lock continua
+// achando que tem, mas qualquer novo lock(key) vai poder adquirir.
+export function evictLock (key: string): boolean {
+  return locks.delete(key)
+}
+
+// Evict todos os locks de um workspace (user-locks `${ws}:${userId}:${email}`
+// e `outcoming:${ws}`). Usado pelo endpoint admin que destrava workspace
+// inteiro sem restart do pod.
+export function evictLocksForWorkspace (workspace: string): string[] {
+  const evicted: string[] = []
+  const outcomingKey = `outcoming:${workspace}`
+  for (const key of Array.from(locks.keys())) {
+    if (key === outcomingKey || key.startsWith(`${workspace}:`)) {
+      if (locks.delete(key)) {
+        evicted.push(key)
+      }
+    }
+  }
+  return evicted
+}
+
 // Debug aid: lista locks vivos com tempo de retenção. Quando algum sync
 // pendura, em vez de restartar o pod cego dá pra inspecionar qual key
 // está travada e há quanto tempo via GET /admin/locks.
