@@ -430,7 +430,9 @@ export async function processDailyDigestEvent (
       return
     }
 
-    // Resolve only the statuses actually referenced by those issues
+    // Resolve only the statuses actually referenced by those issues. Some
+    // prod workspaces have IssueStatus docs that crash bulk findAll on the
+    // REST parser, so we resolve them one-by-one with try/catch.
     const referencedStatusIds = Array.from(
       new Set(assignedIssues.map((i) => i.status).filter((s): s is Ref<IssueStatus> => s != null))
     )
@@ -439,19 +441,28 @@ export async function processDailyDigestEvent (
       issueCount: assignedIssues.length,
       statusCount: referencedStatusIds.length
     })
-    const statuses =
-      referencedStatusIds.length === 0
-        ? []
-        : await client.findAll(tracker.class.IssueStatus, { _id: { $in: referencedStatusIds } })
 
-    const closedStatusIds = new Set(
-      statuses
-        .filter(
-          (s: IssueStatus) =>
-            s != null && (s.category === task.statusCategory.Won || s.category === task.statusCategory.Lost)
-        )
-        .map((s: IssueStatus) => s._id)
-    )
+    const closedStatusIds = new Set<Ref<IssueStatus>>()
+    let statusLoadErrors = 0
+    for (const statusId of referencedStatusIds) {
+      try {
+        const s = await client.findOne(tracker.class.IssueStatus, { _id: statusId })
+        if (s == null) continue
+        if (s.category === task.statusCategory.Won || s.category === task.statusCategory.Lost) {
+          closedStatusIds.add(s._id)
+        }
+      } catch (statusErr: any) {
+        statusLoadErrors++
+        ctx.warn('daily-digest: failed to load status doc, skipping', {
+          workspaceId,
+          statusId,
+          err: statusErr?.message ?? String(statusErr)
+        })
+      }
+    }
+    if (statusLoadErrors > 0) {
+      ctx.warn('daily-digest: some status docs could not be loaded', { workspaceId, statusLoadErrors })
+    }
 
     // Keep only open assigned issues
     const issues = assignedIssues.filter((i) => i.status != null && !closedStatusIds.has(i.status))
