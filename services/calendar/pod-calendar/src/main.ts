@@ -28,7 +28,7 @@ import { decode64 } from './base64'
 import { CalendarController } from './calendarController'
 import { evictClient, getActiveClients } from './client'
 import config from './config'
-import { getActiveLocks } from './mutex'
+import { evictLocksForWorkspace, getActiveLocks } from './mutex'
 import { OutcomingClient } from './outcomingClient'
 import { PushHandler } from './pushHandler'
 import { createServer, listen } from './server'
@@ -243,9 +243,10 @@ export const main = async (): Promise<void> => {
       }
     },
     {
-      // Força evict de um client cacheado de um workspace. Workaround manual
-      // pra quando suspeitar que o client tá num estado ruim sem precisar
-      // restartar o pod. POST /admin/evict-client?workspace=<uuid>
+      // Força evict de um client cacheado de um workspace E limpa todos os
+      // locks (user-locks e outcoming) daquele workspace. Workaround manual
+      // pra quando syncs travam (Google API pendurada, websocket morto, etc)
+      // sem precisar restartar o pod. POST /admin/evict-client?workspace=<uuid>
       endpoint: '/admin/evict-client',
       type: 'post',
       handler: async (req, res) => {
@@ -266,7 +267,38 @@ export const main = async (): Promise<void> => {
           return
         }
         evictClient(workspace as any)
-        res.status(200).json({ ok: true, evicted: workspace })
+        const evictedLocks = evictLocksForWorkspace(workspace)
+        ctx.warn('Admin evict-client', { workspace, evictedLocks: evictedLocks.length })
+        res.status(200).json({ ok: true, evicted: workspace, evictedLocks })
+      }
+    },
+    {
+      // Limpa locks de um workspace sem mexer no client cacheado. Use quando
+      // só quer destravar syncs sem forçar reconexão do WebSocket (caso o
+      // client esteja saudável e só os locks ficaram stale).
+      // POST /admin/evict-locks?workspace=<uuid>
+      endpoint: '/admin/evict-locks',
+      type: 'post',
+      handler: async (req, res) => {
+        const token = readToken(req.headers)
+        if (token === undefined) {
+          res.status(401).send()
+          return
+        }
+        try {
+          decodeToken(token)
+        } catch {
+          res.status(401).send()
+          return
+        }
+        const workspace = req.query.workspace as string
+        if (workspace === undefined || workspace === '') {
+          res.status(400).json({ error: 'workspace query param required' })
+          return
+        }
+        const evictedLocks = evictLocksForWorkspace(workspace)
+        ctx.warn('Admin evict-locks', { workspace, evictedLocks: evictedLocks.length })
+        res.status(200).json({ ok: true, workspace, evictedLocks })
       }
     },
     {
