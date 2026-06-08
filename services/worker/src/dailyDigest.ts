@@ -418,23 +418,27 @@ export async function processDailyDigestEvent (
     const upcomingEndMs = startMs + (1 + config.DigestUpcomingDays) * 24 * 60 * 60 * 1000
 
     // Load open statuses (not Won/Lost)
+    ctx.info('daily-digest: loading statuses', { workspaceId })
     const allStatuses = await client.findAll(tracker.class.IssueStatus, {})
-    const openStatusIds = new Set(
-      allStatuses
-        .filter((s: IssueStatus) => s.category !== task.statusCategory.Won && s.category !== task.statusCategory.Lost)
-        .map((s: IssueStatus) => s._id)
-    )
+    const openStatusIdsArray = allStatuses
+      .filter(
+        (s: IssueStatus) =>
+          s != null && s.category !== task.statusCategory.Won && s.category !== task.statusCategory.Lost
+      )
+      .map((s: IssueStatus) => s._id)
+      .filter((id): id is Ref<IssueStatus> => id != null)
 
-    if (openStatusIds.size === 0) {
+    if (openStatusIdsArray.length === 0) {
       ctx.info('daily-digest: no open statuses in workspace, skipping', { workspaceId })
       return
     }
 
-    // All open issues assigned to someone
-    const issues = await client.findAll(tracker.class.Issue, {
-      status: { $in: Array.from(openStatusIds) as Ref<IssueStatus>[] },
-      assignee: { $ne: null }
+    // All open issues — assignee filter applied client-side to avoid $ne: null quirks
+    ctx.info('daily-digest: loading open issues', { workspaceId, openStatusCount: openStatusIdsArray.length })
+    const allOpenIssues = await client.findAll(tracker.class.Issue, {
+      status: { $in: openStatusIdsArray }
     })
+    const issues = allOpenIssues.filter((i) => i != null && i.assignee != null && (i.assignee as any) !== '')
 
     if (issues.length === 0) {
       ctx.info('daily-digest: no relevant issues in workspace', { workspaceId })
@@ -442,11 +446,15 @@ export async function processDailyDigestEvent (
     }
 
     // Find which issues have at least one scheduled ToDo (workslots > 0)
-    const issueIds = issues.map((i) => i._id)
-    const todos = await client.findAll(time.class.ToDo, {
-      attachedTo: { $in: issueIds },
-      attachedToClass: tracker.class.Issue
-    })
+    const issueIds = issues.map((i) => i._id).filter((id): id is Ref<Issue> => id != null)
+    ctx.info('daily-digest: loading todos', { workspaceId, issueCount: issueIds.length })
+    const todos =
+      issueIds.length === 0
+        ? []
+        : await client.findAll(time.class.ToDo, {
+            attachedTo: { $in: issueIds },
+            attachedToClass: tracker.class.Issue
+          })
     const scheduledIssueIds = new Set<Ref<Issue>>()
     for (const t of todos as ToDo[]) {
       if ((t.workslots ?? 0) > 0 && t.doneOn == null) {
