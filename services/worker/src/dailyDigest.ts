@@ -417,28 +417,44 @@ export async function processDailyDigestEvent (
     const endMs = endOfTodayMs(nowMs)
     const upcomingEndMs = startMs + (1 + config.DigestUpcomingDays) * 24 * 60 * 60 * 1000
 
-    // Load open statuses (not Won/Lost)
-    ctx.info('daily-digest: loading statuses', { workspaceId })
-    const allStatuses = await client.findAll(tracker.class.IssueStatus, {})
-    const openStatusIdsArray = allStatuses
-      .filter(
-        (s: IssueStatus) =>
-          s != null && s.category !== task.statusCategory.Won && s.category !== task.statusCategory.Lost
-      )
-      .map((s: IssueStatus) => s._id)
-      .filter((id): id is Ref<IssueStatus> => id != null)
+    // Fetch all issues first (no IssueStatus pre-query — some workspaces have
+    // malformed status docs that crash findAll(IssueStatus, {})).
+    ctx.info('daily-digest: loading issues', { workspaceId })
+    const allIssues = await client.findAll(tracker.class.Issue, {})
+    const assignedIssues = allIssues.filter(
+      (i) => i != null && i.assignee != null && (i.assignee as any) !== ''
+    )
 
-    if (openStatusIdsArray.length === 0) {
-      ctx.info('daily-digest: no open statuses in workspace, skipping', { workspaceId })
+    if (assignedIssues.length === 0) {
+      ctx.info('daily-digest: no assigned issues in workspace', { workspaceId })
       return
     }
 
-    // All open issues — assignee filter applied client-side to avoid $ne: null quirks
-    ctx.info('daily-digest: loading open issues', { workspaceId, openStatusCount: openStatusIdsArray.length })
-    const allOpenIssues = await client.findAll(tracker.class.Issue, {
-      status: { $in: openStatusIdsArray }
+    // Resolve only the statuses actually referenced by those issues
+    const referencedStatusIds = Array.from(
+      new Set(assignedIssues.map((i) => i.status).filter((s): s is Ref<IssueStatus> => s != null))
+    )
+    ctx.info('daily-digest: loading referenced statuses', {
+      workspaceId,
+      issueCount: assignedIssues.length,
+      statusCount: referencedStatusIds.length
     })
-    const issues = allOpenIssues.filter((i) => i != null && i.assignee != null && (i.assignee as any) !== '')
+    const statuses =
+      referencedStatusIds.length === 0
+        ? []
+        : await client.findAll(tracker.class.IssueStatus, { _id: { $in: referencedStatusIds } })
+
+    const closedStatusIds = new Set(
+      statuses
+        .filter(
+          (s: IssueStatus) =>
+            s != null && (s.category === task.statusCategory.Won || s.category === task.statusCategory.Lost)
+        )
+        .map((s: IssueStatus) => s._id)
+    )
+
+    // Keep only open assigned issues
+    const issues = assignedIssues.filter((i) => i.status != null && !closedStatusIds.has(i.status))
 
     if (issues.length === 0) {
       ctx.info('daily-digest: no relevant issues in workspace', { workspaceId })
