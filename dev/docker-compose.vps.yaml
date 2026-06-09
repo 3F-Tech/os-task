@@ -29,7 +29,6 @@ services:
       - SECRET=secret
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - CACHE_PATH=/data/cache
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     ports:
       - 14040:4040
     restart: unless-stopped
@@ -164,7 +163,6 @@ services:
       - LAST_NAME_FIRST=true
       - ACCOUNTS_URL=http://account:3000
       - BRANDING_PATH=/var/cfg/branding.json
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - MAILBOX_DOMAINS=huly.dev.local
       - MAILBOX_MAX_COUNT_PER_ACCOUNT=2
       - MAX_FAILED_LOGIN_ATTEMPTS=0
@@ -184,7 +182,6 @@ services:
     environment:
       - PORT=4900
       - SERVER_SECRET=secret
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   # payment: disabled — hardcoreeng/payment not yet published to Docker Hub
   workspace_cockroach:
@@ -214,7 +211,6 @@ services:
       - BACKUP_STORAGE=${BACKUP_STORAGE_CONFIG}
       - BACKUP_BUCKET=${BACKUP_BUCKET_NAME}
       - MAIL_URL=http://mail:8092
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   collaborator:
     image: hardcoreeng/collaborator:3f-local
@@ -232,7 +228,6 @@ services:
       - ACCOUNTS_URL=http://account:3000
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - STATS_URL=http://stats:4900
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     stop_grace_period: 60s
     restart: unless-stopped
   front:
@@ -273,7 +268,6 @@ services:
       - COMMUNICATION_API_ENABLED=false
       - BACKUP_URL=http://backup-api:4039/api/backup,
       - EXCLUDED_APPLICATIONS_FOR_ANONYMOUS=[]
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - PULSE_URL=wss://3ftasks.3fventure.tech/_pulse/ws
       - DATALAKE_URL=https://3ftasks.3fventure.tech/files
       - EXPORT_URL=http://export:4009
@@ -322,7 +316,6 @@ services:
       - FILES_URL=https://3ftasks.3fventure.tech/files/blob/:workspace/:blobId/:filename
       # Communication API desabilitada — depende do hulylake (não publicado no Docker Hub)
       - COMMUNICATION_API_ENABLED=false
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       # URL pública do calendar service — necessária para o trigger OnEvent enviar
       # eventos do Huly para o Google Calendar via pod-calendar (/event endpoint).
       - CALENDAR_URL=https://3ftasks.3fventure.tech/_calendar
@@ -357,7 +350,6 @@ services:
       - 4004:4004
     environment:
       - STATS_URL=http://stats:4900
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   fulltext_cockroach:
     image: hardcoreeng/fulltext:v0.7.413
     extra_hosts:
@@ -384,7 +376,6 @@ services:
       - STATS_URL=http://stats:4900
       - REKONI_URL=http://rekoni:4004
       - ACCOUNTS_URL=http://account:3000
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - HULYLAKE_URL=http://hulylake:8096
       - COMMUNICATION_API_ENABLED=true
   print:
@@ -401,7 +392,6 @@ services:
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - STATS_URL=http://stats:4900
       - ACCOUNTS_URL=http://account:3000
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - FRONT_URL=https://3ftasks.3fventure.tech
   sign:
     image: hardcoreeng/sign:v0.7.413
@@ -424,7 +414,6 @@ services:
       - SERVICE_ID=sign-service
       - BRANDING_PATH=/var/cfg/branding.json
       - STATS_URL=http://stats:4900
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   analytics:
     image: hardcoreeng/analytics-collector:v0.7.413
     extra_hosts:
@@ -438,7 +427,6 @@ services:
       - SERVICE_ID=analytics-collector-service
       - ACCOUNTS_URL=http://account:3000
       - STATS_URL=http://stats:4900
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
   export:
     image: hardcoreeng/export:v0.7.413
     extra_hosts:
@@ -456,7 +444,6 @@ services:
       - STATS_URL=http://stats:4900
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - ACCOUNTS_URL=http://account:3000
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   datalake:
     image: hardcoreeng/datalake:v0.7.413
@@ -483,7 +470,6 @@ services:
       - REGION=cockroach
       - QUEUE_CONFIG=redpanda:9092
       - STREAM_URL=http://stream:1080
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   # hulylake: disabled — hardcoreeng/hulylake (Rust) not yet published to Docker Hub
   # hulykvs: disabled — hardcoreeng/hulykvs not yet published to Docker Hub
@@ -550,28 +536,12 @@ services:
       - INTERVAL=60
       - STORAGE=minio|minio?accessKey=minioadmin&secretKey=minioadmin
       - WORKSPACE_STORAGE=datalake|http://datalake:4030
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - QUEUE_CONFIG=redpanda:9092
       - TEMPORAL_ADDRESS=localhost:7233
     restart: unless-stopped
   # backup-api: disabled — hardcoreeng/backup-api not yet published to Docker Hub
   # rating_cockroach: disabled — hardcoreeng/rating not yet published to Docker Hub
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    extra_hosts:
-      - 'huly.local:host-gateway'
-    ports:
-      - 16686:16686
-      - 4317:4317
-      - 4318:4318
-    volumes:
-      - telemetry:/badger
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - SPAN_STORAGE_TYPE=badger
-      - BADGER_DIRECTORY_VALUE=/badger/data
-      - BADGER_DIRECTORY_KEY=/badger/key
-    restart: unless-stopped
+  # jaeger: removido em 2026-06-09 — badger sem retention encheu 39 GB de disco e não estava sendo usado para debug
   hulykvs:
     image: node:20-slim
     command: node /app/server.js
@@ -669,10 +639,8 @@ services:
       # Reativar quando a VPS for upgrade para 4+ cores:
       # - S3_STORAGE_CONFIG=s3|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin&region=local&rootBucket=recordings
       # - RECORDING_PRESET=720p
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
 volumes:
   db:
   dbpg:
-  telemetry:
   livekit_egress_tmp:
