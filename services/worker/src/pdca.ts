@@ -30,6 +30,11 @@ export interface PdcaCycleEvent {
   issueId: Ref<Issue>
   workspaceId: WorkspaceUuid
   retryCount?: number
+  // Advancement watermark: the value of pdcaNextCycleDate at the moment this
+  // event was scheduled. If the issue's actual pdcaNextCycleDate has moved
+  // past this value when the event fires, the cycle was already processed
+  // (e.g. by a redelivered Kafka message) and we must skip.
+  expectedNextCycleDate?: number
 }
 
 interface TimeMachineMessage {
@@ -278,6 +283,7 @@ export async function processPdcaCycleEvent (
     const dueDays = (issue as any).pdcaCycleDueDays as number[] | undefined
     const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
     const shouldDuplicate = (issue as any).pdcaCycleDuplicate === true
+    const currentNextDate = (issue as any).pdcaNextCycleDate as number | undefined
 
     if (!isActive || frequency == null || resetStatus == null) {
       ctx.info('PDCA cycle: skipping — cycle not fully configured or inactive', { issueId })
@@ -289,9 +295,31 @@ export async function processPdcaCycleEvent (
       return
     }
 
+    // Idempotency guard: if this event was scheduled with a specific watermark
+    // and the issue's pdcaNextCycleDate has already moved past that watermark,
+    // the cycle was already processed (typically by a redelivered Kafka msg).
+    if (
+      event.expectedNextCycleDate != null &&
+      currentNextDate != null &&
+      currentNextDate > event.expectedNextCycleDate
+    ) {
+      ctx.info('PDCA cycle: skipping — cycle already advanced (dedup)', {
+        issueId,
+        expected: event.expectedNextCycleDate,
+        actual: currentNextDate
+      })
+      return
+    }
+
     const dueDate = calculateDueDate(frequency, dueDays, customWeekdays)
     const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays)
     ctx.info('PDCA cycle: calculated dates', { issueId, frequency, dueDays, customWeekdays, dueDate, nextDate })
+
+    // Advance the watermark FIRST. Any concurrent re-delivery of this same
+    // event will read this updated pdcaNextCycleDate and skip on the
+    // idempotency guard above. Race window is now bounded to a single
+    // findOne+update round-trip.
+    await client.update(issue, { pdcaNextCycleDate: nextDate } as any)
 
     // Capture snapshot before any mutation
     const prevStatusDoc = await client.findOne(tracker.class.IssueStatus, { _id: issue.status })
@@ -303,9 +331,23 @@ export async function processPdcaCycleEvent (
     let scheduleIssueId: Ref<Issue> = issueId
 
     if (shouldDuplicate) {
-      // Create new issue as copy; the cycle continues on the new issue
-      const wonStatuses = await client.findAll(tracker.class.IssueStatus, {})
-      const wonStatus = wonStatuses.find((s: any) => s.category === 'task:category:Won')
+      // Deactivate ORIGINAL first and mark as done, so any concurrent
+      // redelivery of this event reads pdcaCycleActive=false and skips.
+      // Without this the storm could create N copies before any deactivation
+      // propagates (the bug that produced 355 ghost Diario issues).
+      const allStatuses = await client.findAll(tracker.class.IssueStatus, {})
+      // NB: correct category id is "task:statusCategory:Won" — earlier we had
+      // "task:category:Won" (typo) so wonStatus was always undefined and the
+      // deactivation block was silently skipped.
+      const wonStatus = allStatuses.find((s: any) => s.category === 'task:statusCategory:Won')
+      if (wonStatus != null) {
+        await client.update(issue, { status: wonStatus._id, pdcaCycleActive: false } as any)
+        ctx.info('PDCA cycle: original deactivated and marked as done', { issueId, wonStatus: wonStatus._id })
+      } else {
+        // Fallback: at least deactivate so the cycle doesn't keep firing
+        await client.update(issue, { pdcaCycleActive: false } as any)
+        ctx.warn('PDCA cycle: no Won category status found — deactivated without status change', { issueId })
+      }
 
       // Bump project sequence to get a unique number + identifier for the new issue.
       // Without this the duplicated issue has no identifier and shows up as a
@@ -354,12 +396,6 @@ export async function processPdcaCycleEvent (
       )
       scheduleIssueId = newId as Ref<Issue>
       ctx.info('PDCA cycle: new issue created as duplicate', { issueId, newIssueId: newId, identifier: newIdentifier, number })
-
-      // Mark original as done and deactivate its PDCA
-      if (wonStatus != null) {
-        await client.update(issue, { status: wonStatus._id, pdcaCycleActive: false } as any)
-      }
-      ctx.info('PDCA cycle: original issue marked as done', { issueId })
       try {
         await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
       } catch (commentErr: any) {
@@ -367,11 +403,11 @@ export async function processPdcaCycleEvent (
       }
     } else {
       // Standard mode: reset status, spent time, dates
+      // (pdcaNextCycleDate already advanced above as the idempotency watermark)
       const update: Record<string, any> = {
         status: resetStatus,
         reportedTime: 0,
-        startDate: Date.now(),
-        pdcaNextCycleDate: nextDate
+        startDate: Date.now()
       }
       if (dueDate != null) update.dueDate = dueDate
       await client.update(issue, update as any)
@@ -391,7 +427,9 @@ export async function processPdcaCycleEvent (
       id: `pdca_${scheduleIssueId}`,
       targetDate: nextDate,
       topic: QueueTopic.PdcaCycle,
-      data: { issueId: scheduleIssueId, workspaceId }
+      // Carry the watermark so the next firing can dedup against
+      // issue.pdcaNextCycleDate (which we just set to nextDate above).
+      data: { issueId: scheduleIssueId, workspaceId, expectedNextCycleDate: nextDate }
     }])
   } catch (err: any) {
     ctx.error('PDCA cycle processing error', {
@@ -456,7 +494,7 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
           workspace: workspaceId,
           target_date: targetDate,
           topic: QueueTopic.PdcaCycle,
-          data: { issueId: issue._id, workspaceId }
+          data: { issueId: issue._id, workspaceId, expectedNextCycleDate: targetDate }
         })
 
         ctx.info('PDCA bootstrap: scheduled', { issueId: issue._id, targetDate: new Date(targetDate).toISOString(), workspace: workspaceId })
