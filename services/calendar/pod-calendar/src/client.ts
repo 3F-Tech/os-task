@@ -37,14 +37,19 @@ const clients = new Map<WorkspaceUuid, Promise<Client>>()
 const CREATE_CLIENT_TIMEOUT_MS = 30_000
 
 function withTimeout<T> (promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => {
-        reject(new Error(`${label} timeout after ${ms}ms`))
-      }, ms)
-    )
-  ])
+  let timer: NodeJS.Timeout | undefined
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timeout after ${ms}ms`))
+    }, ms)
+  })
+  // Why: sem clearTimeout, o setTimeout continua agendado mesmo quando a
+  // promise resolve antes do limite. Em chamadas frequentes (createClient
+  // a cada sync), o Node mantém timers ociosos por 30s acumulando até GC,
+  // mantendo o event loop ativo desnecessariamente.
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
 }
 
 async function createClientForWorkspace (workspace: WorkspaceUuid, token: string): Promise<Client> {

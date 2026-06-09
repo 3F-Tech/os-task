@@ -443,7 +443,12 @@ export class IncomingSyncManager {
     await this.eventsSync(calendarId, history)
   }
 
-  private async eventsSync (calendarId: string, syncToken?: string, pageToken?: string): Promise<void> {
+  private async eventsSync (
+    calendarId: string,
+    syncToken?: string,
+    pageToken?: string,
+    retryOn410 = 1
+  ): Promise<void> {
     try {
       await this.rateLimiter.take(1)
       const res = await this.googleClient.events.list({
@@ -454,13 +459,26 @@ export class IncomingSyncManager {
         showDeleted: syncToken != null
       })
       if (res.status === 410) {
+        // Why: 410 esperado quando syncToken expira (>30d). Refazemos full
+        // sync sem syncToken. Se 410 voltar de novo no full sync, é estado
+        // anômalo (conta suspensa, calendar deletado, bug do Google) —
+        // bail em vez de recursar infinito.
+        if (retryOn410 <= 0) {
+          this.ctx.error('Persistent 410 after retry, aborting calendar sync', {
+            workspace: this.user.workspace,
+            user: this.user.userId,
+            email: this.email,
+            calendarId
+          })
+          return
+        }
         this.ctx.warn('Sync token is no longer valid, resyncing calendar', {
           workspace: this.user.workspace,
           user: this.user.userId,
           email: this.email,
           calendarId
         })
-        await this.eventsSync(calendarId)
+        await this.eventsSync(calendarId, undefined, undefined, retryOn410 - 1)
         return
       }
       const nextPageToken = res.data.nextPageToken
@@ -472,7 +490,7 @@ export class IncomingSyncManager {
         }
       }
       if (nextPageToken != null) {
-        await this.eventsSync(calendarId, syncToken, nextPageToken)
+        await this.eventsSync(calendarId, syncToken, nextPageToken, retryOn410)
       }
       if (res.data.nextSyncToken != null) {
         await setEventHistory(this.user, this.email, calendarId, res.data.nextSyncToken)
@@ -480,13 +498,22 @@ export class IncomingSyncManager {
       // if resync
     } catch (err: any) {
       if (err?.response?.status === 410) {
-        await this.eventsSync(calendarId)
+        if (retryOn410 <= 0) {
+          this.ctx.error('Persistent 410 after retry, aborting calendar sync', {
+            workspace: this.user.workspace,
+            user: this.user.userId,
+            email: this.email,
+            calendarId
+          })
+          return
+        }
         this.ctx.warn('Sync token is no longer valid, resyncing calendar', {
           workspace: this.user.workspace,
           user: this.user.userId,
           email: this.email,
           calendarId
         })
+        await this.eventsSync(calendarId, undefined, undefined, retryOn410 - 1)
         return
       }
       this.ctx.error('Event sync error', { workspace: this.user.workspace, user: this.user.userId, err })
