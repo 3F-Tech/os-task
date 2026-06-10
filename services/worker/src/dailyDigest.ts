@@ -430,38 +430,34 @@ export async function processDailyDigestEvent (
       return
     }
 
-    // Resolve only the statuses actually referenced by those issues. Some
-    // prod workspaces have IssueStatus docs that crash bulk findAll on the
-    // REST parser, so we resolve them one-by-one with try/catch.
+    // IssueStatus is a model-domain doc (DOMAIN_MODEL): the full model loaded
+    // at connection time already contains every status, including the ones
+    // whose REST serialization is broken in prod (findAll/findOne crash while
+    // parsing them, which made closed issues leak into the digest as open).
+    // Classify closed statuses from the local model — no server query at all.
     const referencedStatusIds = Array.from(
       new Set(assignedIssues.map((i) => i.status).filter((s): s is Ref<IssueStatus> => s != null))
     )
-    ctx.info('daily-digest: loading referenced statuses', {
+    const modelStatuses = client.getModel().findAllSync(tracker.class.IssueStatus, {})
+    const knownStatusIds = new Set<Ref<IssueStatus>>(modelStatuses.map((s) => s._id))
+    const closedStatusIds = new Set<Ref<IssueStatus>>(
+      modelStatuses
+        .filter((s) => s.category === task.statusCategory.Won || s.category === task.statusCategory.Lost)
+        .map((s) => s._id)
+    )
+    ctx.info('daily-digest: statuses resolved from local model', {
       workspaceId,
       issueCount: assignedIssues.length,
-      statusCount: referencedStatusIds.length
+      referencedCount: referencedStatusIds.length,
+      modelStatusCount: modelStatuses.length,
+      closedCount: closedStatusIds.size
     })
-
-    const closedStatusIds = new Set<Ref<IssueStatus>>()
-    let statusLoadErrors = 0
-    for (const statusId of referencedStatusIds) {
-      try {
-        const s = await client.findOne(tracker.class.IssueStatus, { _id: statusId })
-        if (s == null) continue
-        if (s.category === task.statusCategory.Won || s.category === task.statusCategory.Lost) {
-          closedStatusIds.add(s._id)
-        }
-      } catch (statusErr: any) {
-        statusLoadErrors++
-        ctx.warn('daily-digest: failed to load status doc, skipping', {
-          workspaceId,
-          statusId,
-          err: statusErr?.message ?? String(statusErr)
-        })
-      }
-    }
-    if (statusLoadErrors > 0) {
-      ctx.warn('daily-digest: some status docs could not be loaded', { workspaceId, statusLoadErrors })
+    const unknownStatusIds = referencedStatusIds.filter((id) => !knownStatusIds.has(id))
+    if (unknownStatusIds.length > 0) {
+      ctx.warn('daily-digest: issues reference statuses missing from model, treating as open', {
+        workspaceId,
+        missing: unknownStatusIds.length
+      })
     }
 
     // Keep only open assigned issues
