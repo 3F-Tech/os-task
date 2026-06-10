@@ -369,6 +369,25 @@ Para pacotes Svelte, adicione `"svelte": "src/index.ts"` e dependência `"svelte
 4. `plugins/tracker-resources/src/components/issues/edit/ControlPanel.svelte` → adicionar campo na UI
 5. `server-plugins/tracker/src/index.ts` → adicionar trigger `OnIssueUpdate` se precisar de lógica automática
 
+### 14. Criar Calendar Event / WorkSlot — use findPrimaryCalendar()
+
+Ao criar `calendar.class.Event` ou `time.class.WorkSlot` em qualquer componente do front (Planner, popups de ToDo, drag-drop), **sempre** resolva o calendário via `findPrimaryCalendar()` de `plugins/time-resources/src/utils.ts`:
+
+```typescript
+import { findPrimaryCalendar } from '../utils'   // ou caminho equivalente
+
+const _calendar = await findPrimaryCalendar()
+await client.addCollection(time.class.WorkSlot, calendar.space.Calendar, todoId, time.class.ToDo, 'workslots', {
+  calendar: _calendar,
+  // ...resto
+})
+```
+
+Regras:
+- **Nunca** hardcode `` `${acc.uuid}_calendar` `` como destino — isso é o calendário interno "3ftasks", ignora a preferência do usuário (Settings → Calendar → Primary Calendar) e quebra a integração com Google Calendar.
+- **Nunca** filtre `ExternalCalendar` só por `user: primarySocialId` — usuários autenticam o Google com um `socialId` diferente do primário. Use `user: { $in: acc.socialIds }` se precisar de query custom.
+- O fallback para o calendário interno só faz sentido como inicialização síncrona enquanto a promise resolve; substitua pelo resultado de `findPrimaryCalendar()` assim que disponível.
+
 ---
 
 ## Validação antes de commitar
@@ -393,7 +412,13 @@ Use a tabela abaixo para identificar qual pod rebuildar:
 | `plugins/*/src/index.ts` (sem resources) | `front` + `server` | `./3f-build.sh --pod "front server"` |
 | `models/*/`, `server-plugins/*/` | `server` | `./3f-build.sh --skip-webpack --pod server` |
 | `server/account*/` | `account` | `./3f-build.sh --skip-webpack --pod account` |
+| `services/calendar/` | `calendar` | `./3f-build.sh --skip-webpack --pod calendar` |
+| `services/worker/` | `worker` | `./3f-build.sh --skip-webpack --pod worker` |
+| `services/github/` | `github` | `./3f-build.sh --skip-webpack --pod github` |
+| `services/mail/` | `mail` | `./3f-build.sh --skip-webpack --pod mail` |
 | Não sabe ao certo | todos | `./3f-build.sh` |
+
+Para deploy na VPS, adicionar `--vps` ao comando. Serviços usam imagens `hardcoreeng/<pod>:3f-local` (não as publicadas no Docker Hub).
 
 ### Passo 3 — Verificar erros de boot
 
