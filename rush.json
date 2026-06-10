@@ -1356,6 +1356,21 @@
       "shouldPublish": false
     },
     {
+      "packageName": "@hcengineering/operational-dashboard",
+      "projectFolder": "plugins/operational-dashboard",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/operational-dashboard-resources",
+      "projectFolder": "plugins/operational-dashboard-resources",
+      "shouldPublish": false
+    },
+    {
+      "packageName": "@hcengineering/model-operational-dashboard",
+      "projectFolder": "models/model-operational-dashboard",
+      "shouldPublish": false
+    },
+    {
       "packageName": "@hcengineering/server-chunter",
       "projectFolder": "server-plugins/chunter",
       "shouldPublish": false
