@@ -152,6 +152,8 @@
     "@hcengineering/onboard": "workspace:^0.7.0",
     "@hcengineering/onboard-assets": "workspace:^0.7.0",
     "@hcengineering/onboard-resources": "workspace:^0.7.0",
+    "@hcengineering/operational-dashboard": "workspace:^0.7.0",
+    "@hcengineering/operational-dashboard-resources": "workspace:^0.7.0",
     "@hcengineering/platform": "workspace:^0.7.20",
     "@hcengineering/preference": "workspace:^0.7.0",
     "@hcengineering/preference-assets": "workspace:^0.7.0",

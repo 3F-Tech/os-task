@@ -57,6 +57,7 @@ import support, { supportId, supportLink, reportBugLink, docsLink, privacyPolicy
 import { surveyId } from '@hcengineering/survey'
 import { tagsId } from '@hcengineering/tags'
 import { tagSharingId } from '@hcengineering/tag-sharing'
+import { operationalDashboardId } from '@hcengineering/operational-dashboard'
 import { taskId } from '@hcengineering/task'
 import telegram, { telegramId } from '@hcengineering/telegram'
 import { templatesId } from '@hcengineering/templates'
@@ -344,6 +345,7 @@ function configureI18n(): void {
   addStringsLoader(supportId, async (lang: string) => await import(`@hcengineering/support-assets/lang/${lang}.json`))
   addStringsLoader(tagsId, async (lang: string) => await import(`@hcengineering/tags-assets/lang/${lang}.json`))
   addStringsLoader(tagSharingId, async (lang: string) => await import(`@hcengineering/tag-sharing/lang/${lang}.json`))
+  addStringsLoader(operationalDashboardId, async (lang: string) => await import(`@hcengineering/operational-dashboard/lang/${lang}.json`))
   addStringsLoader(taskId, async (lang: string) => await import(`@hcengineering/task-assets/lang/${lang}.json`))
   addStringsLoader(telegramId, async (lang: string) => await import(`@hcengineering/telegram-assets/lang/${lang}.json`))
   addStringsLoader(
@@ -613,6 +615,7 @@ export async function configurePlatform() {
   )
   addLocation(tagsId, async () => await import(/* webpackChunkName: "tags" */ '@hcengineering/tags-resources'))
   addLocation(tagSharingId, async () => await import(/* webpackChunkName: "tag-sharing" */ '@hcengineering/tag-sharing-resources'))
+  addLocation(operationalDashboardId, async () => await import(/* webpackChunkName: "operational-dashboard" */ '@hcengineering/operational-dashboard-resources'))
   addLocation(
     calendarId,
     async () => await import(/* webpackChunkName: "calendar" */ '@hcengineering/calendar-resources')
