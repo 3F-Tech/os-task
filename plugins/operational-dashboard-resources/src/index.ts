@@ -16,6 +16,7 @@
 import contact from '@hcengineering/contact'
 import { getMetadata, loadMetadata, type Resources } from '@hcengineering/platform'
 import tracker from '@hcengineering/tracker'
+import icons from '../assets/icons.svg'
 import BUManagement from './components/BUManagement.svelte'
 import Dashboard from './components/Dashboard.svelte'
 import EditBusinessUnit from './components/EditBusinessUnit.svelte'
@@ -25,12 +26,10 @@ import operationalDashboard from './plugin'
 
 const trackerIcon = getMetadata(tracker.icon.TrackerApplication)
 const buIcon = getMetadata(contact.icon.Company) ?? getMetadata(contact.icon.Person)
-if (trackerIcon !== undefined) {
-  loadMetadata(operationalDashboard.icon, {
-    Dashboard: trackerIcon,
-    BusinessUnit: (buIcon ?? trackerIcon) as string
-  })
-}
+loadMetadata(operationalDashboard.icon, {
+  Dashboard: `${icons}#dashboard`,
+  BusinessUnit: (buIcon ?? trackerIcon) as string
+})
 
 export default async (): Promise<Resources> => ({
   component: {
