@@ -65,7 +65,17 @@
       "Bash(curl -s http://localhost:3000/)",
       "Bash(curl -s http://localhost:3332/api/v1/health)",
       "Bash(curl -s http://localhost:8087/api/v1/statistics)",
-      "Bash(curl -s http://localhost:4030/ -I)"
+      "Bash(curl -s http://localhost:4030/ -I)",
+      "Bash(rtk git *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\" -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(rtk ls *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk wc *)",
+      "Bash(bash ./3f-build.sh --skip-webpack --pod worker)",
+      "Bash(rtk docker *)",
+      "Bash(rtk find *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\models\\\\model-tag-sharing\" -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\('C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\', ''\\) } | Sort-Object | Where-Object { $_ -notmatch 'node_modules|lib|types|\\\\.rush|\\\\.validate' })"
     ]
   }
 }
