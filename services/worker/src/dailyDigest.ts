@@ -471,15 +471,20 @@ export async function processDailyDigestEvent (
     // Find which issues have at least one scheduled ToDo (workslots > 0)
     const issueIds = issues.map((i) => i._id).filter((id): id is Ref<Issue> => id != null)
     ctx.info('daily-digest: loading todos', { workspaceId, issueCount: issueIds.length })
-    const todos =
-      issueIds.length === 0
-        ? []
-        : await client.findAll(time.class.ToDo, {
-            attachedTo: { $in: issueIds },
-            attachedToClass: tracker.class.Issue
-          })
+    // REST findAll sends the query in the request URL: a $in with hundreds of
+    // issue ids overflows the server header limit (431 Request Header Fields
+    // Too Large) and aborts the whole digest. Query in chunks instead.
+    const todoChunkSize = 100
+    const todos: ToDo[] = []
+    for (let i = 0; i < issueIds.length; i += todoChunkSize) {
+      const part = await client.findAll(time.class.ToDo, {
+        attachedTo: { $in: issueIds.slice(i, i + todoChunkSize) },
+        attachedToClass: tracker.class.Issue
+      })
+      todos.push(...(part as ToDo[]))
+    }
     const scheduledIssueIds = new Set<Ref<Issue>>()
-    for (const t of todos as ToDo[]) {
+    for (const t of todos) {
       if ((t.workslots ?? 0) > 0 && t.doneOn == null) {
         scheduledIssueIds.add(t.attachedTo as Ref<Issue>)
       }
