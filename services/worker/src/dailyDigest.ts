@@ -215,7 +215,9 @@ function renderIssueListHtml (items: Issue[], total: number, workspaceUrl: strin
     .map((it) => {
       const due = showDate && it.dueDate != null ? ` <span style="color:#999;">(${formatDateBr(it.dueDate)})</span>` : ''
       const ident = it.identifier ?? ''
-      return `<li style="margin:6px 0;"><a href="${issueUrl(workspaceUrl, ident)}" style="color:#2563eb;text-decoration:none;font-weight:600;">${escapeHtml(ident)}</a> — ${escapeHtml(it.title ?? '')}${due}</li>`
+      const clientLabel = (it.clientName ?? '').trim()
+      const prefix = clientLabel !== '' ? `<span style="font-weight:600;">${escapeHtml(clientLabel)}</span> — ` : ''
+      return `<li style="margin:6px 0;">${prefix}<a href="${issueUrl(workspaceUrl, ident)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(it.title ?? '')}</a>${due}</li>`
     })
     .join('')
   const extra = total > items.length
@@ -229,7 +231,9 @@ function renderIssueListText (items: Issue[], total: number, workspaceUrl: strin
   const lines = items
     .map((it) => {
       const due = showDate && it.dueDate != null ? ` (${formatDateBr(it.dueDate)})` : ''
-      return `  - [${it.identifier ?? ''}] ${it.title ?? ''}${due}\n    ${issueUrl(workspaceUrl, it.identifier ?? '')}`
+      const clientLabel = (it.clientName ?? '').trim()
+      const prefix = clientLabel !== '' ? `[${clientLabel}] ` : ''
+      return `  - ${prefix}${it.title ?? ''}${due}\n    ${issueUrl(workspaceUrl, it.identifier ?? '')}`
     })
     .join('\n')
   const extra = total > items.length ? `\n  …e mais ${total - items.length}` : ''
