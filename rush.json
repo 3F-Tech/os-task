@@ -1366,6 +1366,11 @@
       "shouldPublish": false
     },
     {
+      "packageName": "@hcengineering/operational-dashboard-assets",
+      "projectFolder": "plugins/operational-dashboard-assets",
+      "shouldPublish": false
+    },
+    {
       "packageName": "@hcengineering/model-operational-dashboard",
       "projectFolder": "models/model-operational-dashboard",
       "shouldPublish": false

@@ -13,7 +13,14 @@
 // limitations under the License.
 //
 
-declare module '*.svg' {
-  const content: string
-  export default content
-}
+import contact from '@hcengineering/contact'
+import { getMetadata, loadMetadata } from '@hcengineering/platform'
+import operationalDashboard from '@hcengineering/operational-dashboard'
+
+const icons = require('../assets/icons.svg') as string // eslint-disable-line
+
+const buIcon = getMetadata(contact.icon.Company) ?? getMetadata(contact.icon.Person)
+loadMetadata(operationalDashboard.icon, {
+  Dashboard: `${icons}#dashboard`,
+  BusinessUnit: (buIcon ?? `${icons}#dashboard`) as string
+})
