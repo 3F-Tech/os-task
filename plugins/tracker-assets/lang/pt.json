@@ -335,7 +335,18 @@
     "OnboardingTasksCount": "tarefas",
     "BommaScenario": "Cenário",
     "Scenario1e2": "Cenário 1 e 2",
-    "Scenario3": "Cenário 3"
+    "Scenario3": "Cenário 3",
+    "RunAutomationScript": "Executar Script",
+    "RunScript": "Executar",
+    "SelectVariantOptions": "Selecione as variantes ativas",
+    "StepsThatWillRun": "Etapas que serão executadas",
+    "NoStepsForVariants": "Nenhuma etapa corresponde às variantes selecionadas.",
+    "AssigneeByLabel": "Responsável por etiqueta",
+    "AssigneeByLabelHint": "Tarefas que tiverem a etiqueta serão atribuídas às pessoas selecionadas (até 3)",
+    "NoLabelsInScript": "As tarefas deste script não possuem etiquetas cadastradas.",
+    "LabelNoAssignee": "Sem responsável",
+    "MultipleLabelsWarning": "Mais de 3 responsáveis",
+    "MultipleLabelsTooltip": "As etiquetas desta tarefa somam mais de 3 responsáveis. Apenas os 3 primeiros serão atribuídos."
   },
   "status": {}
 }

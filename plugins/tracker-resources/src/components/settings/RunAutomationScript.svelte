@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
   import type { Person } from '@hcengineering/contact'
-  import { AssigneeBox } from '@hcengineering/contact-resources'
+  import { UserBoxList } from '@hcengineering/contact-resources'
   import { type Ref } from '@hcengineering/core'
   import presentation, { Card, getClient } from '@hcengineering/presentation'
   import tags, { type TagElement } from '@hcengineering/tags'
@@ -18,7 +18,7 @@
     PdcaFrequency,
     Project
   } from '@hcengineering/tracker'
-  import { Button, EditBox, Label } from '@hcengineering/ui'
+  import { Button, EditBox, Label, tooltip } from '@hcengineering/ui'
   import { createEventDispatcher, onMount } from 'svelte'
 
   import tracker from '../../plugin'
@@ -39,7 +39,10 @@
   let clientName = ''
   // Escolha selecionada em cada grupo de variantes (índice do grupo → valor)
   let groupChoices: Record<number, string> = {}
-  let labelAssignees: Record<string, Ref<Person> | null> = {}
+  // Máximo de responsáveis por etiqueta (e por tarefa) — alinhado ao limite do tracker
+  const MAX_ASSIGNEES = 3
+  // Cada etiqueta pode mapear até MAX_ASSIGNEES responsáveis
+  let labelAssignees: Record<string, Ref<Person>[]> = {}
   let executando = false
   let concluido = false
   let progresso: Array<{ label: string, ok: boolean }> = []
@@ -148,45 +151,62 @@
   $: canStart = !executando && !concluido && clientName.trim().length > 0 && filteredSteps.length > 0
 
   // Para uma lista de labels de uma tarefa, retorna:
-  // - assignee: o da PRIMEIRA label com mapping (a regra escolhida)
-  // - conflict: true se >=2 labels têm mappings para pessoas diferentes
-  function resolveAssignee (labels: Ref<TagElement>[] | undefined): {
-    assignee: Ref<Person> | null
-    conflict: boolean
+  // - assignees: a UNIÃO dos responsáveis de TODAS as labels (sem duplicar),
+  //   limitada a MAX_ASSIGNEES e preservando a ordem das labels
+  // - overflow: true se as labels mapeiam mais responsáveis do que o limite
+  function resolveAssignees (labels: Ref<TagElement>[] | undefined): {
+    assignees: Ref<Person>[]
+    overflow: boolean
   } {
-    if (labels === undefined) return { assignee: null, conflict: false }
-    let assignee: Ref<Person> | null = null
-    let conflict = false
+    if (labels === undefined) return { assignees: [], overflow: false }
+    const all: Ref<Person>[] = []
     for (const labelId of labels) {
-      const a = labelAssignees[labelId as unknown as string]
-      if (a !== undefined && a !== null) {
-        if (assignee === null) {
-          assignee = a
-        } else if (a !== assignee) {
-          conflict = true
-        }
+      const mapped = labelAssignees[labelId as unknown as string] ?? []
+      for (const a of mapped) {
+        if (a != null && !all.includes(a)) all.push(a)
       }
     }
-    return { assignee, conflict }
+    return { assignees: all.slice(0, MAX_ASSIGNEES), overflow: all.length > MAX_ASSIGNEES }
   }
 
-  function pickAssignee (labels: Ref<TagElement>[] | undefined): Ref<Person> | null {
-    return resolveAssignee(labels).assignee
+  function pickAssignees (labels: Ref<TagElement>[] | undefined): Ref<Person>[] {
+    return resolveAssignees(labels).assignees
   }
 
-  // Para um step do preview, indica se a tarefa raiz OU algum child tem múltiplas
-  // labels mapeadas que apontam para assignees diferentes.
-  function stepHasConflict (step: AutomationScriptStep): boolean {
+  // Resultado final do responsável de uma tarefa: usa os responsáveis derivados
+  // das etiquetas se houver; senão cai para o assignee do próprio template/child.
+  // Trata array vazio como "sem responsável" (null) — o contrato do schema é
+  // Ref<Person>[] | null, NUNCA [] (um [] gravado no JSONB não casa com a query de
+  // "não especificado" e some das views agrupadas por responsável).
+  function finalAssignee (
+    picked: Ref<Person>[],
+    own: Ref<Person>[] | null | undefined
+  ): Ref<Person>[] | null {
+    if (picked.length > 0) return picked
+    return Array.isArray(own) && own.length > 0 ? own : null
+  }
+
+  // Para um step do preview, indica se a tarefa raiz OU algum child mapeia mais
+  // responsáveis (somando todas as labels) do que o limite — só os primeiros
+  // MAX_ASSIGNEES serão aplicados.
+  function stepHasOverflow (step: AutomationScriptStep): boolean {
     const tpl = templatesById.get(step.template)
     if (tpl === undefined) return false
     const tplLabels = ((tpl as any).labels ?? []) as Ref<TagElement>[]
-    if (resolveAssignee(tplLabels).conflict) return true
+    if (resolveAssignees(tplLabels).overflow) return true
     const children = ((tpl as any).children ?? []) as Array<{ labels?: Ref<TagElement>[] }>
     for (const child of children) {
-      if (resolveAssignee(child.labels).conflict) return true
+      if (resolveAssignees(child.labels).overflow) return true
     }
     return false
   }
+
+  // Reativo: quais steps excedem MAX_ASSIGNEES (só os primeiros serão aplicados).
+  // Referencia labelAssignees e templatesById (ambos lidos dentro de
+  // stepHasOverflow) para o Svelte rastrear as dependências; filteredSteps já é
+  // rastreado no corpo da função.
+  $: overflowStepIds = ((_deps: unknown[]) =>
+    new Set(filteredSteps.filter(stepHasOverflow).map((s) => s._id)))([labelAssignees, templatesById])
 
   function tagBackground (tag: TagElement): string {
     const c = (tag as any).color
@@ -196,13 +216,13 @@
     return 'var(--theme-button-default)'
   }
 
-  function getAssigneeForLabel (tag: TagElement): Ref<Person> | null {
-    return labelAssignees[tag._id as unknown as string] ?? null
+  function getAssigneesForLabel (tag: TagElement): Ref<Person>[] {
+    return labelAssignees[tag._id as unknown as string] ?? []
   }
 
-  function setAssigneeForLabel (tag: TagElement, val: Ref<Person> | null): void {
+  function setAssigneesForLabel (tag: TagElement, val: Ref<Person>[]): void {
     const next = { ...labelAssignees }
-    next[tag._id as unknown as string] = val
+    next[tag._id as unknown as string] = (val ?? []).slice(0, MAX_ASSIGNEES)
     labelAssignees = next
   }
 
@@ -319,7 +339,10 @@
       const clientStage = (template as any).clientStage ?? 'onboarding'
 
       const tplLabels = ((template as any).labels ?? []) as Ref<TagElement>[]
-      const tplAssignee = pickAssignee(tplLabels) ?? (template as any).assignee ?? null
+      const tplAssignee: Ref<Person>[] | null = finalAssignee(
+        pickAssignees(tplLabels),
+        (template as any).assignee
+      )
 
       const tarefaId = await client.addCollection(
         tracker.class.Issue,
@@ -343,6 +366,7 @@
           pdcaCycleFrequency: pdcaFrequency,
           pdcaCycleDueDays: pdcaDueDays,
           pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
+          pdcaCycleResetSubIssues: (template as any).pdcaCycleResetSubIssues,
           dueDate: finalDueDate,
           template: { template: step.template }
         } as any
@@ -372,7 +396,7 @@
         const subIdentifier = `${projeto.identifier}-${subNumber}`
 
         const childLabels = (child.labels ?? []) as Ref<TagElement>[]
-        const childAssignee = pickAssignee(childLabels) ?? child.assignee ?? null
+        const childAssignee: Ref<Person>[] | null = finalAssignee(pickAssignees(childLabels), child.assignee)
         const childId = (child as any).id as string | undefined
         const childDueDays = childId !== undefined ? step.childDueInDays?.[childId] : undefined
         const childDueDate =
@@ -497,16 +521,15 @@
                     {tag.title}
                   </span>
                   <div class="label-assignee-picker">
-                    <AssigneeBox
+                    <UserBoxList
                       label={tracker.string.AssigneeByLabel}
-                      placeholder={tracker.string.LabelNoAssignee}
-                      value={getAssigneeForLabel(tag)}
+                      emptyLabel={tracker.string.LabelNoAssignee}
+                      items={getAssigneesForLabel(tag)}
                       kind="regular"
                       size="small"
                       width="100%"
                       justify="left"
-                      showNavigate={false}
-                      on:change={(e) => setAssigneeForLabel(tag, e.detail ?? null)}
+                      on:update={(e) => setAssigneesForLabel(tag, e.detail ?? [])}
                     />
                   </div>
                 </li>
@@ -527,17 +550,17 @@
               {#each filteredSteps as step (step._id)}
                 {@const template = templatesById.get(step.template)}
                 {@const projeto = projectsById.get(step.project)}
-                {@const hasConflict = stepHasConflict(step)}
-                <li class="preview-row" class:warn={hasConflict}>
-                  {#if hasConflict}
-                    <span class="warn-icon" title="Múltiplas etiquetas com responsável — será usado o da primeira etiqueta">⚠</span>
+                {@const hasOverflow = overflowStepIds.has(step._id)}
+                <li class="preview-row" class:warn={hasOverflow}>
+                  {#if hasOverflow}
+                    <span class="warn-icon" use:tooltip={{ label: tracker.string.MultipleLabelsTooltip }}>⚠</span>
                   {/if}
                   <span class="preview-title">{template?.title ?? '(template ausente)'}</span>
                   <span class="preview-project">{projeto?.name ?? '(projeto ausente)'}</span>
                 </li>
               {/each}
             </ul>
-            {#if filteredSteps.some(stepHasConflict)}
+            {#if overflowStepIds.size > 0}
               <p class="warn-note">
                 ⚠ <Label label={tracker.string.MultipleLabelsTooltip} />
               </p>
