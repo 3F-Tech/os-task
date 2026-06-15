@@ -50,6 +50,7 @@
     "PdcaDueMonthDay": "Due day (month day)",
     "PdcaDueMonthDays": "Due days (month days)",
     "PdcaDuplicate": "Duplicate on reset",
+    "PdcaResetSubIssues": "Reset sub-issues",
     "PdcaWeekdayMon": "Monday",
     "PdcaWeekdayTue": "Tuesday",
     "PdcaWeekdayWed": "Wednesday",

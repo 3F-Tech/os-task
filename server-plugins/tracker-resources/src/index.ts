@@ -124,7 +124,8 @@ export async function getIssueNotificationContent (
     if (
       updateTx.operations.assignee !== null &&
       updateTx.operations.assignee !== undefined &&
-      updateTx.operations.assignee === target
+      Array.isArray(updateTx.operations.assignee) &&
+      updateTx.operations.assignee.includes(target)
     ) {
       body = tracker.string.IssueAssignedToYou
     } else {

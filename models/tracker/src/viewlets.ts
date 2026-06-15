@@ -18,7 +18,7 @@ import { SortingOrder } from '@hcengineering/core'
 import { type Builder } from '@hcengineering/model'
 import core from '@hcengineering/model-core'
 import task from '@hcengineering/model-task'
-import view, { showColorsViewOption } from '@hcengineering/model-view'
+import view, { createAttributePresenter, showColorsViewOption } from '@hcengineering/model-view'
 import tags from '@hcengineering/tags'
 import { type ViewOptionModel, type BuildModelKey, type ViewOptionsModel } from '@hcengineering/view'
 import tracker from './plugin'
@@ -30,13 +30,13 @@ export const issuesOptions = (kanban: boolean): ViewOptionsModel => ({
     'assignee',
     'priority',
     'space',
-    'component',
-    'milestone',
     'createdBy',
     'modifiedBy',
     'estimation',
     'remainingTime',
-    'reportedTime'
+    'reportedTime',
+    'clientName',
+    'clientStage'
   ],
   orderBy: [
     ['modifiedOn', SortingOrder.Descending],
@@ -218,6 +218,10 @@ export function issueConfig (
 }
 
 export function defineViewlets (builder: Builder): void {
+  // Cabeçalho de agrupamento por Etapa do Cliente (kanban/lista/filtros):
+  // renderiza o badge em PT em vez do valor cru do enum.
+  createAttributePresenter(builder, tracker.component.ClientStageValuePresenter, tracker.class.Issue, 'clientStage', 'attribute')
+
   builder.createDoc(
     view.class.ViewletDescriptor,
     core.space.Model,
@@ -487,8 +491,8 @@ export function defineViewlets (builder: Builder): void {
       config: [
         'subIssues',
         'priority',
-        'component',
-        'milestone',
+        'clientName',
+        'clientStage',
         'dueDate',
         'labels',
         'estimation',

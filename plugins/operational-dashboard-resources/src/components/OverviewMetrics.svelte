@@ -13,10 +13,11 @@
 // limitations under the License.
 -->
 <script lang="ts">
+  import { type Team } from '@hcengineering/operational-dashboard'
   import { type IntlString } from '@hcengineering/platform'
-  import { getClient } from '@hcengineering/presentation'
+  import { createQuery, getClient } from '@hcengineering/presentation'
   import { Label, showPopup } from '@hcengineering/ui'
-  import { computeMetrics, type IssueRow, type MetricsResult } from '../metrics'
+  import { computeDashboard, type IssueRow, type MetricsResult, type TeamRankingRow } from '../metrics'
   import operationalDashboard from '../plugin'
   import {
     dashboardFilters,
@@ -31,8 +32,15 @@
   import IssueListModal from './IssueListModal.svelte'
   import MetricCard from './MetricCard.svelte'
   import PersonWorkloadModal from './PersonWorkloadModal.svelte'
+  import TeamRanking from './TeamRanking.svelte'
 
   const client = getClient()
+
+  const teamsQuery = createQuery()
+  let teams: Team[] = []
+  $: teamsQuery.query(operationalDashboard.class.Team, { archived: false }, (res) => {
+    teams = res
+  })
 
   const loading: MetricsResult = {
     onTime: { value: '…', subtitle: '', tone: 'neutral', issues: [] },
@@ -45,16 +53,18 @@
   }
 
   let metrics: MetricsResult = loading
+  let ranking: TeamRankingRow[] = []
   let isLoading = false
   let pendingToken = 0
 
-  $: $refreshTrigger, void load($dashboardFilters)
+  $: $refreshTrigger, teams, void load($dashboardFilters)
 
   async function load (filters: Filters): Promise<void> {
     const token = ++pendingToken
     // Sem BU selecionada: zera estado, não consulta backend, mantém botão liberado para idle.
     if (filters.buId === '') {
       metrics = loading
+      ranking = []
       isLoading = false
       refreshState.set('idle')
       return
@@ -63,9 +73,10 @@
     // Garante 'loading' mesmo se chamado por mudança de filtro (e não por triggerRefresh).
     refreshState.set('loading')
     try {
-      const result = await computeMetrics(client, filters)
+      const result = await computeDashboard(client, filters, teams)
       if (token === pendingToken) {
-        metrics = result
+        metrics = result.metrics
+        ranking = result.ranking
         markRefreshDone()
       }
     } catch (e) {
@@ -163,6 +174,10 @@
         on:click={() => openDrillDown(operationalDashboard.string.WaitingApproval, metrics.waitingApproval.issues)}
       />
     </div>
+
+    {#if ranking.length > 0}
+      <TeamRanking rows={ranking} selectedTeamId={$dashboardFilters.teamId} />
+    {/if}
   {/if}
 </div>
 

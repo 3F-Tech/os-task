@@ -200,20 +200,45 @@
     if (groupByKey === noCategory) {
       headerComponent = undefined
     } else {
-      void getPresenter(client, _class, { key: groupByKey }, { key: groupByKey }).then((p) => {
-        headerComponent = p
-      })
+      // agrupamento por atributo array espalha os valores em buckets escalares,
+      // então o header recebe um elemento — usa o presenter escalar ('attribute')
+      const attr = client.getHierarchy().findAttribute(_class, groupByKey)
+      const category = attr?.type._class === core.class.ArrOf ? 'attribute' : undefined
+      void getPresenter(client, _class, { key: groupByKey }, { key: groupByKey }, undefined, false, category).then(
+        (p) => {
+          headerComponent = p
+        }
+      )
     }
   }
 
   let headerComponent: AttributeModel | undefined
   $: getHeader(_class, groupByKey)
 
-  const getUpdateProps = (doc: Doc, category: CategoryType): DocumentUpdate<Item> | undefined => {
+  const getUpdateProps = (
+    doc: Doc,
+    category: CategoryType,
+    fromCategory?: CategoryType
+  ): DocumentUpdate<Item> | undefined => {
     const groupValue =
       typeof category === 'object' ? category.values.find((it) => it.space === doc.space)?._id : category
     if (groupValue === undefined) {
       return undefined
+    }
+    if (groupByKey === 'assignee') {
+      // multi-assignee: arrastar entre colunas troca o responsável de origem pelo de destino
+      const raw = (doc as Task).assignee
+      const current: any[] = Array.isArray(raw) ? raw : raw != null ? [raw] : []
+      const from = typeof fromCategory === 'object' ? undefined : fromCategory
+      let next = current.filter((it) => it !== from)
+      if (!next.includes(groupValue)) {
+        next = [...next, groupValue]
+      }
+      next = next.slice(0, 3)
+      return {
+        assignee: next.length > 0 ? next : null,
+        space: doc.space
+      } as unknown as DocumentUpdate<Item>
     }
     return {
       [groupByKey]: groupValue,

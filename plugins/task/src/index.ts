@@ -56,7 +56,7 @@ export interface Task extends AttachedDoc {
   status: Ref<Status>
   isDone?: boolean
   number: number
-  assignee: Ref<Person> | null
+  assignee: Ref<Person>[] | null
   dueDate: Timestamp | null
   comments?: number
   attachments?: number

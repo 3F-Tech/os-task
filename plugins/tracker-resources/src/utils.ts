@@ -416,15 +416,17 @@ export async function getPreviousAssignees (objectId: Ref<Issue> | undefined): P
     { sort: { modifiedOn: -1 } }
   )
   const set = new Set<Ref<Person>>()
-  const createAssignee = createTx?.attributes?.assignee
+  // valores podem ser escalares (Txs antigas) ou arrays (multi-assignee)
+  const addAll = (value: Ref<Person>[] | Ref<Person> | null | undefined): void => {
+    if (value == null) return
+    for (const v of Array.isArray(value) ? value : [value]) {
+      set.add(v)
+    }
+  }
   for (const tx of updateTxes) {
-    const assignee = tx.operations.assignee
-    if (assignee == null) continue
-    set.add(assignee)
+    addAll(tx.operations.assignee as Ref<Person>[] | Ref<Person> | null | undefined)
   }
-  if (createAssignee != null) {
-    set.add(createAssignee)
-  }
+  addAll(createTx?.attributes?.assignee as Ref<Person>[] | Ref<Person> | null | undefined)
   return Array.from(set)
 }
 

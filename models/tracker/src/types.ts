@@ -225,9 +225,9 @@ export class TIssue extends TTask implements Issue {
   @ReadOnly()
   declare number: number
 
-  @Prop(TypeRef(contact.class.Person), tracker.string.Assignee)
+  @Prop(ArrOf(TypeRef(contact.class.Person)), tracker.string.Assignee)
   @Index(IndexKind.Indexed)
-  declare assignee: Ref<Person> | null
+  declare assignee: Ref<Person>[] | null
 
   @Prop(TypeRef(tracker.class.Component), tracker.string.Component, { icon: tracker.icon.Component })
   @Index(IndexKind.Indexed)
@@ -310,6 +310,10 @@ export class TIssue extends TTask implements Issue {
   @Hidden()
     pdcaCycleDuplicate?: boolean
 
+  @Prop(TypeBoolean(), tracker.string.PdcaResetSubIssues)
+  @Hidden()
+    pdcaCycleResetSubIssues?: boolean
+
   @Prop(TypeString(), tracker.string.ClientName)
   @Index(IndexKind.Indexed)
     clientName!: string
@@ -343,8 +347,8 @@ export class TIssueTemplate extends TDoc implements IssueTemplate {
   @Prop(TypeIssuePriority(), tracker.string.Priority)
     priority!: IssuePriority
 
-  @Prop(TypeRef(contact.class.Person), tracker.string.Assignee)
-    assignee!: Ref<Person> | null
+  @Prop(ArrOf(TypeRef(contact.class.Person)), tracker.string.Assignee)
+    assignee!: Ref<Person>[] | null
 
   @Prop(TypeRef(tracker.class.Component), tracker.string.Component)
     component!: Ref<Component> | null
@@ -399,6 +403,10 @@ export class TIssueTemplate extends TDoc implements IssueTemplate {
   @Prop(TypeBoolean(), tracker.string.PdcaDuplicate)
   @Hidden()
     pdcaCycleDuplicate?: boolean
+
+  @Prop(TypeBoolean(), tracker.string.PdcaResetSubIssues)
+  @Hidden()
+    pdcaCycleResetSubIssues?: boolean
 
   @Prop(TypeString(), tracker.string.ClientName)
   @Index(IndexKind.Indexed)

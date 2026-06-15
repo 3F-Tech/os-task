@@ -47,7 +47,12 @@
   export let onChange: (e: Filter) => void
 
   filter.modes = [view.filter.FilterArrayAll, view.filter.FilterArrayAny]
-  filter.mode = filter.mode === undefined ? filter.modes[0] : filter.mode
+  // filtros salvos antes do atributo virar array podem trazer modo de ObjectFilter (FilterObjectIn)
+  // e valores em formato antigo — reseta modo e seleção para o formato do ArrayFilter
+  if (filter.mode === undefined || !filter.modes.includes(filter.mode)) {
+    filter.mode = filter.modes[0]
+    filter.value = []
+  }
 
   const client = getClient()
   const key = { key: filter.key.key }

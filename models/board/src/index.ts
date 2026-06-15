@@ -102,8 +102,8 @@ export class TCard extends TTask implements Card {
   @Index(IndexKind.FullText)
     location?: string
 
-  @Prop(TypeRef(contact.mixin.Employee), board.string.Assignee)
-  declare assignee: Ref<Employee> | null
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), board.string.Assignee)
+  declare assignee: Ref<Employee>[] | null
 
   @Prop(ArrOf(TypeRef(contact.mixin.Employee)), board.string.Members)
     members?: Ref<Employee>[]

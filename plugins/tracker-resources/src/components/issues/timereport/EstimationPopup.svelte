@@ -136,7 +136,7 @@
             issueId: object._id,
             issueClass: object._class,
             space: object.space,
-            assignee: object.assignee,
+            assignee: object.assignee?.[0] ?? null,
             defaultTimeReportDay
           },
           'top'

@@ -56,7 +56,7 @@
   $: personIds = Array.from(
     new Set(
       rows
-        .map((r) => r.issue.assignee)
+        .flatMap((r) => r.issue.assignee ?? [])
         .filter((a): a is Ref<Person> => a != null)
     )
   )
@@ -171,9 +171,13 @@
               <td class="title-col">{row.issue.title}</td>
               <td>{statusMap.get(row.issue.status)?.name ?? '…'}</td>
               <td>
-                {#if row.issue.assignee != null}
-                  {@const assigneePerson = personMap.get(row.issue.assignee)}
-                  {assigneePerson != null ? formatName(assigneePerson.name ?? '') : '…'}
+                {#if row.issue.assignee != null && row.issue.assignee.length > 0}
+                  {row.issue.assignee
+                    .map((a) => {
+                      const p = personMap.get(a)
+                      return p != null ? formatName(p.name ?? '') : '…'
+                    })
+                    .join(', ')}
                 {:else}
                   <span class="muted">—</span>
                 {/if}

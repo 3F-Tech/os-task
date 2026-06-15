@@ -232,7 +232,7 @@ export class PullRequestSyncManager extends IssueSyncManagerBase implements DocS
       case 'unassigned': {
         const assignees = await this.getAssignees(externalData)
         const update: GithubPullRequestUpdate = {
-          assignee: assignees?.[0] ?? null
+          assignee: assignees != null && assignees.length > 0 ? assignees.slice(0, 3) : null
         }
         await this.handleUpdate(ctx, externalData, derivedClient, update, account, prj, true)
         break
@@ -411,7 +411,7 @@ export class PullRequestSyncManager extends IssueSyncManagerBase implements DocS
         pullRequestExternal.body,
         this.stripGuestLink
       ),
-      assignee: assignees[0] ?? null,
+      assignee: assignees.length > 0 ? assignees.slice(0, 3) : null,
       reviewers,
       draft: pullRequestExternal.isDraft,
       head: pullRequestExternal.headRef,

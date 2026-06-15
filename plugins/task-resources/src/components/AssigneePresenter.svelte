@@ -24,7 +24,7 @@
   import { IntlString, getEmbeddedLabel } from '@hcengineering/platform'
   import task from '../plugin'
 
-  export let value: Ref<Person> | Person | null | undefined
+  export let value: Ref<Person> | Ref<Person>[] | Person | null | undefined
   export let issueId: Ref<Task>
   export let defaultClass: Ref<Class<Doc>> | undefined = undefined
   export let currentSpace: Ref<Space> | undefined = undefined
@@ -33,7 +33,9 @@
   export let defaultName: IntlString | undefined = undefined
   export let placeholderLabel: IntlString | undefined = undefined
 
-  $: employeeValue = typeof value === 'string' ? $employeeByIdStore.get(value as Ref<Employee>) : value
+  // multi-assignee: exibe/edita o primeiro responsável
+  $: singleValue = Array.isArray(value) ? value[0] : value
+  $: employeeValue = typeof singleValue === 'string' ? $employeeByIdStore.get(singleValue as Ref<Employee>) : singleValue
 
   const client = getClient()
 
@@ -62,7 +64,7 @@
       return
     }
 
-    const newAssignee = result === null ? null : result._id
+    const newAssignee = result === null ? null : [result._id]
 
     await client.updateCollection(
       currentIssue._class,
@@ -102,7 +104,7 @@
 {#if presenter}
   <svelte:component
     this={presenter.presenter}
-    {value}
+    value={singleValue}
     {defaultName}
     avatarSize={'x-small'}
     disabled={false}

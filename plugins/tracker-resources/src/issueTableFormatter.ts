@@ -219,24 +219,18 @@ export async function formatIssueValue (
     return ''
   }
 
-  // Handle assignee field - format PersonId to person name
+  // Handle assignee field - format person ref(s) to name(s), comma separated
   if (attr.key === 'assignee') {
     const assigneeValue: unknown = issueDoc.assignee
     if (assigneeValue !== undefined && assigneeValue !== null) {
-      // Check if assignee is in lookup
-      const issueWithLookup = issueDoc as Record<string, unknown> & { $lookup?: Record<string, unknown> }
-      const lookupAssignee: unknown = issueWithLookup.$lookup?.assignee
-      if (lookupAssignee !== undefined && lookupAssignee !== null) {
-        const assigneeObj = lookupAssignee as Record<string, unknown>
-        const assigneeName: unknown = assigneeObj.name
-        if (typeof assigneeName === 'string') {
-          return assigneeName
+      const refs: unknown[] = Array.isArray(assigneeValue) ? assigneeValue : [assigneeValue]
+      const names: string[] = []
+      for (const ref of refs) {
+        if (typeof ref === 'string') {
+          names.push(await loadPersonName(ref as PersonId))
         }
       }
-      // If not in lookup, fetch it
-      if (typeof assigneeValue === 'string') {
-        return await loadPersonName(assigneeValue as PersonId)
-      }
+      return names.filter((it) => it.length > 0).join(', ')
     }
     return ''
   }

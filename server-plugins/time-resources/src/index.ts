@@ -586,7 +586,7 @@ export async function IssueToDoDone (
 }
 
 async function createIssueHandler (issue: Issue, control: TriggerControl): Promise<Tx[]> {
-  if (issue.assignee != null) {
+  if (issue.assignee != null && issue.assignee.length > 0) {
     const project = (await control.findAll(control.ctx, task.class.Project, { _id: issue.space }))[0]
     if (project === undefined) return []
     const type = (await control.modelDb.findAll(task.class.ProjectType, { _id: project.type }))[0]
@@ -594,9 +594,15 @@ async function createIssueHandler (issue: Issue, control: TriggerControl): Promi
     const status = (await control.modelDb.findAll(core.class.Status, { _id: issue.status }))[0]
     if (status === undefined) return []
     if (status.category === task.statusCategory.Active || status.category === task.statusCategory.ToDo) {
-      const tx = await getCreateToDoTx(issue, issue.assignee, control)
-      if (tx !== undefined) {
-        await control.apply(control.ctx, [tx])
+      const txes: Tx[] = []
+      for (const assignee of issue.assignee) {
+        const tx = await getCreateToDoTx(issue, assignee, control)
+        if (tx !== undefined) {
+          txes.push(tx)
+        }
+      }
+      if (txes.length > 0) {
+        await control.apply(control.ctx, txes)
       }
     }
   }
@@ -657,7 +663,7 @@ async function getCreateToDoTx (issue: Issue, user: Ref<Person>, control: Trigge
 
 async function changeIssueAssigneeHandler (
   control: TriggerControl,
-  newAssignee: Ref<Person>,
+  newAssignees: Ref<Person>[],
   issueId: Ref<Issue>
 ): Promise<Tx[]> {
   const issue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: issueId }))[0]
@@ -670,13 +676,21 @@ async function changeIssueAssigneeHandler (
         attachedTo: issue._id
       })
       const now = Date.now()
+      const usersWithOpenTodo = new Set<Ref<Person>>()
       for (const todo of todos) {
         if (todo.doneOn != null) continue
-        res.push(control.txFactory.createTxUpdateDoc(todo._class, todo.space, todo._id, { doneOn: now }))
+        if (newAssignees.includes(todo.user)) {
+          usersWithOpenTodo.add(todo.user)
+        } else {
+          res.push(control.txFactory.createTxUpdateDoc(todo._class, todo.space, todo._id, { doneOn: now }))
+        }
       }
-      const tx = await getCreateToDoTx(issue, newAssignee, control)
-      if (tx !== undefined) {
-        res.push(tx)
+      for (const assignee of newAssignees) {
+        if (usersWithOpenTodo.has(assignee)) continue
+        const tx = await getCreateToDoTx(issue, assignee, control)
+        if (tx !== undefined) {
+          res.push(tx)
+        }
       }
       return res
     }
@@ -693,16 +707,22 @@ async function changeIssueStatusHandler (
   if (status === undefined) return []
   if (status.category === task.statusCategory.Active || status.category === task.statusCategory.ToDo) {
     const issue = (await control.findAll(control.ctx, tracker.class.Issue, { _id: issueId }))[0]
-    if (issue?.assignee != null) {
+    if (issue?.assignee != null && issue.assignee.length > 0) {
       const todos = await control.findAll(control.ctx, time.class.ToDo, {
         attachedTo: issue._id,
-        user: issue.assignee as Ref<Employee>
+        user: { $in: issue.assignee as Ref<Employee>[] }
       })
-      if (todos.length === 0) {
-        const tx = await getCreateToDoTx(issue, issue.assignee, control)
+      const usersWithTodo = new Set<Ref<Person>>(todos.map((it) => it.user))
+      const txes: Tx[] = []
+      for (const assignee of issue.assignee) {
+        if (usersWithTodo.has(assignee)) continue
+        const tx = await getCreateToDoTx(issue, assignee, control)
         if (tx !== undefined) {
-          await control.apply(control.ctx, [tx])
+          txes.push(tx)
         }
+      }
+      if (txes.length > 0) {
+        await control.apply(control.ctx, txes)
       }
     }
   } else if (status.category === task.statusCategory.Won || status.category === task.statusCategory.Lost) {
@@ -765,8 +785,9 @@ async function updateIssueHandler (tx: TxUpdateDoc<Issue>, control: TriggerContr
   const type = (await control.modelDb.findAll(task.class.ProjectType, { _id: project.type }))[0]
   if (!type?.classic) return []
   const newAssignee = tx.operations.assignee
-  if (newAssignee != null) {
-    res.push(...(await changeIssueAssigneeHandler(control, newAssignee, tx.objectId)))
+  if (newAssignee !== undefined) {
+    // null/[] = todos os responsáveis removidos -> fecha os ToDos abertos
+    res.push(...(await changeIssueAssigneeHandler(control, newAssignee ?? [], tx.objectId)))
   }
   const newStatus = tx.operations.status
   if (newStatus !== undefined) {

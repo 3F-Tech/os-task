@@ -28,6 +28,7 @@ import {
   type AccountUuid
 } from '@hcengineering/core'
 import {
+  ArrOf,
   Collection as TypeCollection,
   Hidden,
   Index,
@@ -162,9 +163,9 @@ export class TApplicant extends TTask implements Applicant {
   @Prop(TypeDate(), task.string.StartDate)
     startDate!: Timestamp | null
 
-  @Prop(TypeRef(contact.mixin.Employee), recruit.string.AssignedRecruiter)
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), recruit.string.AssignedRecruiter)
   @Index(IndexKind.Indexed)
-  declare assignee: Ref<Employee> | null
+  declare assignee: Ref<Employee>[] | null
 
   @Prop(TypeRef(core.class.Status), task.string.TaskState, { _id: recruit.attribute.State })
   @Index(IndexKind.Indexed)

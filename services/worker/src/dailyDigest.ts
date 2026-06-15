@@ -425,9 +425,13 @@ export async function processDailyDigestEvent (
     // malformed status docs that crash findAll(IssueStatus, {})).
     ctx.info('daily-digest: loading issues', { workspaceId })
     const allIssues = await client.findAll(tracker.class.Issue, {})
-    const assignedIssues = allIssues.filter(
-      (i) => i != null && i.assignee != null && (i.assignee as any) !== ''
-    )
+    // assignee é array (multi-assignee); aceita também escalar legado pré-migration
+    const assigneesOf = (i: Issue): Ref<Person>[] => {
+      const value = i.assignee as unknown
+      if (value == null || value === '') return []
+      return (Array.isArray(value) ? value : [value]).filter((it): it is Ref<Person> => it != null && it !== '')
+    }
+    const assignedIssues = allIssues.filter((i) => i != null && assigneesOf(i).length > 0)
 
     if (assignedIssues.length === 0) {
       ctx.info('daily-digest: no assigned issues in workspace', { workspaceId })
@@ -503,19 +507,21 @@ export async function processDailyDigestEvent (
     })
     const byAssignee = new Map<Ref<Person>, ReturnType<typeof empty>>()
     for (const issue of issues) {
-      if (issue.assignee == null) continue
-      const bucket = byAssignee.get(issue.assignee) ?? empty()
-      const due = issue.dueDate ?? null
-      if (due != null && due > 0 && due >= startMs && due <= endMs) {
-        bucket.today.push(issue)
-      } else if (due != null && due > 0 && due < startMs) {
-        bucket.overdue.push(issue)
-      } else if (due != null && due > 0 && due > endMs && due <= upcomingEndMs) {
-        bucket.upcoming.push(issue)
-      } else if (!scheduledIssueIds.has(issue._id)) {
-        bucket.unplanned.push(issue)
+      // issue entra no digest de cada responsável
+      for (const assignee of assigneesOf(issue)) {
+        const bucket = byAssignee.get(assignee) ?? empty()
+        const due = issue.dueDate ?? null
+        if (due != null && due > 0 && due >= startMs && due <= endMs) {
+          bucket.today.push(issue)
+        } else if (due != null && due > 0 && due < startMs) {
+          bucket.overdue.push(issue)
+        } else if (due != null && due > 0 && due > endMs && due <= upcomingEndMs) {
+          bucket.upcoming.push(issue)
+        } else if (!scheduledIssueIds.has(issue._id)) {
+          bucket.unplanned.push(issue)
+        }
+        byAssignee.set(assignee, bucket)
       }
-      byAssignee.set(issue.assignee, bucket)
     }
 
     if (byAssignee.size === 0) {

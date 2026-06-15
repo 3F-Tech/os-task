@@ -22,5 +22,6 @@ const icons = require('../assets/icons.svg') as string // eslint-disable-line
 const buIcon = getMetadata(contact.icon.Company) ?? getMetadata(contact.icon.Person)
 loadMetadata(operationalDashboard.icon, {
   Dashboard: `${icons}#dashboard`,
-  BusinessUnit: (buIcon ?? `${icons}#dashboard`) as string
+  BusinessUnit: (buIcon ?? `${icons}#dashboard`) as string,
+  Team: `${icons}#team`
 })

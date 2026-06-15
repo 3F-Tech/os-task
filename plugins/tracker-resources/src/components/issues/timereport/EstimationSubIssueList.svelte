@@ -59,7 +59,7 @@
             kind={'ghost'}
             label={tracker.string.Assignee}
             _class={contact.mixin.Employee}
-            value={issue.assignee}
+            value={issue.assignee?.[0] ?? null}
             readonly
             showNavigate={false}
           />

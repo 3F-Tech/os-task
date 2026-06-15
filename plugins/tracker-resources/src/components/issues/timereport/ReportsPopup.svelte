@@ -45,7 +45,7 @@
         issueId: issue._id,
         issueClass: issue._class,
         space: issue.space,
-        assignee: issue.assignee,
+        assignee: issue.assignee?.[0] ?? null,
         defaultTimeReportDay
       },
       eventToHTMLElement(event)

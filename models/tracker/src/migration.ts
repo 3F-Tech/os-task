@@ -41,12 +41,14 @@ import task from '@hcengineering/task'
 import tracker, {
   type Issue,
   type IssueStatus,
+  type IssueTemplate,
   type Project,
   TimeReportDayType,
   trackerId
 } from '@hcengineering/tracker'
 
 import { classicIssueTaskStatuses } from '.'
+import { DOMAIN_TRACKER } from './types'
 
 async function createDefaultProject (tx: TxOperations): Promise<void> {
   const current = await tx.findOne(tracker.class.Project, {
@@ -509,6 +511,52 @@ export const trackerOperation: MigrateOperation = {
             if (Object.keys(update).length === 0) continue
             await client.update(DOMAIN_TASK, { _id: issue._id }, update)
           }
+        }
+      },
+      {
+        state: 'templateAssigneeToArray',
+        mode: 'upgrade',
+        func: async (client) => {
+          const templates = await client.find<IssueTemplate>(DOMAIN_TRACKER, {
+            _class: tracker.class.IssueTemplate
+          })
+          for (const template of templates) {
+            const update: Record<string, unknown> = {}
+            const assignee = (template as any).assignee
+            if (typeof assignee === 'string') {
+              update.assignee = [assignee]
+            }
+            if (Array.isArray(template.children)) {
+              let childrenChanged = false
+              const children = template.children.map((child) => {
+                const childAssignee = (child as any).assignee
+                if (typeof childAssignee === 'string') {
+                  childrenChanged = true
+                  return { ...child, assignee: [childAssignee] }
+                }
+                return child
+              })
+              if (childrenChanged) {
+                update.children = children
+              }
+            }
+            if (Object.keys(update).length === 0) continue
+            await client.update(DOMAIN_TRACKER, { _id: template._id }, update)
+          }
+        }
+      },
+      {
+        state: 'pdcaCycleResetSubIssuesDefault',
+        mode: 'upgrade',
+        func: async (client) => {
+          await client.update(
+            DOMAIN_TASK,
+            {
+              _class: tracker.class.Issue,
+              pdcaCycleResetSubIssues: { $exists: false }
+            },
+            { pdcaCycleResetSubIssues: false }
+          )
         }
       }
     ])

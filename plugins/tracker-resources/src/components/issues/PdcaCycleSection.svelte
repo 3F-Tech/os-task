@@ -181,6 +181,14 @@
     }
   }
 
+  async function toggleResetSubIssues (val: boolean): Promise<void> {
+    if (issue._id && issue._class) {
+      await client.update(issue, { pdcaCycleResetSubIssues: val } as any)
+    } else {
+      ;(issue as any).pdcaCycleResetSubIssues = val
+    }
+  }
+
   function openStatusPopup (event: MouseEvent): void {
     if (readonly) return
     const items = [
@@ -235,6 +243,7 @@
   $: selectedWeekday = String(dueDays?.[0] ?? 5) // default: Friday
   $: customWeekdays = ((issue as any).pdcaCycleCustomWeekdays as number[] | undefined) ?? []
   $: isDuplicate = (issue as any).pdcaCycleDuplicate === true
+  $: isResetSubIssues = (issue as any).pdcaCycleResetSubIssues === true
 </script>
 
 <div class="pdca-card">
@@ -380,6 +389,17 @@
           on={isDuplicate}
           disabled={readonly}
           on:change={(e) => { void toggleDuplicate(e.detail) }}
+        />
+      </div>
+
+      <div class="pdca-row">
+        <span class="pdca-label">
+          <Label label={tracker.string.PdcaResetSubIssues} />
+        </span>
+        <Toggle
+          on={isResetSubIssues}
+          disabled={readonly}
+          on:change={(e) => { void toggleResetSubIssues(e.detail) }}
         />
       </div>
 

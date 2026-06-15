@@ -48,7 +48,7 @@
   let object: Data<IssueTemplate> = {
     title: '',
     description: '',
-    assignee,
+    assignee: assignee != null ? [assignee] : null,
     component,
     milestone,
     priority,
@@ -65,6 +65,7 @@
     pdcaCycleResetStatus: undefined,
     pdcaCycleDueDays: [],
     pdcaCycleDuplicate: false,
+    pdcaCycleResetSubIssues: false,
     _class: tracker.class.IssueTemplate,
     kind: undefined
   }
@@ -114,7 +115,8 @@
       pdcaCycleFrequency: object.pdcaCycleFrequency,
       pdcaCycleResetStatus: object.pdcaCycleResetStatus,
       pdcaCycleDueDays: object.pdcaCycleDueDays,
-      pdcaCycleDuplicate: object.pdcaCycleDuplicate
+      pdcaCycleDuplicate: object.pdcaCycleDuplicate,
+      pdcaCycleResetSubIssues: object.pdcaCycleResetSubIssues
     }
 
     await client.createDoc(tracker.class.IssueTemplate, _space, value, objectId)

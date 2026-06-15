@@ -18,8 +18,9 @@
   import BUManagement from './BUManagement.svelte'
   import MetricsConfig from './MetricsConfig.svelte'
   import OverviewMetrics from './OverviewMetrics.svelte'
+  import TeamManagement from './TeamManagement.svelte'
 
-  type Tab = 'overview' | 'businessUnits' | 'metricsConfig'
+  type Tab = 'overview' | 'businessUnits' | 'teams' | 'metricsConfig'
   let activeTab: Tab = 'overview'
 </script>
 
@@ -35,6 +36,9 @@
     <button class:active={activeTab === 'businessUnits'} on:click={() => (activeTab = 'businessUnits')}>
       <Label label={operationalDashboard.string.BusinessUnits} />
     </button>
+    <button class:active={activeTab === 'teams'} on:click={() => (activeTab = 'teams')}>
+      <Label label={operationalDashboard.string.Teams} />
+    </button>
     <button class:active={activeTab === 'metricsConfig'} on:click={() => (activeTab = 'metricsConfig')}>
       <Label label={operationalDashboard.string.MetricsConfig} />
     </button>
@@ -45,6 +49,8 @@
       <OverviewMetrics />
     {:else if activeTab === 'businessUnits'}
       <BUManagement />
+    {:else if activeTab === 'teams'}
+      <TeamManagement />
     {:else if activeTab === 'metricsConfig'}
       <MetricsConfig />
     {/if}

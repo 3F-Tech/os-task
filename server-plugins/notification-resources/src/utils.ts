@@ -88,7 +88,8 @@ export function isUserEmployeeInFieldValueTypeMatch (
   if (value === person) return true
 
   if (Array.isArray(value)) {
-    return includesAny(value, socialIds)
+    // campo pode conter Ref<Person>[] (ex.: assignee) ou PersonId[]
+    return value.includes(person) || includesAny(value, socialIds)
   } else {
     return socialIds.includes(value)
   }

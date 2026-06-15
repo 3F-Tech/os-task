@@ -30,7 +30,7 @@
   export let issueId: Ref<Issue> | undefined = issue?._id
   export let issueClass: Ref<Class<Issue>> = issue?._class ?? tracker.class.Issue
   export let space: Ref<Space> | undefined = issue?.space
-  export let assignee: Ref<Employee> | null | undefined = issue?.assignee as Ref<Employee>
+  export let assignee: Ref<Employee> | null | undefined = (issue?.assignee?.[0] as Ref<Employee>) ?? null
 
   export let value: TimeSpendReport | undefined
   export let placeholder: IntlString = tracker.string.TimeSpendReportValue

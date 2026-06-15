@@ -45,7 +45,7 @@
   $: personIds = Array.from(
     new Set(
       rows
-        .map((r) => r.issue.assignee)
+        .flatMap((r) => r.issue.assignee ?? [])
         .filter((a): a is Ref<Person> => a != null)
     )
   )
@@ -69,14 +69,23 @@
 
   function computeBuckets (rs: IssueRow[]): Bucket[] {
     const map = new Map<Ref<Person> | 'unassigned', Bucket>()
-    for (const r of rs) {
-      const key = r.issue.assignee ?? 'unassigned'
-      const personId: Ref<Person> | null = r.issue.assignee ?? null
+    const add = (key: Ref<Person> | 'unassigned', personId: Ref<Person> | null, r: IssueRow): void => {
       const cur = map.get(key) ?? { personId, tasks: 0, subtasks: 0, estimation: 0 }
       if (isSubtask(r)) cur.subtasks += 1
       else cur.tasks += 1
       cur.estimation += r.issue.estimation ?? 0
       map.set(key, cur)
+    }
+    for (const r of rs) {
+      const assignees = r.issue.assignee ?? []
+      if (assignees.length === 0) {
+        add('unassigned', null, r)
+      } else {
+        // multi-assignee: a issue conta no bucket de cada responsável
+        for (const a of assignees) {
+          add(a, a, r)
+        }
+      }
     }
     return [...map.values()]
   }

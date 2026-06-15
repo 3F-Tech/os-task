@@ -466,6 +466,7 @@ export default mergeIds(trackerId, tracker, {
     IssueStatusIcon: '' as AnyComponent,
     MilestoneStatusIcon: '' as AnyComponent,
     ClientStagePresenter: '' as AnyComponent,
+    ClientStageValuePresenter: '' as AnyComponent,
     ClientNamePresenter: '' as AnyComponent
   },
   metadata: {

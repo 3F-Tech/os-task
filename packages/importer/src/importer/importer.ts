@@ -584,7 +584,7 @@ export class WorkspaceImporter {
     const issueData: AttachedData<Issue> = {
       title: issue.title,
       description: contentId,
-      assignee: issue.assignee ?? null,
+      assignee: issue.assignee != null ? [issue.assignee] : null,
       component: null,
       number,
       status,

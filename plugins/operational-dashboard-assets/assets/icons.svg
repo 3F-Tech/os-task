@@ -6,4 +6,11 @@
     <rect x="65.2"  y="225.2" width="174.6" height="221.6" rx="41.4"/>
     <rect x="272.2" y="321.2" width="174.6" height="125.6" rx="41.4"/>
   </symbol>
+  <symbol id="team" viewBox="0 0 512 512"
+          fill="none" stroke="currentColor" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="184" cy="156" r="76"/>
+    <path d="M48 432c0-75 61-136 136-136s136 61 136 136"/>
+    <circle cx="368" cy="180" r="56"/>
+    <path d="M344 296c75 0 120 55 120 116"/>
+  </symbol>
 </svg>

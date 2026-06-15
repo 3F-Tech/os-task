@@ -278,6 +278,7 @@ export interface Issue extends Task {
   pdcaCycleDueDays?: number[]
   pdcaCycleCustomWeekdays?: number[]
   pdcaCycleDuplicate?: boolean
+  pdcaCycleResetSubIssues?: boolean
 
   clientName: string
   clientStage: ClientStage
@@ -293,7 +294,7 @@ export interface IssueDraft {
   description: Markup
   status?: Ref<IssueStatus>
   priority: IssuePriority
-  assignee: Ref<Person> | null
+  assignee: Ref<Person>[] | null
   component: Ref<Component> | null
   space: Ref<Project>
   dueDate: Timestamp | null
@@ -315,6 +316,7 @@ export interface IssueDraft {
   pdcaCycleDueDays?: number[]
   pdcaCycleCustomWeekdays?: number[]
   pdcaCycleDuplicate?: boolean
+  pdcaCycleResetSubIssues?: boolean
 
   template?: {
     // A template issue is based on
@@ -332,7 +334,7 @@ export interface IssueTemplateData {
   description: Markup
   priority: IssuePriority
 
-  assignee: Ref<Person> | null
+  assignee: Ref<Person>[] | null
   component: Ref<Component> | null
 
   milestone?: Ref<Milestone> | null
@@ -350,6 +352,7 @@ export interface IssueTemplateData {
   pdcaCycleDueDays?: number[]
   pdcaCycleCustomWeekdays?: number[]
   pdcaCycleDuplicate?: boolean
+  pdcaCycleResetSubIssues?: boolean
 
   clientName?: string
   clientStage?: ClientStage
@@ -677,6 +680,7 @@ const pluginState = plugin(trackerId, {
     PdcaDueMonthDay: '' as IntlString,
     PdcaDueMonthDays: '' as IntlString,
     PdcaDuplicate: '' as IntlString,
+    PdcaResetSubIssues: '' as IntlString,
     PdcaWeekdayMon: '' as IntlString,
     PdcaWeekdayTue: '' as IntlString,
     PdcaWeekdayWed: '' as IntlString,

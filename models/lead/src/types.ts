@@ -26,6 +26,7 @@ import {
 } from '@hcengineering/core'
 import { type Customer, type Funnel, type Lead } from '@hcengineering/lead'
 import {
+  ArrOf,
   Collection,
   Index,
   Mixin,
@@ -80,8 +81,8 @@ export class TLead extends TTask implements Lead {
   @Index(IndexKind.FullText)
     title!: string
 
-  @Prop(TypeRef(contact.mixin.Employee), lead.string.Assignee)
-  declare assignee: Ref<Employee> | null
+  @Prop(ArrOf(TypeRef(contact.mixin.Employee)), lead.string.Assignee)
+  declare assignee: Ref<Employee>[] | null
 
   @Prop(TypeRef(core.class.Status), task.string.TaskState, { _id: lead.attribute.State })
   declare status: Ref<Status>

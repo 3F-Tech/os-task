@@ -283,6 +283,7 @@ export async function processPdcaCycleEvent (
     const dueDays = (issue as any).pdcaCycleDueDays as number[] | undefined
     const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
     const shouldDuplicate = (issue as any).pdcaCycleDuplicate === true
+    const resetSubIssues = (issue as any).pdcaCycleResetSubIssues === true
     const currentNextDate = (issue as any).pdcaNextCycleDate as number | undefined
 
     if (!isActive || frequency == null || resetStatus == null) {
@@ -367,7 +368,7 @@ export async function processPdcaCycleEvent (
         rank: '0|hzzzzz:',
         status: resetStatus,
         kind: issue.kind,
-        assignee: issue.assignee,
+        assignee: issue.assignee != null ? [...issue.assignee] : null,
         priority: issue.priority,
         component: issue.component,
         milestone: issue.milestone,
@@ -381,6 +382,7 @@ export async function processPdcaCycleEvent (
         pdcaCycleDueDays: dueDays,
         pdcaCycleCustomWeekdays: customWeekdays,
         pdcaCycleDuplicate: true,
+        pdcaCycleResetSubIssues: resetSubIssues,
         pdcaNextCycleDate: nextDate,
         clientName: (issue as any).clientName,
         clientStage: (issue as any).clientStage
@@ -396,6 +398,68 @@ export async function processPdcaCycleEvent (
       )
       scheduleIssueId = newId as Ref<Issue>
       ctx.info('PDCA cycle: new issue created as duplicate', { issueId, newIssueId: newId, identifier: newIdentifier, number })
+
+      // When enabled, recreate the original's DIRECT sub-issues under the new
+      // duplicated issue, each reset to the parent's reset status with fresh
+      // spent time / dates. The originals remain attached to the now-Won issue
+      // as historical record.
+      if (resetSubIssues) {
+        try {
+          const children = await client.findAll(tracker.class.Issue, { attachedTo: issueId } as any)
+          for (const child of children) {
+            const childInc = await client.update(project, { $inc: { sequence: 1 } } as any, true)
+            const childNumber = ((childInc as any)?.object?.sequence) ?? ((project.sequence ?? 0) + 1)
+            const childIdentifier = `${project.identifier}-${childNumber}`
+            await client.addCollection(
+              tracker.class.Issue,
+              issue.space,
+              newId,
+              tracker.class.Issue,
+              'subIssues',
+              {
+                title: child.title,
+                description: null,
+                number: childNumber,
+                identifier: childIdentifier,
+                rank: child.rank ?? '0|hzzzzz:',
+                status: resetStatus,
+                priority: child.priority,
+                assignee: child.assignee != null ? [...child.assignee] : null,
+                component: child.component,
+                milestone: child.milestone,
+                estimation: child.estimation,
+                kind: child.kind,
+                // Re-link the recreated sub-issue to the new duplicated parent so it
+                // shows in its breadcrumb and contributes to its estimation rollup.
+                parents: [
+                  {
+                    parentId: newId as Ref<Issue>,
+                    parentTitle: issue.title,
+                    space: issue.space,
+                    identifier: newIdentifier
+                  }
+                ],
+                comments: 0,
+                subIssues: 0,
+                reportedTime: 0,
+                remainingTime: 0,
+                reports: 0,
+                childInfo: [],
+                relations: [],
+                startDate: Date.now(),
+                dueDate: null,
+                completedDate: null,
+                clientName: (child as any).clientName,
+                clientStage: (child as any).clientStage
+              } as any
+            )
+          }
+          ctx.info('PDCA cycle: sub-issues duplicated under new issue', { issueId, newIssueId: newId, count: children.length })
+        } catch (subErr: any) {
+          ctx.warn('PDCA cycle: failed to duplicate sub-issues', { issueId, err: subErr?.message ?? String(subErr) })
+        }
+      }
+
       try {
         await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
       } catch (commentErr: any) {
@@ -413,6 +477,28 @@ export async function processPdcaCycleEvent (
       await client.update(issue, update as any)
       await client.update(issue, { completedDate: null } as any)
       ctx.info('PDCA cycle: status reset', { issueId, resetStatus })
+
+      // When enabled, reset the DIRECT sub-issues in place the same way as the
+      // parent: status -> reset status, spent time zeroed, start date refreshed,
+      // completion cleared. The sub-issue's own dueDate is left untouched (it is
+      // not recalculated from the parent's frequency).
+      if (resetSubIssues) {
+        try {
+          const children = await client.findAll(tracker.class.Issue, { attachedTo: issueId } as any)
+          for (const child of children) {
+            await client.update(child, {
+              status: resetStatus,
+              reportedTime: 0,
+              startDate: Date.now()
+            } as any)
+            await client.update(child, { completedDate: null } as any)
+          }
+          ctx.info('PDCA cycle: sub-issues status reset', { issueId, count: children.length })
+        } catch (subErr: any) {
+          ctx.warn('PDCA cycle: failed to reset sub-issues', { issueId, err: subErr?.message ?? String(subErr) })
+        }
+      }
+
       try {
         await addCycleComment(client, issue, prevStatusName, prevReportedTime, prevDueDate, prevCompletedDate)
       } catch (commentErr: any) {

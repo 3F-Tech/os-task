@@ -85,6 +85,25 @@
     "TotalEstimation": "Estimativa total",
     "Unassigned": "Sem responsável",
     "Hours": "h",
-    "NoIssuesInMetric": "Nenhuma tarefa nesta métrica"
+    "NoIssuesInMetric": "Nenhuma tarefa nesta métrica",
+    "Teams": "Equipes",
+    "Team": "Equipe",
+    "NewTeam": "Nova Equipe",
+    "EditTeam": "Editar Equipe",
+    "NoTeams": "Nenhuma equipe cadastrada",
+    "TeamNamePlaceholder": "Nome da equipe...",
+    "Members": "Membros",
+    "AddMember": "Adicionar membro",
+    "Role": "Papel",
+    "RoleLeader": "Líder",
+    "RoleManager": "Gestor",
+    "RoleMember": "Membro",
+    "RolePlaceholder": "Papel...",
+    "AllTeams": "Todas as equipes",
+    "TeamRanking": "Ranking de Equipes",
+    "RankBy": "Ordenar por",
+    "NoTeamsForRanking": "Nenhuma equipe com membros",
+    "ActiveTasks": "Tarefas ativas",
+    "Position": "#"
   }
 }

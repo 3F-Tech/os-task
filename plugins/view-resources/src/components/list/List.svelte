@@ -189,6 +189,7 @@
   let dragItem: {
     doc?: Doc
     revert?: () => void
+    fromCategory?: any
   } = {}
 
   let listDiv: HTMLDivElement

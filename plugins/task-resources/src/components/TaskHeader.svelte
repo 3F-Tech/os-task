@@ -15,7 +15,7 @@
 -->
 <script lang="ts">
   import contact from '@hcengineering/contact'
-  import core, { Class, Doc, Mixin, Ref, RefTo } from '@hcengineering/core'
+  import core, { ArrOf, Class, Doc, Mixin, Ref, RefTo } from '@hcengineering/core'
   import { AttributesBar, getClient, KeyedAttribute } from '@hcengineering/presentation'
   import { UserBox } from '@hcengineering/contact-resources'
   import { Task } from '@hcengineering/task'
@@ -33,7 +33,11 @@
   const client = getClient()
   const hierarchy = client.getHierarchy()
 
+  // multi-assignee: UserBox edita o primeiro responsável
+  $: assigneeSingle = object.assignee?.[0] ?? null
+
   function change () {
+    object.assignee = assigneeSingle != null ? [assigneeSingle] : null
     client.updateCollection(
       object._class,
       object.space,
@@ -49,9 +53,15 @@
 
   function getAssigneeClass (object: Task): Ref<Class<Doc>> {
     const attribute = hierarchy.getAttribute(object._class, 'assignee')
-    const attrClass = attribute.type._class
-    if (attrClass === core.class.RefTo) {
-      return (attribute.type as RefTo<Doc>).to
+    const attrType = attribute.type
+    if (attrType._class === core.class.RefTo) {
+      return (attrType as RefTo<Doc>).to
+    }
+    if (attrType._class === core.class.ArrOf) {
+      const of = (attrType as ArrOf<Doc>).of
+      if (of._class === core.class.RefTo) {
+        return (of as RefTo<Doc>).to
+      }
     }
     return contact.mixin.Employee
   }
@@ -68,7 +78,7 @@
         _class={getAssigneeClass(object)}
         label={assigneeTitle}
         placeholder={assigneeTitle}
-        bind:value={object.assignee}
+        bind:value={assigneeSingle}
         on:change={change}
         allowDeselect
         {readonly}

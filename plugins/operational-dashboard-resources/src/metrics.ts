@@ -18,7 +18,8 @@ import contact, { formatName, type Person } from '@hcengineering/contact'
 import { type Client, type Ref, type Timestamp } from '@hcengineering/core'
 import operationalDashboard, {
   type ProjectDashboardConfig,
-  type ProjectWithBU
+  type ProjectWithBU,
+  type Team
 } from '@hcengineering/operational-dashboard'
 import task from '@hcengineering/task'
 import tracker, { type Issue, type IssueStatus, type Project } from '@hcengineering/tracker'
@@ -46,6 +47,23 @@ export interface MetricsResult {
   approvedNoChanges: MetricResult
   reworkCycles: MetricResult
   waitingApproval: MetricResult
+}
+
+export interface TeamRankingRow {
+  team: Team
+  memberCount: number
+  activeCount: number
+  onTimePct: number | null
+  overduePct: number | null
+  avgCycleDays: number | null
+  avgRework: number | null
+}
+
+export type RankMetric = 'onTime' | 'overdue' | 'cycleTime' | 'rework'
+
+export interface DashboardResult {
+  metrics: MetricsResult
+  ranking: TeamRankingRow[]
 }
 
 const NO_DATA = (): MetricResult => ({ value: '—', subtitle: '', tone: 'neutral', issues: [] })
@@ -83,9 +101,13 @@ function emptyResult (): MetricsResult {
   }
 }
 
-export async function computeMetrics (client: Client, filters: DashboardFilters): Promise<MetricsResult> {
+export async function computeDashboard (
+  client: Client,
+  filters: DashboardFilters,
+  teams: Team[]
+): Promise<DashboardResult> {
   // BU é obrigatória — sem BU selecionada, não há dados a apresentar.
-  if (filters.buId === '') return emptyResult()
+  if (filters.buId === '') return { metrics: emptyResult(), ranking: [] }
 
   const hierarchy = client.getHierarchy()
 
@@ -98,7 +120,7 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
   if (filters.projectId !== '') {
     filteredProjects = filteredProjects.filter((p) => p._id === (filters.projectId as Ref<Project>))
   }
-  if (filteredProjects.length === 0) return emptyResult()
+  if (filteredProjects.length === 0) return { metrics: emptyResult(), ranking: [] }
 
   // 2. Per-project metrics config
   const configByProject = new Map<Ref<Project>, ResolvedConfig>()
@@ -130,26 +152,91 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
   const isCancelled = (status: Ref<IssueStatus>): boolean =>
     statusMap.get(status)?.category === task.statusCategory.Lost
 
-  // 4. Load issues
+  // 4. Load issues — uma carga só, compartilhada entre métricas e ranking.
+  // userId/teamId NÃO entram na query: membership em campo array não é
+  // confiável no adapter Postgres/Cockroach — o filtro é feito client-side.
   const projectIds = filteredProjects.map((p) => p._id)
   const issueQuery: Record<string, unknown> = { space: { $in: projectIds } }
   if (filters.clientStage !== '') {
     issueQuery.clientStage = filters.clientStage
   }
-  if (filters.userId !== '') {
-    issueQuery.assignee = filters.userId
-  }
-  const issues = await client.findAll(tracker.class.Issue, issueQuery)
+  const allIssues = await client.findAll(tracker.class.Issue, issueQuery)
 
-  // 5. Active issues — exclui aprovadas (config), concluídas (categoria Won/Done)
-  // e canceladas (Lost). Mesmo com approvedStatuses customizados, um status de
-  // categoria "concluído" nunca conta como carga ativa.
   const isDone = (status: Ref<IssueStatus>): boolean =>
     statusMap.get(status)?.category === task.statusCategory.Won
-  const activeIssues = issues.filter((i) => {
+  const isActive = (i: Issue): boolean => {
     const approved = effectiveApproved(i.space)
     return !approved.has(i.status) && !isDone(i.status) && !isCancelled(i.status)
+  }
+  const allActiveIssues = allIssues.filter(isActive)
+
+  // === Activity log for status transitions (todas as issues) ===
+  const issueIds = allIssues.map((i) => i._id)
+  const transitionsByIssue = new Map<Ref<Issue>, Transition[]>()
+  if (issueIds.length > 0) {
+    const messages = (await client.findAll(activity.class.DocUpdateMessage, {
+      objectId: { $in: issueIds }
+    })) as DocUpdateMessage[]
+
+    for (const m of messages) {
+      const upd = m.attributeUpdates
+      if (upd?.attrKey !== 'status') continue
+      const next = upd.set?.[0]
+      if (typeof next !== 'string' || next.length === 0) continue
+      const issueId = m.objectId as Ref<Issue>
+      const list = transitionsByIssue.get(issueId) ?? []
+      list.push({ time: m.modifiedOn ?? m.createdOn ?? 0, newStatus: next as Ref<IssueStatus> })
+      transitionsByIssue.set(issueId, list)
+    }
+    for (const list of transitionsByIssue.values()) list.sort((a, b) => a.time - b.time)
+  }
+
+  // Per-issue analysis (todas as issues)
+  const allAnalyses: IssueAnalysis[] = allIssues.map((issue) => {
+    const cfg = configByProject.get(issue.space)
+    const transitions = transitionsByIssue.get(issue._id) ?? []
+    const approvedSet = effectiveApproved(issue.space)
+
+    const firstApprovalTrans = transitions.find((t) => approvedSet.has(t.newStatus))
+
+    let cycleStartTime = issue.createdOn ?? issue.modifiedOn ?? 0
+    if (cfg?.cycleStartStatus != null) {
+      const csTrans = transitions.find((t) => t.newStatus === cfg.cycleStartStatus)
+      if (csTrans != null) cycleStartTime = csTrans.time
+    }
+
+    const reworkCount =
+      firstApprovalTrans != null && cfg != null
+        ? transitions.filter(
+            (t) => t.time < firstApprovalTrans.time && cfg.reworkSet.has(t.newStatus)
+          ).length
+        : 0
+
+    return {
+      issue,
+      firstApproval: firstApprovalTrans?.time,
+      cycleStart: cycleStartTime,
+      reworkCount
+    }
   })
+
+  // === Filtro client-side por usuário/equipe (só para as métricas) ===
+  const teamForFilter = filters.teamId !== '' ? teams.find((t) => t._id === filters.teamId) : undefined
+  const memberSet =
+    teamForFilter != null ? new Set(teamForFilter.members.map((m) => m.person)) : undefined
+
+  const matchesFilter = (i: Issue): boolean => {
+    if (filters.userId !== '') {
+      return (i.assignee ?? []).includes(filters.userId as Ref<Person>)
+    }
+    if (memberSet != null) {
+      return (i.assignee ?? []).some((a) => memberSet.has(a))
+    }
+    return true
+  }
+
+  const activeIssues = allActiveIssues.filter(matchesFilter)
+  const analyses = allAnalyses.filter((a) => matchesFilter(a.issue))
 
   // === M2: Overdue ===
   // Compara só a data (zera a hora) — uma tarefa que vence "hoje" não está atrasada,
@@ -160,12 +247,13 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
     d.setHours(0, 0, 0, 0)
     return d.getTime()
   })()
-  const overdueIssues = activeIssues.filter((i) => {
+  const isOverdue = (i: Issue): boolean => {
     if (i.dueDate == null) return false
     const due = new Date(i.dueDate)
     due.setHours(0, 0, 0, 0)
     return due.getTime() < todayStart
-  })
+  }
+  const overdueIssues = activeIssues.filter(isOverdue)
   const overduePct = activeIssues.length > 0
     ? Math.round((overdueIssues.length / activeIssues.length) * 100)
     : 0
@@ -195,11 +283,14 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
       issues: activeIssues.map((i) => ({ issue: i }))
     }
   } else {
+    // multi-assignee: issue conta na carga de cada responsável.
+    // Com equipe filtrada, só membros entram na contagem.
     const byAssignee = new Map<Ref<Person>, number>()
     for (const i of activeIssues) {
-      if (i.assignee == null) continue
-      const key = i.assignee as Ref<Person>
-      byAssignee.set(key, (byAssignee.get(key) ?? 0) + 1)
+      for (const key of i.assignee ?? []) {
+        if (memberSet != null && !memberSet.has(key)) continue
+        byAssignee.set(key, (byAssignee.get(key) ?? 0) + 1)
+      }
     }
     const sortedAssignees = [...byAssignee.entries()].sort((a, b) => b[1] - a[1])
     if (sortedAssignees.length === 0) {
@@ -220,11 +311,16 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
       const topName = topPerson != null ? formatName(topPerson.name ?? '') : '?'
       // Inclui também issues sem assignee — o drill-down agrupa por pessoa
       // e mostra "Sem responsável" como linha extra.
+      const issueWeight = (i: (typeof activeIssues)[number]): number => {
+        const counts = (i.assignee ?? []).map((a) => byAssignee.get(a) ?? 0)
+        return counts.length > 0 ? Math.max(...counts) : -1
+      }
+      const issueKey = (i: (typeof activeIssues)[number]): string => (i.assignee ?? []).join(',')
       const sortedIssues = [...activeIssues].sort((a, b) => {
-        const ca = a.assignee != null ? byAssignee.get(a.assignee as Ref<Person>) ?? 0 : -1
-        const cb = b.assignee != null ? byAssignee.get(b.assignee as Ref<Person>) ?? 0 : -1
+        const ca = issueWeight(a)
+        const cb = issueWeight(b)
         if (cb !== ca) return cb - ca
-        return (a.assignee ?? '').localeCompare(b.assignee ?? '')
+        return issueKey(a).localeCompare(issueKey(b))
       })
       workload = {
         value: String(topCount),
@@ -235,61 +331,11 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
     }
   }
 
-  // === Activity log for status transitions ===
-  const issueIds = issues.map((i) => i._id)
-  const transitionsByIssue = new Map<Ref<Issue>, Transition[]>()
-  if (issueIds.length > 0) {
-    const messages = (await client.findAll(activity.class.DocUpdateMessage, {
-      objectId: { $in: issueIds }
-    })) as DocUpdateMessage[]
-
-    for (const m of messages) {
-      const upd = m.attributeUpdates
-      if (upd?.attrKey !== 'status') continue
-      const next = upd.set?.[0]
-      if (typeof next !== 'string' || next.length === 0) continue
-      const issueId = m.objectId as Ref<Issue>
-      const list = transitionsByIssue.get(issueId) ?? []
-      list.push({ time: m.modifiedOn ?? m.createdOn ?? 0, newStatus: next as Ref<IssueStatus> })
-      transitionsByIssue.set(issueId, list)
-    }
-    for (const list of transitionsByIssue.values()) list.sort((a, b) => a.time - b.time)
-  }
-
-  // 6. Per-issue analysis
-  const analyses: IssueAnalysis[] = issues.map((issue) => {
-    const cfg = configByProject.get(issue.space)
-    const transitions = transitionsByIssue.get(issue._id) ?? []
-    const approvedSet = effectiveApproved(issue.space)
-
-    const firstApprovalTrans = transitions.find((t) => approvedSet.has(t.newStatus))
-
-    let cycleStartTime = issue.createdOn ?? issue.modifiedOn ?? 0
-    if (cfg?.cycleStartStatus != null) {
-      const csTrans = transitions.find((t) => t.newStatus === cfg.cycleStartStatus)
-      if (csTrans != null) cycleStartTime = csTrans.time
-    }
-
-    const reworkCount =
-      firstApprovalTrans != null && cfg != null
-        ? transitions.filter(
-            (t) => t.time < firstApprovalTrans.time && cfg.reworkSet.has(t.newStatus)
-          ).length
-        : 0
-
-    return {
-      issue,
-      firstApproval: firstApprovalTrans?.time,
-      cycleStart: cycleStartTime,
-      reworkCount
-    }
-  })
-
   // 7. Approved-in-period subset
   const { dateFrom, dateTo } = filters
-  const approvedInPeriod = analyses.filter(
-    (a) => a.firstApproval != null && a.firstApproval >= dateFrom && a.firstApproval <= dateTo
-  )
+  const inPeriod = (a: IssueAnalysis): boolean =>
+    a.firstApproval != null && a.firstApproval >= dateFrom && a.firstApproval <= dateTo
+  const approvedInPeriod = analyses.filter(inPeriod)
 
   // === M1: On Time ===
   let onTime: MetricResult
@@ -333,10 +379,11 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
   }
 
   // === M5 + M6: rework metrics ===
-  const withReworkConfig = approvedInPeriod.filter((a) => {
+  const hasReworkConfig = (a: IssueAnalysis): boolean => {
     const cfg = configByProject.get(a.issue.space)
     return cfg != null && cfg.reworkSet.size > 0
-  })
+  }
+  const withReworkConfig = approvedInPeriod.filter(hasReworkConfig)
 
   let approvedNoChanges: MetricResult
   let reworkCycles: MetricResult
@@ -415,5 +462,99 @@ export async function computeMetrics (client: Client, filters: DashboardFilters)
     }
   }
 
-  return { onTime, overdue, workload, cycleTime, approvedNoChanges, reworkCycles, waitingApproval }
+  // === Ranking de equipes ===
+  // Obedece BU/Projeto/Etapa/Período; ignora teamId/userId (compara todas as
+  // equipes entre si — a equipe filtrada é só destacada na UI). Uma issue com
+  // dois membros da mesma equipe conta uma vez para a equipe; uma pessoa em
+  // duas equipes conta para ambas (consistente com multi-assignee).
+  const rankedTeams = teams.filter((t) => !t.archived && t.members.length > 0)
+  const ranking: TeamRankingRow[] = []
+  if (rankedTeams.length > 0) {
+    const personTeams = new Map<Ref<Person>, Set<Ref<Team>>>()
+    for (const t of rankedTeams) {
+      for (const m of t.members) {
+        const set = personTeams.get(m.person) ?? new Set()
+        set.add(t._id)
+        personTeams.set(m.person, set)
+      }
+    }
+    const teamsOf = (i: Issue): Set<Ref<Team>> => {
+      const result = new Set<Ref<Team>>()
+      for (const a of i.assignee ?? []) {
+        const set = personTeams.get(a)
+        if (set != null) for (const t of set) result.add(t)
+      }
+      return result
+    }
+
+    interface TeamAgg {
+      active: number
+      overdue: number
+      approvedCount: number
+      cycleSum: number
+      withDue: number
+      onTimeCount: number
+      reworkN: number
+      reworkSum: number
+    }
+    const aggByTeam = new Map<Ref<Team>, TeamAgg>()
+    const aggOf = (id: Ref<Team>): TeamAgg => {
+      let agg = aggByTeam.get(id)
+      if (agg == null) {
+        agg = { active: 0, overdue: 0, approvedCount: 0, cycleSum: 0, withDue: 0, onTimeCount: 0, reworkN: 0, reworkSum: 0 }
+        aggByTeam.set(id, agg)
+      }
+      return agg
+    }
+
+    for (const i of allActiveIssues) {
+      const od = isOverdue(i)
+      for (const tid of teamsOf(i)) {
+        const agg = aggOf(tid)
+        agg.active++
+        if (od) agg.overdue++
+      }
+    }
+
+    for (const a of allAnalyses) {
+      if (!inPeriod(a)) continue
+      const cycleDays = ((a.firstApproval as number) - a.cycleStart) / DAY_MS
+      const due = a.issue.dueDate
+      const onTimeHit = due != null && (a.firstApproval as number) <= due
+      const rework = hasReworkConfig(a)
+      for (const tid of teamsOf(a.issue)) {
+        const agg = aggOf(tid)
+        agg.approvedCount++
+        agg.cycleSum += cycleDays
+        if (due != null) {
+          agg.withDue++
+          if (onTimeHit) agg.onTimeCount++
+        }
+        if (rework) {
+          agg.reworkN++
+          agg.reworkSum += a.reworkCount
+        }
+      }
+    }
+
+    for (const t of rankedTeams) {
+      const agg = aggByTeam.get(t._id)
+      ranking.push({
+        team: t,
+        memberCount: t.members.length,
+        activeCount: agg?.active ?? 0,
+        onTimePct:
+          agg != null && agg.withDue > 0 ? Math.round((agg.onTimeCount / agg.withDue) * 100) : null,
+        overduePct:
+          agg != null && agg.active > 0 ? Math.round((agg.overdue / agg.active) * 100) : null,
+        avgCycleDays: agg != null && agg.approvedCount > 0 ? agg.cycleSum / agg.approvedCount : null,
+        avgRework: agg != null && agg.reworkN > 0 ? agg.reworkSum / agg.reworkN : null
+      })
+    }
+  }
+
+  return {
+    metrics: { onTime, overdue, workload, cycleTime, approvedNoChanges, reworkCycles, waitingApproval },
+    ranking
+  }
 }

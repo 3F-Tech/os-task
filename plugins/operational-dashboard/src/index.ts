@@ -29,6 +29,21 @@ export interface BusinessUnit extends Doc {
 }
 
 /** @public */
+export interface TeamMember {
+  person: Ref<Person>
+  role: string
+}
+
+/** @public */
+export interface Team extends Doc {
+  name: string
+  description?: string
+  color: number
+  archived: boolean
+  members: TeamMember[]
+}
+
+/** @public */
 export interface ProjectWithBU extends Project {
   businessUnit?: Ref<BusinessUnit>
 }
@@ -46,7 +61,8 @@ export const operationalDashboardId = 'operational-dashboard' as Plugin
 
 export default plugin(operationalDashboardId, {
   class: {
-    BusinessUnit: '' as Ref<Class<BusinessUnit>>
+    BusinessUnit: '' as Ref<Class<BusinessUnit>>,
+    Team: '' as Ref<Class<Team>>
   },
   mixin: {
     ProjectWithBU: '' as Ref<Mixin<ProjectWithBU>>,
@@ -138,17 +154,40 @@ export default plugin(operationalDashboardId, {
     TotalEstimation: '' as IntlString,
     Unassigned: '' as IntlString,
     Hours: '' as IntlString,
-    NoIssuesInMetric: '' as IntlString
+    NoIssuesInMetric: '' as IntlString,
+    Teams: '' as IntlString,
+    Team: '' as IntlString,
+    NewTeam: '' as IntlString,
+    EditTeam: '' as IntlString,
+    NoTeams: '' as IntlString,
+    TeamNamePlaceholder: '' as IntlString,
+    Members: '' as IntlString,
+    AddMember: '' as IntlString,
+    Role: '' as IntlString,
+    RoleLeader: '' as IntlString,
+    RoleManager: '' as IntlString,
+    RoleMember: '' as IntlString,
+    RolePlaceholder: '' as IntlString,
+    AllTeams: '' as IntlString,
+    TeamRanking: '' as IntlString,
+    RankBy: '' as IntlString,
+    NoTeamsForRanking: '' as IntlString,
+    ActiveTasks: '' as IntlString,
+    Position: '' as IntlString
   },
   icon: {
     Dashboard: '' as Asset,
-    BusinessUnit: '' as Asset
+    BusinessUnit: '' as Asset,
+    Team: '' as Asset
   },
   component: {
     Dashboard: '' as AnyComponent,
     BUManagement: '' as AnyComponent,
     EditBusinessUnit: '' as AnyComponent,
     MetricsConfig: '' as AnyComponent,
-    EditProjectMetricsConfig: '' as AnyComponent
+    EditProjectMetricsConfig: '' as AnyComponent,
+    TeamManagement: '' as AnyComponent,
+    EditTeam: '' as AnyComponent,
+    TeamRanking: '' as AnyComponent
   }
 })

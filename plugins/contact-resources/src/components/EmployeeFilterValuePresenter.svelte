@@ -19,6 +19,14 @@
   import contact from '../plugin'
 
   export let value: Ref<Person>[]
+
+  // ObjectFilter guarda refs diretas; ArrayFilter guarda tuplas [chave, [refs]] —
+  // achata os dois formatos para a lista de refs reais
+  $: items = Array.from(
+    new Set(
+      (value ?? []).flatMap((v) => (Array.isArray(v) ? (Array.isArray(v[1]) ? v[1] : []) : [v]))
+    )
+  ) as Ref<Person>[]
 </script>
 
-<CombineAvatars _class={contact.mixin.Employee} items={value} limit={5} size={'x-small'} />
+<CombineAvatars _class={contact.mixin.Employee} {items} limit={5} size={'x-small'} />

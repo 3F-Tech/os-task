@@ -319,7 +319,9 @@ export function findAttributePresenter (
 
   const attribute = hierarchy.findAttribute(_class, key)
   if (attribute === undefined) return
-  const { attrClass, category } = getAttributePresenterClass(hierarchy, attribute.type)
+  const { attrClass, category: attrCategory } = getAttributePresenterClass(hierarchy, attribute.type)
+  // respeita o override de categoria (ex.: ArrayFilter pede presenter escalar p/ valores individuais)
+  const category = _category ?? attrCategory
   let overridedPresenter = model.findAllSync(view.class.AttrPresenter, {
     objectClass: _class,
     attribute: attribute._id,
@@ -970,22 +972,26 @@ resolvedLocationStore.subscribe(() => {
 
 export function groupBy<T extends Doc> (docs: T[], key: string, categories?: CategoryType[]): Record<any, T[]> {
   return docs.reduce((storage: Record<string, T[]>, item: T) => {
-    let group = getObjectValue(key, item) ?? undefined
+    const value = getObjectValue(key, item) ?? undefined
+    // valores array (ex.: multi-assignee) entram em um grupo por elemento
+    const groups: any[] = Array.isArray(value) ? (value.length > 0 ? value : [undefined]) : [value]
 
-    if (categories !== undefined) {
-      for (const c of categories) {
-        if (typeof c === 'object') {
-          const st = c.values.find((it) => it._id === group)
-          if (st !== undefined) {
-            group = st.name
-            break
+    for (let group of groups) {
+      if (categories !== undefined) {
+        for (const c of categories) {
+          if (typeof c === 'object') {
+            const st = c.values.find((it) => it._id === group)
+            if (st !== undefined) {
+              group = st.name
+              break
+            }
           }
         }
       }
-    }
 
-    storage[group] = storage[group] ?? []
-    storage[group].push(item)
+      storage[group] = storage[group] ?? []
+      storage[group].push(item)
+    }
 
     return storage
   }, {})
@@ -1068,7 +1074,11 @@ export async function getCategories (
     _class,
     space,
     key,
-    docs.map((it) => getObjectValue(key, it) ?? undefined),
+    docs.flatMap((it) => {
+      const value = getObjectValue(key, it) ?? undefined
+      // valores array (ex.: multi-assignee) geram uma categoria por elemento
+      return Array.isArray(value) ? (value.length > 0 ? value : [undefined]) : [value]
+    }),
     viewletDescriptorId
   )
 }

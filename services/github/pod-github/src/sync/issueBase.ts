@@ -499,16 +499,20 @@ export abstract class IssueSyncManagerBase {
       }
     }
     if (platformUpdate.assignee !== undefined) {
-      const info =
-        platformUpdate.assignee !== null
-          ? await this.provider.getGithubLogin(container.container, platformUpdate.assignee)
-          : undefined
+      // multi-assignee: mapeia cada responsável para o login do GitHub
+      const assigneeIds: string[] = []
+      for (const assignee of platformUpdate.assignee ?? []) {
+        const info = await this.provider.getGithubLogin(container.container, assignee)
+        if (info !== undefined) {
+          assigneeIds.push(info.id)
+        }
+      }
       // Check external
 
       const currentAssignees = (issueExternal.assignees.nodes ?? []).map((it) => it.id)
       currentAssignees.sort((a, b) => a.localeCompare(b))
 
-      issueUpdate.assigneeIds = info !== undefined ? [info.id] : []
+      issueUpdate.assigneeIds = assigneeIds
       issueUpdate.assigneeIds.sort((a, b) => a.localeCompare(b))
 
       if (deepEqual(currentAssignees, issueUpdate.assigneeIds)) {
@@ -587,7 +591,7 @@ export abstract class IssueSyncManagerBase {
     }
     if (!deepEqual(previousExternal.assignees, issueExternal.assignees)) {
       const assignees = await this.getAssignees(issueExternal)
-      update.assignee = assignees?.[0] ?? null
+      update.assignee = assignees != null && assignees.length > 0 ? assignees.slice(0, 3) : null
     }
     if (Object.keys(update).length > 0) {
       await this.handleUpdate(ctx, issueExternal, derivedClient, update, account, container.project, false)

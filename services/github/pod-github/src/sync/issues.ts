@@ -226,7 +226,7 @@ export class IssueSyncManager extends IssueSyncManagerBase implements DocSyncMan
         const assignees = await this.getAssigneesI(event.issue)
         const persons = await this.getPersonsFromId(assignees)
         const update: IssueUpdate = {
-          assignee: persons?.[0] ?? null
+          assignee: persons != null && persons.length > 0 ? persons.slice(0, 3) : null
         }
         await this.handleUpdate(ctx, externalData as IssueExternalData, derivedClient, update, account, prj, false)
         break
@@ -470,7 +470,7 @@ export class IssueSyncManager extends IssueSyncManagerBase implements DocSyncMan
     const issueData = {
       title: issueExternal.title,
       description: await this.provider.getMarkupSafe(container.container, issueExternal.body, this.stripGuestLink),
-      assignee: assignees[0],
+      assignee: assignees.length > 0 ? assignees.slice(0, 3) : null,
       repository: info.repository,
       remainingTime: 0
     }
@@ -757,12 +757,13 @@ export class IssueSyncManager extends IssueSyncManagerBase implements DocSyncMan
 
     const repoId = repository.nodeId
 
-    const info =
-      existingIssue.assignee !== null
-        ? await this.provider.getGithubLogin(container.container, existingIssue.assignee)
-        : undefined
-
-    const assigneeIds = info !== undefined ? [info.id] : []
+    const assigneeIds: string[] = []
+    for (const assignee of existingIssue.assignee ?? []) {
+      const assigneeInfo = await this.provider.getGithubLogin(container.container, assignee)
+      if (assigneeInfo !== undefined) {
+        assigneeIds.push(assigneeInfo.id)
+      }
+    }
 
     const q = `mutation createIssue($repo:ID!, $title: String!, $body: String, $assigneeIds: [ID!]) {
       createIssue(

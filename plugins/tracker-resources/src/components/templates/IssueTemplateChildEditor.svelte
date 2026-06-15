@@ -82,6 +82,7 @@
       pdcaCycleResetStatus: undefined,
       pdcaCycleDueDays: [],
       pdcaCycleDuplicate: false,
+      pdcaCycleResetSubIssues: false,
       _class: tracker.class.IssueTemplate,
       kind: undefined
     }

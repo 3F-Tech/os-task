@@ -88,7 +88,7 @@
   const doc: Applicant = {
     status: '' as Ref<TaskStatus>,
     number: 0,
-    assignee,
+    assignee: assignee != null ? [assignee] : null,
     rank: '',
     attachedTo: candidate,
     attachedToClass: recruit.mixin.Candidate,
@@ -109,6 +109,10 @@
   const client = getClient()
   const hierarchy = client.getHierarchy()
   fillDefaults(hierarchy, doc, recruit.class.Applicant)
+
+  // multi-assignee: EmployeeBox edita o primeiro (e único) recrutador
+  let assigneeSingle: Ref<Employee> | null = (doc.assignee?.[0] as Ref<Employee>) ?? null
+  $: doc.assignee = assigneeSingle != null ? [assigneeSingle] : null
 
   export function canClose (): boolean {
     return (preserveCandidate || _candidate === undefined) && assignee === undefined
@@ -376,7 +380,7 @@
         focusIndex={2}
         label={assignAttr.label}
         placeholder={assignAttr.label}
-        bind:value={doc.assignee}
+        bind:value={assigneeSingle}
         allowDeselect
         showNavigate={false}
         kind={'regular'}

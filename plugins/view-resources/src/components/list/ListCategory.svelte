@@ -80,6 +80,7 @@
   export let dragItem: {
     doc?: Doc
     revert?: () => void
+    fromCategory?: PrimitiveType | AggregateValue
   }
   export let listDiv: HTMLDivElement
   // export let index: number
@@ -334,7 +335,19 @@
       if (props !== undefined) {
         for (const key in props) {
           const value = props[key]
-          if ((dragItem.doc as any)[key] !== value) {
+          const current = (dragItem.doc as any)[key]
+          if (Array.isArray(current) && !Array.isArray(value)) {
+            // campo multi-valor (ex.: assignee): troca o valor da categoria de origem pelo de destino
+            const from = typeof dragItem.fromCategory === 'object' ? undefined : dragItem.fromCategory
+            let next = current.filter((it: any) => it !== from)
+            if (value != null && !next.includes(value)) {
+              next = [...next, value]
+            }
+            const changed = next.length !== current.length || next.some((it: any, idx: number) => it !== current[idx])
+            if (changed) {
+              ;(update as any)[key] = next.length > 0 ? next : null
+            }
+          } else if (current !== value) {
             ;(update as any)[key] = value
           }
         }
@@ -347,6 +360,7 @@
     }
     dragItem.doc = undefined
     dragItem.revert = undefined
+    dragItem.fromCategory = undefined
     dragItemIndex = undefined
   }
 
@@ -379,6 +393,7 @@
     ev.target?.addEventListener('dragend', (e) => dragEndListener(e, i))
     dragItem = {
       doc: docObject,
+      fromCategory: category,
       revert: () => {
         const d = items.find((it) => it._id === docObject._id)
         if (d === undefined) {

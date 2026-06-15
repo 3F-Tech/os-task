@@ -53,7 +53,11 @@
   export let checked: Doc[] = []
   export let dontUpdateRank: boolean = false
 
-  export let getUpdateProps: (doc: Doc, state: CategoryType) => DocumentUpdate<Item> | undefined
+  export let getUpdateProps: (
+    doc: Doc,
+    state: CategoryType,
+    fromState?: CategoryType
+  ) => DocumentUpdate<Item> | undefined
   export let getAvailableCategories: ((doc: Doc) => Promise<CategoryType[]>) | undefined = undefined
 
   const dispatch = createEventDispatcher()
@@ -73,7 +77,7 @@
       return
     }
 
-    let updates = getUpdateProps(dragCard, state)
+    let updates = getUpdateProps(dragCard, state, dragCardInitialState)
 
     if (updates === undefined) {
       panelDragLeave(undefined, dragCardState)
@@ -125,7 +129,7 @@
         return
       }
 
-      const updates = getUpdateProps(dragCard, state)
+      const updates = getUpdateProps(dragCard, state, dragCardInitialState)
       if (updates === undefined) {
         return
       }
@@ -187,7 +191,7 @@
 
   function cardDragOver (evt: CardDragEvent, object: Item, state: CategoryType): void {
     if (dragCard !== undefined && !dontUpdateRank) {
-      const updates = getUpdateProps(dragCard, state)
+      const updates = getUpdateProps(dragCard, state, dragCardInitialState)
       if (updates === undefined) {
         return
       }
@@ -236,7 +240,7 @@
       const s = arr.findIndex((p) => p._id === dragCard?._id)
       if (s !== -1) {
         dragCard.rank = makeRank(arr[s - 1]?.rank, arr[s + 1]?.rank)
-        const updates = getUpdateProps(dragCard, state)
+        const updates = getUpdateProps(dragCard, state, dragCardInitialState)
 
         if (updates === undefined) {
           await client.update(dragCard, { rank: dragCard.rank })

@@ -14,7 +14,9 @@
 -->
 <script lang="ts">
   import { AttachmentsPresenter } from '@hcengineering/attachment-resources'
-  import {
+  import { Person } from '@hcengineering/contact'
+  import core, {
+    AnyAttribute,
     CategoryType,
     Class,
     Doc,
@@ -22,6 +24,7 @@
     DocumentUpdate,
     FindOptions,
     generateId,
+    getObjectValue,
     Lookup,
     mergeQueries,
     Ref,
@@ -29,7 +32,7 @@
   } from '@hcengineering/core'
   import { Item, Kanban as KanbanUI } from '@hcengineering/kanban'
   import notification from '@hcengineering/notification'
-  import { ActionContext, createQuery, getClient } from '@hcengineering/presentation'
+  import { ActionContext, createQuery, getAttributePresenterClass, getClient } from '@hcengineering/presentation'
   import tags from '@hcengineering/tags'
   import { DocWithRank, getStates } from '@hcengineering/task'
   import { getTaskKanbanResultQuery, typeStore, updateTaskKanbanCategories } from '@hcengineering/task-resources'
@@ -48,6 +51,8 @@
   } from '@hcengineering/ui'
   import view, { AttributeModel, BuildModelKey, Viewlet, ViewOptionModel, ViewOptions } from '@hcengineering/view'
   import {
+    buildConfigLookup,
+    buildModel,
     enabledConfig,
     focusStore,
     getCategoryQueryNoLookup,
@@ -70,9 +75,10 @@
 
   import tracker from '../../plugin'
   import { activeProjects } from '../../utils'
-  import ComponentEditor from '../components/ComponentEditor.svelte'
   import CreateIssue from '../CreateIssue.svelte'
   import AssigneeEditor from './AssigneeEditor.svelte'
+  import ClientNamePresenter from './ClientNamePresenter.svelte'
+  import ClientStagePresenter from './ClientStagePresenter.svelte'
   import DueDatePresenter from './DueDatePresenter.svelte'
   import SubIssuesSelector from './edit/SubIssuesSelector.svelte'
   import IssuePresenter from './IssuePresenter.svelte'
@@ -80,7 +86,6 @@
   import PriorityEditor from './PriorityEditor.svelte'
   import StatusEditor from './StatusEditor.svelte'
   import EstimationEditor from './timereport/EstimationEditor.svelte'
-  import MilestoneEditor from '../milestones/MilestoneEditor.svelte'
 
   const _class = tracker.class.Issue
   export let space: Ref<Project> | undefined = undefined
@@ -109,6 +114,7 @@
 
   let resultQuery: DocumentQuery<any> = { ...query }
   const client = getClient()
+  const hierarchy = client.getHierarchy()
 
   $: void getTaskKanbanResultQuery(client.getHierarchy(), query, viewOptionsConfig, viewOptions).then((p) => {
     resultQuery = mergeQueries(p, query)
@@ -120,12 +126,47 @@
     return object as WithLookup<Issue>
   }
 
-  const lookup: Lookup<Issue> = {
+  // Atributos personalizados (Settings → Classes em Issue) — sempre renderizados no card
+  let customAttrs: AnyAttribute[] = []
+  const customAttrsQuery = createQuery()
+  $: customAttrsQuery.query(core.class.Attribute, { attributeOf: _class, isCustom: true }, (res) => {
+    customAttrs = res.filter(
+      (a) =>
+        a.hidden !== true &&
+        a.label !== undefined &&
+        !hierarchy.isDerived(a.type._class, core.class.Collection) &&
+        !hierarchy.isDerived(a.type._class, core.class.TypeMarkup) &&
+        !hierarchy.isDerived(a.type._class, core.class.TypeCollaborativeDoc)
+    )
+  })
+
+  // espelha ViewletSetting.getValue(): RefTo sem AttributePresenter no target → key $lookup
+  function customKey (attr: AnyAttribute): string {
+    const { attrClass } = getAttributePresenterClass(hierarchy, attr.type)
+    const presenter = hierarchy.classHierarchyMixin(attrClass, view.mixin.AttributePresenter)?.presenter
+    if (presenter === undefined && hierarchy.isDerived(attr.type._class, core.class.RefTo)) {
+      return '$lookup.' + attr.name
+    }
+    return attr.name
+  }
+  $: customKeys = customAttrs.map(customKey)
+
+  let lookup: Lookup<Issue>
+  $: lookup = buildConfigLookup(hierarchy, _class, customKeys, {
     ...(options?.lookup ?? {}),
     attachedTo: tracker.class.Issue,
     _id: {
       subIssues: tracker.class.Issue
     }
+  } as Lookup<Issue>)
+
+  let customModels: AttributeModel[] = []
+  $: void buildModel({ client, _class, keys: customKeys, lookup, ignoreMissing: true }).then((res) => {
+    customModels = res
+  })
+
+  function isEmpty (value: any): boolean {
+    return value == null || value === '' || (Array.isArray(value) && value.length === 0)
   }
 
   $: resultOptions = { ...options, lookup, ...(orderBy !== undefined ? { sort: { [orderBy[0]]: orderBy[1] } } : {}) }
@@ -232,20 +273,44 @@
     if (groupByKey === noCategory) {
       headerComponent = undefined
     } else {
-      void getPresenter(client, _class, { key: groupByKey }, { key: groupByKey }).then((p) => {
-        headerComponent = p
-      })
+      // agrupamento por atributo array espalha os valores em buckets escalares,
+      // então o header recebe um elemento — usa o presenter escalar ('attribute')
+      const attr = hierarchy.findAttribute(_class, groupByKey)
+      const category = attr?.type._class === core.class.ArrOf ? 'attribute' : undefined
+      void getPresenter(client, _class, { key: groupByKey }, { key: groupByKey }, undefined, false, category).then(
+        (p) => {
+          headerComponent = p
+        }
+      )
     }
   }
 
   let headerComponent: AttributeModel | undefined
   $: getHeader(_class, groupByKey)
 
-  const getUpdateProps = (doc: Doc, category: CategoryType): DocumentUpdate<Item> | undefined => {
+  const getUpdateProps = (
+    doc: Doc,
+    category: CategoryType,
+    fromCategory?: CategoryType
+  ): DocumentUpdate<Item> | undefined => {
     const groupValue =
       typeof category === 'object' ? category.values.find((it) => it.space === doc.space)?._id : category
     if (groupValue === undefined) {
       return undefined
+    }
+    if (groupByKey === IssuesGrouping.Assignee) {
+      // multi-assignee: arrastar entre colunas troca o responsável de origem pelo de destino
+      const current = toIssue(doc).assignee ?? []
+      const from = typeof fromCategory === 'object' ? undefined : (fromCategory as Ref<Person> | undefined)
+      let next = current.filter((it) => it !== from)
+      if (!next.includes(groupValue as Ref<Person>)) {
+        next = [...next, groupValue as Ref<Person>]
+      }
+      next = next.slice(0, 3)
+      return {
+        assignee: next.length > 0 ? next : null,
+        space: doc.space
+      } as DocumentUpdate<Item>
     }
     return {
       [groupByKey]: groupValue,
@@ -428,30 +493,63 @@
                 justify={'center'}
               />
             {/if}
-            {#if enabledConfig(config, 'component')}
-              <ComponentEditor
-                value={issue}
-                {space}
-                isEditable={true}
-                kind={'link-bordered'}
-                size={'small'}
-                justify={'center'}
-              />
+            {#if enabledConfig(config, 'clientName') && issue.clientName}
+              <div class="client-chip">
+                <ClientNamePresenter value={issue} />
+              </div>
             {/if}
-            {#if enabledConfig(config, 'milestone')}
-              <MilestoneEditor
-                value={issue}
-                {space}
-                isEditable={true}
-                kind={'link-bordered'}
-                size={'small'}
-                justify={'center'}
-              />
+            {#if enabledConfig(config, 'clientStage') && issue.clientStage != null}
+              <div class="client-chip">
+                <ClientStagePresenter value={issue} />
+              </div>
             {/if}
             {#if enabledConfig(config, 'dueDate')}
               <DueDatePresenter value={issue} size={'small'} kind={'link-bordered'} />
             {/if}
           </div>
+          {#if customModels.length > 0}
+            <div class="card-custom-attrs">
+              {#each customModels as m (m.key)}
+                {@const v = getObjectValue(m.key, object)}
+                {#if !isEmpty(v)}
+                  <div class="custom-chip">
+                    {#if m.attribute?.type?._class === core.class.EnumOf}
+                      <svelte:component
+                        this={m.presenter}
+                        value={v}
+                        label={m.label}
+                        attribute={m.attribute}
+                        kind={'list'}
+                        size={'small'}
+                        {...(m.props ?? {})}
+                        type={m.attribute.type}
+                        readonly
+                        disabled
+                        editable={false}
+                        isEditable={false}
+                      />
+                    {:else}
+                      <svelte:component
+                        this={m.presenter}
+                        value={v}
+                        object={issue}
+                        space={issue.space}
+                        label={m.label}
+                        attribute={m.attribute}
+                        kind={'list'}
+                        size={'small'}
+                        {...(m.props ?? {})}
+                        readonly
+                        disabled
+                        editable={false}
+                        isEditable={false}
+                      />
+                    {/if}
+                  </div>
+                {/if}
+              {/each}
+            </div>
+          {/if}
           {#if enabledConfig(config, 'labels')}
             <div class="card-labels labels">
               <Component
@@ -543,6 +641,28 @@
         width: calc(100% - 2rem);
         border-radius: 0 0.24rem 0.24rem 0;
       }
+    }
+    .card-custom-attrs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin: 0.25rem 0.75rem 0 1rem;
+      min-width: 0;
+    }
+    .custom-chip {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      max-width: 100%;
+      font-size: 0.75rem;
+    }
+    .client-chip {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      max-width: 8rem;
+      overflow: hidden;
+      margin-left: 0.25rem;
     }
     .card-footer {
       margin-top: 1rem;

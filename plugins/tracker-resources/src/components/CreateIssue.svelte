@@ -175,7 +175,7 @@
       ...draft,
       ...(status != null ? { status } : {}),
       ...(priority != null ? { priority } : {}),
-      ...(assignee != null ? { assignee } : {}),
+      ...(assignee != null ? { assignee: [assignee] } : {}),
       ...(component != null ? { component } : {}),
       ...(milestone != null ? { milestone } : {}),
       ...(_parentIssue !== undefined ? { parentIssue: _parentIssue._id } : {})
@@ -196,7 +196,7 @@
       estimation: 0,
       milestone: milestone ?? $activeMilestone ?? null,
       status,
-      assignee,
+      assignee: assignee != null ? [assignee] : null,
       labels: [],
       parentIssue: parentIssue?._id,
       subIssues: [],
@@ -263,7 +263,12 @@
   }
 
   $: empty = {
-    assignee: assignee ?? currentProject?.defaultAssignee,
+    assignee:
+      assignee != null
+        ? [assignee]
+        : currentProject?.defaultAssignee != null
+          ? [currentProject.defaultAssignee]
+          : undefined,
     status: status ?? currentProject?.defaultIssueStatus,
     parentIssue: parentIssue?._id,
     description: EmptyMarkup,
@@ -318,7 +323,7 @@
     isAssigneeTouched = true
     object.assignee = detail
     manager.setFocusPos(5)
-    if (detail != null) void activateInView('assignee')
+    if (detail != null && detail.length > 0) void activateInView('assignee')
   }
 
   function onAttachmentRemoved (result: any): void {
@@ -541,15 +546,20 @@
   }
 
   function resetDefaultAssigneeId (): void {
-    if (!isAssigneeTouched && !(object.assignee == null) && object.assignee === currentProject?.defaultAssignee) {
-      object = { ...object, assignee: assignee ?? null }
+    if (
+      !isAssigneeTouched &&
+      object.assignee != null &&
+      object.assignee.length === 1 &&
+      object.assignee[0] === currentProject?.defaultAssignee
+    ) {
+      object = { ...object, assignee: assignee != null ? [assignee] : null }
     }
   }
 
   function updateAssigneeId (object: IssueDraft, currentProject: Project | undefined): void {
-    if (!isAssigneeTouched && object.assignee == null && currentProject !== undefined) {
+    if (!isAssigneeTouched && (object.assignee == null || object.assignee.length === 0) && currentProject !== undefined) {
       if (currentProject.defaultAssignee !== undefined) {
-        object.assignee = currentProject.defaultAssignee
+        object.assignee = [currentProject.defaultAssignee]
       } else {
         object.assignee = null
       }
@@ -678,7 +688,8 @@
         pdcaCycleResetStatus: object.pdcaCycleResetStatus,
         pdcaCycleDueDays: object.pdcaCycleDueDays,
         pdcaCycleCustomWeekdays: object.pdcaCycleCustomWeekdays,
-        pdcaCycleDuplicate: object.pdcaCycleDuplicate
+        pdcaCycleDuplicate: object.pdcaCycleDuplicate,
+        pdcaCycleResetSubIssues: object.pdcaCycleResetSubIssues
       } as any
 
       if (!isEmptyMarkup(object.description)) {

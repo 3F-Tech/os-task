@@ -68,7 +68,7 @@
       title: '',
       description: '',
       kind: '' as Ref<TaskType>,
-      assignee: project.defaultAssignee ?? null,
+      assignee: project.defaultAssignee != null ? [project.defaultAssignee] : null,
       status: project.defaultIssueStatus,
       space: project._id,
       dueDate: null,
@@ -85,7 +85,7 @@
   const empty = {
     space: project._id,
     status: project.defaultIssueStatus,
-    assignee: project.defaultAssignee ?? null,
+    assignee: project.defaultAssignee != null ? [project.defaultAssignee] : null,
     component,
     priority: IssuePriority.NoPriority,
     milestone

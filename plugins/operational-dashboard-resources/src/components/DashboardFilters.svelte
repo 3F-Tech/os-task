@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import contact, { formatName, type Person } from '@hcengineering/contact'
-  import { type BusinessUnit, type ProjectWithBU } from '@hcengineering/operational-dashboard'
+  import { type BusinessUnit, type ProjectWithBU, type Team } from '@hcengineering/operational-dashboard'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tracker, { ClientStage, type Project } from '@hcengineering/tracker'
   import { Button, Label } from '@hcengineering/ui'
@@ -36,13 +36,19 @@
   const busQuery = createQuery()
   const projectsQuery = createQuery()
   const personsQuery = createQuery()
+  const teamsQuery = createQuery()
 
   let bus: BusinessUnit[] = []
   let allProjects: Project[] = []
   let persons: Person[] = []
+  let teams: Team[] = []
 
   $: busQuery.query(operationalDashboard.class.BusinessUnit, { archived: false }, (res) => {
     bus = res.slice().sort((a, b) => a.name.localeCompare(b.name))
+  })
+
+  $: teamsQuery.query(operationalDashboard.class.Team, { archived: false }, (res) => {
+    teams = res.slice().sort((a, b) => a.name.localeCompare(b.name))
   })
 
   $: projectsQuery.query(tracker.class.Project, { archived: false }, (res) => {
@@ -69,6 +75,29 @@
     prevBuId = $dashboardFilters.buId
     if ($dashboardFilters.projectId !== '') {
       $dashboardFilters.projectId = ''
+    }
+  }
+
+  // Com equipe selecionada, o select de usuário lista só os membros.
+  $: selectedTeam = teams.find((t) => t._id === $dashboardFilters.teamId)
+  $: filteredPersons =
+    selectedTeam != null
+      ? persons.filter((p) => selectedTeam?.members.some((m) => m.person === p._id))
+      : persons
+
+  // Ao trocar de equipe, limpa o usuário se não for membro da nova equipe.
+  // Busca a equipe localmente (não via selectedTeam) para não criar ciclo
+  // reativo: este bloco escreve em $dashboardFilters.
+  let prevTeamId = $dashboardFilters.teamId
+  $: if ($dashboardFilters.teamId !== prevTeamId) {
+    prevTeamId = $dashboardFilters.teamId
+    const team = teams.find((t) => t._id === $dashboardFilters.teamId)
+    if (
+      $dashboardFilters.userId !== '' &&
+      team != null &&
+      !team.members.some((m) => m.person === $dashboardFilters.userId)
+    ) {
+      $dashboardFilters.userId = ''
     }
   }
 
@@ -141,10 +170,20 @@
   </div>
 
   <div class="filter">
+    <span class="filter-label"><Label label={operationalDashboard.string.Team} /></span>
+    <select bind:value={$dashboardFilters.teamId}>
+      <option value="">— Todas —</option>
+      {#each teams as t (t._id)}
+        <option value={t._id}>{t.name}</option>
+      {/each}
+    </select>
+  </div>
+
+  <div class="filter">
     <span class="filter-label"><Label label={operationalDashboard.string.User} /></span>
     <select bind:value={$dashboardFilters.userId}>
       <option value="">— Todos —</option>
-      {#each persons as p (p._id)}
+      {#each filteredPersons as p (p._id)}
         <option value={p._id}>{formatName(p.name ?? '')}</option>
       {/each}
     </select>

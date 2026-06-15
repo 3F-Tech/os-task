@@ -13,7 +13,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import {
+  import core, {
     CategoryType,
     Class,
     Doc,
@@ -76,6 +76,7 @@
   export let dragItem: {
     doc?: Doc
     revert?: () => void
+    fromCategory?: any
   }
   export let listDiv: HTMLDivElement
   export let selection: number | undefined
@@ -140,7 +141,13 @@
     if (groupByKey === noCategory) {
       headerComponent = undefined
     } else {
-      await getPresenter(client, _class, { key: groupByKey }, { key: groupByKey }).then((p) => (headerComponent = p))
+      // agrupamento por atributo array espalha os valores em buckets escalares,
+      // então o header recebe um elemento — usa o presenter escalar ('attribute')
+      const attr = hierarchy.findAttribute(_class, groupByKey)
+      const category = attr?.type._class === core.class.ArrOf ? 'attribute' : undefined
+      await getPresenter(client, _class, { key: groupByKey }, { key: groupByKey }, undefined, false, category).then(
+        (p) => (headerComponent = p)
+      )
     }
   })
 

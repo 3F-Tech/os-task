@@ -15,14 +15,28 @@
 
 import { type Person } from '@hcengineering/contact'
 import { type Domain, IndexKind, type Ref } from '@hcengineering/core'
-import { ArrOf, Index, Mixin, Model, Prop, TypeBoolean, TypeNumber, TypeRef, TypeString, UX } from '@hcengineering/model'
+import {
+  ArrOf,
+  Index,
+  Mixin,
+  Model,
+  Prop,
+  TypeBoolean,
+  TypeNumber,
+  TypeRecord,
+  TypeRef,
+  TypeString,
+  UX
+} from '@hcengineering/model'
 import contact from '@hcengineering/model-contact'
 import core, { TDoc } from '@hcengineering/model-core'
 import tracker, { TProject } from '@hcengineering/model-tracker'
 import {
   type BusinessUnit,
   type ProjectDashboardConfig,
-  type ProjectWithBU
+  type ProjectWithBU,
+  type Team,
+  type TeamMember
 } from '@hcengineering/operational-dashboard'
 import { type IssueStatus } from '@hcengineering/tracker'
 
@@ -48,6 +62,26 @@ export class TBusinessUnit extends TDoc implements BusinessUnit {
 
   @Prop(TypeBoolean(), operationalDashboard.string.Archived)
     archived!: boolean
+}
+
+@Model(operationalDashboard.class.Team, core.class.Doc, DOMAIN_OPERATIONAL_DASHBOARD)
+@UX(operationalDashboard.string.Team, operationalDashboard.icon.Team)
+export class TTeam extends TDoc implements Team {
+  @Prop(TypeString(), operationalDashboard.string.Name)
+  @Index(IndexKind.FullText)
+    name!: string
+
+  @Prop(TypeString(), operationalDashboard.string.Description)
+    description?: string
+
+  @Prop(TypeNumber(), operationalDashboard.string.Color)
+    color!: number
+
+  @Prop(TypeBoolean(), operationalDashboard.string.Archived)
+    archived!: boolean
+
+  @Prop(ArrOf(TypeRecord()), operationalDashboard.string.Members)
+    members!: TeamMember[]
 }
 
 @Mixin(operationalDashboard.mixin.ProjectWithBU, tracker.class.Project)

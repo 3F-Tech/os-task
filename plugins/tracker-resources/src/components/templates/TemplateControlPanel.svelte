@@ -57,6 +57,7 @@
     'pdcaNextCycleDate',
     'pdcaCycleDueDays',
     'pdcaCycleDuplicate',
+    'pdcaCycleResetSubIssues',
     'clientName',
     'clientStage'
   ])

@@ -63,6 +63,7 @@ import Issues from './components/issues/Issues.svelte'
 import IssueSearchIcon from './components/issues/IssueSearchIcon.svelte'
 import IssueStatusPresenter from './components/issues/IssueStatusPresenter.svelte'
 import ClientStagePresenter from './components/issues/ClientStagePresenter.svelte'
+import ClientStageValuePresenter from './components/issues/ClientStageValuePresenter.svelte'
 import ClientNamePresenter from './components/issues/ClientNamePresenter.svelte'
 import IssueColumnHeader from './components/issues/IssueColumnHeader.svelte'
 import IssuesView from './components/issues/IssuesView.svelte'
@@ -502,6 +503,7 @@ export default async (): Promise<Resources> => ({
     IssueStatusPresenter,
     LabelsView,
     ClientStagePresenter,
+    ClientStageValuePresenter,
     ClientNamePresenter,
     IssueColumnHeader
   },

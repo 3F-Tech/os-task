@@ -19,14 +19,14 @@ import core from '@hcengineering/model-core'
 import workbench from '@hcengineering/model-workbench'
 
 import operationalDashboard from './plugin'
-import { TBusinessUnit, TProjectDashboardConfig, TProjectWithBU } from './types'
+import { TBusinessUnit, TProjectDashboardConfig, TProjectWithBU, TTeam } from './types'
 
 export { operationalDashboardId } from '@hcengineering/operational-dashboard'
 export * from './migration'
 export * from './types'
 
 export function createModel (builder: Builder): void {
-  builder.createModel(TBusinessUnit, TProjectWithBU, TProjectDashboardConfig)
+  builder.createModel(TBusinessUnit, TTeam, TProjectWithBU, TProjectDashboardConfig)
 
   builder.createDoc(
     workbench.class.Application,

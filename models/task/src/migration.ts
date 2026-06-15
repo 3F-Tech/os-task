@@ -38,7 +38,9 @@ import {
   tryMigrate,
   tryUpgrade,
   type MigrateOperation,
+  type MigrateUpdate,
   type MigrationClient,
+  type MigrationDocumentQuery,
   type MigrationUpgradeClient,
   type ModelLogger
 } from '@hcengineering/model'
@@ -502,6 +504,43 @@ async function migrateRanks (client: MigrationClient): Promise<void> {
   }
 }
 
+async function migrateAssigneeToArray (client: MigrationClient): Promise<void> {
+  client.logger.log('task: migrating assignee scalar -> array', {})
+  const iterator = await client.traverse<Task>(DOMAIN_TASK, { assignee: { $ne: null } } as any)
+  try {
+    let processed = 0
+    let converted = 0
+    while (true) {
+      const docs = await iterator.next(500)
+      if (docs === null || docs.length === 0) {
+        break
+      }
+
+      const operations: { filter: MigrationDocumentQuery<Task>, update: MigrateUpdate<Task> }[] = []
+      for (const doc of docs) {
+        const assignee = (doc as any).assignee
+        if (typeof assignee === 'string') {
+          operations.push({
+            filter: { _id: doc._id },
+            update: { assignee: [assignee] as any }
+          })
+        }
+      }
+
+      if (operations.length > 0) {
+        await client.bulk(DOMAIN_TASK, operations)
+        converted += operations.length
+      }
+
+      processed += docs.length
+      client.logger.log('task assignee-to-array: processed', { count: processed })
+    }
+    client.logger.log('task assignee-to-array: done', { converted })
+  } finally {
+    await iterator.close()
+  }
+}
+
 function areSameArrays (arr1: any[] | undefined, arr2: any[] | undefined): boolean {
   if (arr1 === arr2) {
     return true
@@ -594,6 +633,11 @@ export const taskOperation: MigrateOperation = {
           )
           await client.move('kanban' as Domain, { _class: core.class.Sequence }, DOMAIN_SEQUENCE)
         }
+      },
+      {
+        state: 'assignee-to-array',
+        mode: 'upgrade',
+        func: migrateAssigneeToArray
       }
     ])
   },

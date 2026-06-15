@@ -21,6 +21,7 @@ export interface DashboardFilters {
   buId: string
   projectId: string
   clientStage: string
+  teamId: string
   userId: string
   dateFrom: number
   dateTo: number
@@ -69,6 +70,7 @@ function getInitialFilters (): DashboardFilters {
     buId: '',
     projectId: '',
     clientStage: '',
+    teamId: '',
     userId: '',
     dateFrom: from,
     dateTo: to,

@@ -1288,6 +1288,12 @@ abstract class PostgresAdapterBase implements DbAdapter {
     }
 
     if (value === null) {
+      if (type === 'dataArray') {
+        // Campo ArrOf em JSONB: `data->'key'` retorna JSON null (não SQL NULL) quando a
+        // chave existe com valor null; só vira SQL NULL quando a chave está ausente.
+        // Cobre os dois casos para o filtro/agrupamento "sem valor" funcionar.
+        return `(${tkey} IS NULL OR ${tkey} = 'null'::jsonb)`
+      }
       return `${tkey} IS NULL`
     } else if (typeof value === 'object' && !Array.isArray(value)) {
       // we can have multiple criteria for one field
@@ -1308,7 +1314,12 @@ abstract class PostgresAdapterBase implements DbAdapter {
         switch (operator) {
           case '$ne':
             if (val == null) {
-              res.push(`${tlkey} IS NOT NULL`)
+              if (type === 'dataArray') {
+                // simétrico ao caso null acima: JSON null não é SQL NULL em campo JSONB
+                res.push(`(${tkey} IS NOT NULL AND ${tkey} <> 'null'::jsonb)`)
+              } else {
+                res.push(`${tlkey} IS NOT NULL`)
+              }
             } else {
               res.push(`(${tlkey} != ${vars.add(val, valType)} OR ${tkey} IS NULL)`)
             }
@@ -1326,6 +1337,10 @@ abstract class PostgresAdapterBase implements DbAdapter {
             res.push(`${tlkey} <= ${vars.add(val, valType)}`)
             break
           case '$in':
+            // queries malformadas (ex.: filtros salvos antigos) podem trazer escalar em $in
+            if (!Array.isArray(val)) {
+              val = val == null ? [] : [val]
+            }
             switch (type) {
               case 'common':
                 if (Array.isArray(val) && val.includes(null)) {
@@ -1354,6 +1369,9 @@ abstract class PostgresAdapterBase implements DbAdapter {
             }
             break
           case '$nin':
+            if (!Array.isArray(val)) {
+              val = val == null ? [] : [val]
+            }
             if (Array.isArray(val) && val.includes(null)) {
               res.push(`(${tlkey} != ALL(${vars.addArray(val, valType)}) AND ${tkey} IS NOT NULL)`)
             } else if (Array.isArray(val) && val.length > 0) {
