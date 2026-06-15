@@ -3,16 +3,13 @@
 // Licensed under the Eclipse Public License, Version 2.0
 -->
 <script lang="ts">
-  import { type Ref } from '@hcengineering/core'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import type { AutomationScript } from '@hcengineering/tracker'
   import { Breadcrumb, Button, Header, IconAdd, IconDelete, IconEdit, Label, showPopup } from '@hcengineering/ui'
 
   import tracker from '../../plugin'
   import EditAutomationScript from './EditAutomationScript.svelte'
-  import NewClientOnboardingModal from './NewClientOnboardingModal.svelte'
   import RunAutomationScript from './RunAutomationScript.svelte'
-  import { type BU, type SmVariant, type BommaScenario } from './onboarding-config'
 
   interface HistoryEntry {
     date: string
@@ -39,35 +36,6 @@
   function formatDate (): string {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
-
-  function buLabel (bu: BU, variant?: SmVariant, cenario?: BommaScenario): string {
-    const sm = variant === 'com SM' ? 'com SM' : variant === 'sem SM' ? 'sem SM' : undefined
-    if (bu === 'Bomma') {
-      const cen = cenario === '3' ? 'Cen. 3' : 'Cen. 1e2'
-      return `Bomma ${sm ?? ''} / ${cen}`.replace(/\s+/g, ' ').trim()
-    }
-    return sm !== undefined ? `${bu} ${sm}` : bu
-  }
-
-  function openOnboardingModal (): void {
-    showPopup(
-      NewClientOnboardingModal,
-      {
-        onComplete: (entry: { clientName: string, bu: BU, variant?: SmVariant, cenario?: BommaScenario, count: number }) => {
-          historico = [
-            {
-              date: formatDate(),
-              label: entry.clientName,
-              detail: buLabel(entry.bu, entry.variant, entry.cenario),
-              count: entry.count
-            },
-            ...historico
-          ]
-        }
-      },
-      'top'
-    )
   }
 
   function openNewScript (): void {
@@ -125,28 +93,6 @@
     <p class="page-description">
       <Label label={tracker.string.AutomationScriptsDescription} />
     </p>
-
-    <section class="legacy-section">
-      <h3 class="section-title"><Label label={tracker.string.LegacyOnboardingSection} /></h3>
-      <div class="script-card">
-        <div class="script-info">
-          <h4 class="script-title"><Label label={tracker.string.ClientOnboarding} /></h4>
-          <p class="script-description">
-            <Label label={tracker.string.ClientOnboardingDescription} />
-          </p>
-        </div>
-        <div class="script-action">
-          <Button
-            label={tracker.string.NewClientOnboarding}
-            kind="primary"
-            size="medium"
-            on:click={openOnboardingModal}
-          />
-        </div>
-      </div>
-    </section>
-
-    <div class="divider" />
 
     <section class="custom-section">
       <div class="custom-header">
@@ -252,7 +198,6 @@
     font-size: 0.875rem;
   }
 
-  .legacy-section,
   .custom-section,
   .history-section {
     display: flex;
@@ -274,41 +219,6 @@
     color: var(--theme-caption-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-  }
-
-  .script-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    border: 1px solid var(--theme-divider-color);
-    border-radius: 0.5rem;
-    background-color: var(--theme-comp-header-color);
-  }
-
-  .script-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .script-title {
-    margin: 0;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--theme-caption-color);
-  }
-
-  .script-description {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: var(--theme-dark-color);
-    max-width: 28rem;
-  }
-
-  .script-action {
-    flex-shrink: 0;
   }
 
   .divider {
