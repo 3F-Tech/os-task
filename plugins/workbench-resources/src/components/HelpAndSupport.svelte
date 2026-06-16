@@ -20,6 +20,7 @@
     AnySvelteComponent,
     Icon,
     IconArrowLeft,
+    IconInfo,
     Label,
     ListView,
     Scroller,
@@ -32,6 +33,7 @@
   } from '@hcengineering/ui'
   import view, { Action, ActionCategory } from '@hcengineering/view'
   import workbench from '../plugin'
+  import { showSupportNotice } from '../supportNotice'
   import RightArrowIcon from './icons/Collapsed.svelte'
   import KeyboardIcon from './icons/Keyboard.svelte'
   import { WorkbenchEvents } from '@hcengineering/workbench'
@@ -100,6 +102,15 @@
       onClick: () => {
         shortcuts = true
         Analytics.handleEvent(WorkbenchEvents.KeyboardShortcutsOpened)
+      }
+    },
+    {
+      icon: IconInfo,
+      title: workbench.string.SupportNoticeTitle,
+      description: workbench.string.SupportNoticeCardDescription,
+      onClick: () => {
+        closePopup()
+        showSupportNotice()
       }
     }
   ]

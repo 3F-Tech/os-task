@@ -104,6 +104,7 @@
   import { subscribeMobile } from '../mobile'
   import workbench from '../plugin'
   import { buildNavModel, isAllowedToRole, logOut, workspacesStore } from '../utils'
+  import { showSupportNoticeOnce } from '../supportNotice'
   import AccountPopup from './AccountPopup.svelte'
   import AppItem from './AppItem.svelte'
   import AppSwitcher from './AppSwitcher.svelte'
@@ -264,6 +265,8 @@
     })
     syncSidebarState()
     syncWorkbenchTab()
+    // Aviso de suporte: mostra uma vez por usuário após a atualização (controlado por localStorage + versão)
+    showSupportNoticeOnce(account.uuid)
   })
 
   const workspaceId = $location.path[1]
