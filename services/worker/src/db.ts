@@ -49,6 +49,13 @@ export class TimeMachineDB {
         );
 
         CREATE INDEX IF NOT EXISTS idx_delayed_events_target_date ON ${delayedEventsTable} (target_date);
+
+        CREATE TABLE IF NOT EXISTS time_machine.digest_runs (
+          workspace UUID NOT NULL,
+          run_date TEXT NOT NULL,
+          created_at INT8 NOT NULL,
+          PRIMARY KEY (workspace, run_date)
+        );
     `
 
     await client.unsafe(sql)
@@ -99,6 +106,20 @@ export class TimeMachineDB {
         `
       }
     })
+  }
+
+  // Atomically claim the digest run for (workspace, runDate). Returns true if
+  // this caller won the claim (first run today), false if it was already taken
+  // — used as an idempotency guard so a Kafka redelivery / rebalance never
+  // re-sends the same day's digest.
+  async tryClaimDigestRun (workspace: WorkspaceUuid, runDate: string): Promise<boolean> {
+    const res = await this.client`
+      INSERT INTO time_machine.digest_runs (workspace, run_date, created_at)
+      VALUES (${workspace}, ${runDate}, ${Date.now()})
+      ON CONFLICT (workspace, run_date) DO NOTHING
+      RETURNING workspace
+    `
+    return res.length > 0
   }
 
   async getActiveWorkspaces (): Promise<WorkspaceUuid[]> {

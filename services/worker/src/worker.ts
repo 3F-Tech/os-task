@@ -69,7 +69,7 @@ export async function runWorker (): Promise<void> {
 
   void bootstrapPdcaSchedules(ctx, db)
 
-  startDailyDigestConsumer(ctx)
+  startDailyDigestConsumer(ctx, db)
 
   void bootstrapDailyDigestSchedule(ctx, db)
 

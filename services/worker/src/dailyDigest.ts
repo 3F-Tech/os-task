@@ -120,6 +120,16 @@ function isWeekendDate (year: number, month: number, day: number): boolean {
   return dow === 0 || dow === 6 // Sun or Sat
 }
 
+// Calendar date (YYYY-MM-DD) in the digest timezone — used as the idempotency
+// key so the digest runs at most once per workspace per day, regardless of
+// Kafka redelivery or rebalance.
+function digestRunDateKey (nowMs: number): string {
+  const d = dateInTz(new Date(nowMs), config.DigestTimezone)
+  const mm = String(d.month).padStart(2, '0')
+  const dd = String(d.day).padStart(2, '0')
+  return `${d.year}-${mm}-${dd}`
+}
+
 export function calculateNextDigestDate (fromMs: number): number {
   const tz = config.DigestTimezone
   const hour = config.DigestHour
@@ -406,7 +416,8 @@ async function rescheduleForRetry (
 
 export async function processDailyDigestEvent (
   ctx: MeasureMetricsContext,
-  event: DailyDigestEvent
+  event: DailyDigestEvent,
+  db: TimeMachineDB
 ): Promise<void> {
   const { workspaceId } = event
   let connection: WorkspaceConnection | undefined
@@ -415,6 +426,18 @@ export async function processDailyDigestEvent (
   try {
     connection = await createWorkspaceConnection(workspaceId)
     const { client, workspaceUrl } = connection
+
+    // Idempotency guard: claim today's run atomically. If another delivery of
+    // this event already ran today (Kafka redelivery after a rebalance, or a
+    // manual re-trigger), this returns false and we skip sending — the offset
+    // then commits quickly on this fast path, breaking the redelivery loop.
+    const runDate = digestRunDateKey(Date.now())
+    const claimed = await db.tryClaimDigestRun(workspaceId, runDate)
+    if (!claimed) {
+      ctx.info('daily-digest: already ran today, skipping (idempotency guard)', { workspaceId, runDate })
+      return
+    }
+    ctx.info('daily-digest: claimed run for today', { workspaceId, runDate })
 
     const nowMs = Date.now()
     const startMs = startOfTodayMs(nowMs)
@@ -606,14 +629,14 @@ export async function processDailyDigestEvent (
   }
 }
 
-export function startDailyDigestConsumer (ctx: MeasureMetricsContext): void {
+export function startDailyDigestConsumer (ctx: MeasureMetricsContext, db: TimeMachineDB): void {
   const queue = getPlatformQueue(SERVICE_NAME, config.QueueRegion)
   queue.createConsumer<DailyDigestEvent>(
     ctx,
     QueueTopic.DailyDigest,
     'daily-digest-worker-group',
     async (ctx, msg) => {
-      await processDailyDigestEvent(ctx as MeasureMetricsContext, msg.value)
+      await processDailyDigestEvent(ctx as MeasureMetricsContext, msg.value, db)
     }
   )
 }
