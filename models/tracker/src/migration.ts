@@ -43,6 +43,7 @@ import tracker, {
   type IssueStatus,
   type IssueTemplate,
   type Project,
+  type TimeSpendReport,
   TimeReportDayType,
   trackerId
 } from '@hcengineering/tracker'
@@ -557,6 +558,79 @@ export const trackerOperation: MigrateOperation = {
             },
             { pdcaCycleResetSubIssues: false }
           )
+        }
+      },
+      {
+        // Automation/onboarding-created issues were built without the canonical
+        // collection fields. A missing `parents` makes the time-report server
+        // trigger (updateIssueParentEstimations -> `for (… of parents)`) throw,
+        // which aborts OnIssueUpdate and silently drops the reportedTime $inc —
+        // so spent time never shows up on those issues. Backfill safe defaults.
+        state: 'backfillIssueCollectionDefaults',
+        mode: 'upgrade',
+        func: async (client) => {
+          await client.update(
+            DOMAIN_TASK,
+            { _class: tracker.class.Issue, parents: { $exists: false } },
+            { parents: [] }
+          )
+          await client.update(
+            DOMAIN_TASK,
+            { _class: tracker.class.Issue, childInfo: { $exists: false } },
+            { childInfo: [] }
+          )
+          await client.update(
+            DOMAIN_TASK,
+            { _class: tracker.class.Issue, reportedTime: { $exists: false } },
+            { reportedTime: 0 }
+          )
+          await client.update(
+            DOMAIN_TASK,
+            { _class: tracker.class.Issue, remainingTime: { $exists: false } },
+            { remainingTime: 0 }
+          )
+          await client.update(
+            DOMAIN_TASK,
+            { _class: tracker.class.Issue, reports: { $exists: false } },
+            { reports: 0 }
+          )
+        }
+      },
+      {
+        // Tasks that had time logged before the parents-throw fix never had their
+        // reportedTime incremented (the trigger threw and dropped the $inc). Recompute
+        // reportedTime (and remainingTime) from the actual TimeSpendReports so the
+        // already-logged spent time finally shows up. Runs AFTER the backfill above,
+        // so issues without reports keep reportedTime: 0. Idempotent: re-summing the
+        // same reports yields the same totals.
+        state: 'recomputeReportedTimeFromReports',
+        mode: 'upgrade',
+        func: async (client) => {
+          const reports = await client.find<TimeSpendReport>(DOMAIN_TRACKER, {
+            _class: tracker.class.TimeSpendReport
+          })
+          const totals = new Map<Ref<Issue>, number>()
+          for (const r of reports) {
+            const id = r.attachedTo
+            if (id === undefined) continue
+            totals.set(id, (totals.get(id) ?? 0) + (r.value ?? 0))
+          }
+          if (totals.size === 0) return
+          const issues = await client.find<Issue>(DOMAIN_TASK, {
+            _class: tracker.class.Issue,
+            _id: { $in: Array.from(totals.keys()) }
+          })
+          const estimationById = new Map<Ref<Issue>, number>(
+            issues.map((i) => [i._id, (i as any).estimation ?? 0])
+          )
+          for (const [issueId, total] of totals) {
+            if (!estimationById.has(issueId)) continue
+            await client.update(
+              DOMAIN_TASK,
+              { _id: issueId },
+              { reportedTime: total, remainingTime: Math.max(0, (estimationById.get(issueId) ?? 0) - total) }
+            )
+          }
         }
       }
     ])

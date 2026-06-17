@@ -99,7 +99,7 @@ export function createModel (builder: Builder): void {
   builder.createDoc(serverCore.class.Trigger, core.space.Model, {
     trigger: (serverTracker.trigger as any).OnPdcaCycleToggle,
     txMatch: {
-      _class: core.class.TxUpdateDoc,
+      _class: { $in: [core.class.TxCreateDoc, core.class.TxUpdateDoc] },
       objectClass: tracker.class.Issue
     }
   })

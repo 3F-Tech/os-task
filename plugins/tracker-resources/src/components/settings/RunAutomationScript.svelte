@@ -360,6 +360,19 @@
           status: ((template as any).status ?? projeto.defaultIssueStatus) as any,
           estimation: (template as any).estimation ?? 0,
           assignee: tplAssignee,
+          // Canonical collection fields — must mirror CreateIssue.svelte. A missing
+          // `parents` makes the time-report trigger throw and silently drop the
+          // reportedTime increment (spent time never shows up).
+          parents: [],
+          childInfo: [],
+          comments: 0,
+          subIssues: 0,
+          reports: 0,
+          relations: [],
+          reportedTime: 0,
+          remainingTime: 0,
+          startDate: Date.now(),
+          completedDate: null,
           clientName: cliente,
           clientStage,
           pdcaCycleActive: pdcaActive,
@@ -420,6 +433,25 @@
             status: (child.status ?? projeto.defaultIssueStatus) as any,
             estimation: child.estimation ?? 0,
             assignee: childAssignee,
+            // Link to the parent tarefa so it appears in the breadcrumb and rolls
+            // up into the parent's estimation. Canonical fields mirror CreateIssue.
+            parents: [
+              {
+                parentId: tarefaId as unknown as Ref<Issue>,
+                parentTitle: template.title,
+                space: step.project,
+                identifier
+              }
+            ],
+            childInfo: [],
+            comments: 0,
+            subIssues: 0,
+            reports: 0,
+            relations: [],
+            reportedTime: 0,
+            remainingTime: 0,
+            startDate: Date.now(),
+            completedDate: null,
             clientName: cliente,
             clientStage,
             dueDate: childDueDate

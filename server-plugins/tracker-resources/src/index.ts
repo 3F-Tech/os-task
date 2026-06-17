@@ -741,6 +741,28 @@ async function cancelPdcaTimer (issueId: string, control: TriggerControl): Promi
 export async function OnPdcaCycleToggle (txes: Tx[], control: TriggerControl): Promise<Tx[]> {
   const result: Tx[] = []
   for (const tx of txes) {
+    if (tx._class === core.class.TxCreateDoc) {
+      // Issues created already PDCA-active (automation scripts, templates, the
+      // Create Issue dialog with PDCA enabled) never produced an update, so the
+      // cycle was only scheduled on the next worker restart (bootstrap). Schedule
+      // it here too. Idempotent with bootstrap: same TimeMachine id (pdca_<id>)
+      // upserts, and bootstrap keeps any pdcaNextCycleDate we set.
+      const createTx = tx as TxCreateDoc<Issue>
+      if (!control.hierarchy.isDerived(createTx.objectClass, tracker.class.Issue)) continue
+      if ((createTx.attributes as any).pdcaCycleActive !== true) continue
+
+      const issue = TxProcessor.createDoc2Doc(createTx)
+      const nextDate = await schedulePdcaTimer(issue, control)
+      if (nextDate !== undefined) {
+        result.push(control.txFactory.createTxUpdateDoc(
+          createTx.objectClass,
+          createTx.objectSpace,
+          createTx.objectId,
+          { pdcaNextCycleDate: nextDate }
+        ))
+      }
+      continue
+    }
     if (tx._class === core.class.TxUpdateDoc) {
       const updateTx = tx as TxUpdateDoc<Issue>
       if (!control.hierarchy.isDerived(updateTx.objectClass, tracker.class.Issue)) continue
