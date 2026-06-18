@@ -39,7 +39,8 @@ function getIndexName (): string {
 }
 
 function getIndexVersion (): string {
-  return getMetadata(serverCore.metadata.ElasticIndexVersion) ?? 'v2'
+  // v3: índice recriado com asciifolding (busca insensível a acentos)
+  return getMetadata(serverCore.metadata.ElasticIndexVersion) ?? 'v3'
 }
 
 const mappings = {
@@ -170,7 +171,15 @@ class ElasticAdapter implements FullTextAdapter {
                     rebuilt_english: {
                       type: 'custom',
                       tokenizer: 'standard',
-                      filter: ['english_possessive_stemmer', 'lowercase', 'english_stemmer']
+                      filter: ['english_possessive_stemmer', 'lowercase', 'asciifolding', 'english_stemmer']
+                    },
+                    // Analyzer padrão de todos os campos de texto (inclui os dinâmicos como
+                    // clientName/searchTitle). asciifolding remove acentos na indexação e na
+                    // busca → "Joao" encontra "João", "Diario" encontra "Diário".
+                    default: {
+                      type: 'custom',
+                      tokenizer: 'standard',
+                      filter: ['lowercase', 'asciifolding']
                     }
                   }
                 }

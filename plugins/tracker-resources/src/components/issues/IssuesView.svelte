@@ -60,7 +60,15 @@
   let search = ''
   let searchQuery: DocumentQuery<Issue> = { ...query }
   function updateSearchQuery (search: string): void {
-    searchQuery = search === '' ? { ...query } : { ...query, $search: search }
+    const trimmed = search.trim()
+    if (trimmed === '') {
+      searchQuery = { ...query }
+      return
+    }
+    // Busca por prefixo: anexa '*' ao termo para casar enquanto o usuário digita
+    // (ex.: "Migu" encontra "Miguel"). Respeita operadores já digitados (* ? ~ ").
+    const term = /[*?~"]/.test(trimmed) ? trimmed : `${trimmed}*`
+    searchQuery = { ...query, $search: term }
   }
   $: if (query) updateSearchQuery(search)
   let resultQuery: DocumentQuery<Issue> = { ...searchQuery }
