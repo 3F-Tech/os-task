@@ -333,7 +333,23 @@
     "NoLabelsInScript": "As tarefas deste script não possuem etiquetas cadastradas.",
     "LabelNoAssignee": "Sem responsável",
     "MultipleLabelsWarning": "Mais de 3 responsáveis",
-    "MultipleLabelsTooltip": "As etiquetas desta tarefa somam mais de 3 responsáveis. Apenas os 3 primeiros serão atribuídos."
+    "MultipleLabelsTooltip": "As etiquetas desta tarefa somam mais de 3 responsáveis. Apenas os 3 primeiros serão atribuídos.",
+    "ScriptExecutions": "Histórico de execuções",
+    "ScriptLabel": "Script",
+    "ScriptExecutedBy": "Executado por",
+    "ExecutionDate": "Data",
+    "ExecutionTasksTitle": "Tarefas criadas",
+    "ScriptHistoryEmpty": "Nenhuma execução registrada.",
+    "NoExecutionsMatch": "Nenhuma execução corresponde aos filtros.",
+    "FilterByClient": "Cliente",
+    "FilterByScript": "Script",
+    "FilterByPerson": "Pessoa",
+    "FilterDateFrom": "De",
+    "FilterDateTo": "Até",
+    "FilterMinTasks": "Mín. tarefas",
+    "ClearFilters": "Limpar",
+    "IssueNoLongerExists": "Esta tarefa não existe mais.",
+    "PageOf": "{current} / {total}"
   },
   "status": {}
 }

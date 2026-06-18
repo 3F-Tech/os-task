@@ -381,7 +381,25 @@ export default mergeIds(trackerId, tracker, {
     VariantGroupNamePlaceholder: '' as IntlString,
     RemoveVariantGroup: '' as IntlString,
     AnyValue: '' as IntlString,
-    VariantGroupRequiresHint: '' as IntlString
+    VariantGroupRequiresHint: '' as IntlString,
+
+    // Histórico persistente de execuções de script
+    ScriptExecutions: '' as IntlString,
+    ScriptLabel: '' as IntlString,
+    ScriptExecutedBy: '' as IntlString,
+    ExecutionDate: '' as IntlString,
+    ExecutionTasksTitle: '' as IntlString,
+    ScriptHistoryEmpty: '' as IntlString,
+    NoExecutionsMatch: '' as IntlString,
+    FilterByClient: '' as IntlString,
+    FilterByScript: '' as IntlString,
+    FilterByPerson: '' as IntlString,
+    FilterDateFrom: '' as IntlString,
+    FilterDateTo: '' as IntlString,
+    FilterMinTasks: '' as IntlString,
+    ClearFilters: '' as IntlString,
+    IssueNoLongerExists: '' as IntlString,
+    PageOf: '' as IntlString
   },
   component: {
     NopeComponent: '' as AnyComponent,

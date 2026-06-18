@@ -391,7 +391,23 @@
     "VariantGroupNamePlaceholder": "e.g. Plan",
     "RemoveVariantGroup": "Remove group",
     "AnyValue": "any",
-    "VariantGroupRequiresHint": "Step only runs if the wizard choice matches the selected option"
+    "VariantGroupRequiresHint": "Step only runs if the wizard choice matches the selected option",
+    "ScriptExecutions": "Execution history",
+    "ScriptLabel": "Script",
+    "ScriptExecutedBy": "Run by",
+    "ExecutionDate": "Date",
+    "ExecutionTasksTitle": "Created tasks",
+    "ScriptHistoryEmpty": "No executions recorded yet.",
+    "NoExecutionsMatch": "No executions match the filters.",
+    "FilterByClient": "Client",
+    "FilterByScript": "Script",
+    "FilterByPerson": "Person",
+    "FilterDateFrom": "From",
+    "FilterDateTo": "To",
+    "FilterMinTasks": "Min tasks",
+    "ClearFilters": "Clear",
+    "IssueNoLongerExists": "This task no longer exists.",
+    "PageOf": "{current} / {total}"
   },
   "status": {}
 }

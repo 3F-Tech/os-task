@@ -60,6 +60,8 @@ import {
   type ProjectTargetPreference,
   type AutomationScript,
   type AutomationScriptStep,
+  type ScriptExecution,
+  type ScriptExecutionTask,
   type Component,
   type Issue,
   type IssueChildInfo,
@@ -574,4 +576,32 @@ export class TAutomationScriptStep extends TAttachedDoc implements AutomationScr
 
   @Prop(TypeRecord(), tracker.string.DueInDays)
     childDueInDays?: Record<string, number>
+}
+
+@Model(tracker.class.ScriptExecution, core.class.Doc, DOMAIN_AUTOMATION)
+@UX(tracker.string.ScriptExecutions, tracker.icon.Issue, 'SCRIPTRUN', 'clientName')
+export class TScriptExecution extends TDoc implements ScriptExecution {
+  @Prop(TypeRef(tracker.class.AutomationScript), tracker.string.ScriptLabel)
+  @Index(IndexKind.Indexed)
+    script!: Ref<AutomationScript>
+
+  @Prop(TypeString(), tracker.string.AutomationScriptName)
+  @Index(IndexKind.Indexed)
+    scriptName!: string
+
+  @Prop(TypeString(), tracker.string.ClientName)
+  @Index(IndexKind.Indexed)
+    clientName!: string
+
+  @Prop(TypeRef(contact.class.Person), tracker.string.ScriptExecutedBy)
+  @Index(IndexKind.Indexed)
+    executedBy!: Ref<Person>
+
+  @Prop(TypeNumber(), tracker.string.OnboardingTasksCount)
+    taskCount!: number
+
+  // Snapshot inline das tarefas-raiz criadas (id/identifier/title/space). Não é
+  // consultado por dotted-path — só lido de volta no popup do histórico.
+  @Prop(ArrOf(TypeRecord()), tracker.string.ExecutionTasksTitle)
+    tasks!: ScriptExecutionTask[]
 }

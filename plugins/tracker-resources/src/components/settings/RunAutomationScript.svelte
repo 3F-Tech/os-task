@@ -3,9 +3,9 @@
 // Licensed under the Eclipse Public License, Version 2.0
 -->
 <script lang="ts">
-  import type { Person } from '@hcengineering/contact'
+  import { getCurrentEmployee, type Person } from '@hcengineering/contact'
   import { UserBoxList } from '@hcengineering/contact-resources'
-  import { type Ref } from '@hcengineering/core'
+  import core, { type Ref } from '@hcengineering/core'
   import presentation, { Card, getClient } from '@hcengineering/presentation'
   import tags, { type TagElement } from '@hcengineering/tags'
   import task from '@hcengineering/task'
@@ -16,7 +16,8 @@
     Issue,
     IssueTemplate,
     PdcaFrequency,
-    Project
+    Project,
+    ScriptExecutionTask
   } from '@hcengineering/tracker'
   import { Button, EditBox, Label, tooltip } from '@hcengineering/ui'
   import { createEventDispatcher, onMount } from 'svelte'
@@ -282,6 +283,8 @@
     const kindCache = new Map<string, string>()
     const cliente = clientName.trim()
     let sucessos = 0
+    // Snapshot das tarefas-raiz criadas — persistido no ScriptExecution para o histórico.
+    const createdTasks: ScriptExecutionTask[] = []
 
     for (const step of filteredSteps) {
       const projeto = projectsById.get(step.project)
@@ -471,8 +474,29 @@
         }
       }
 
+      createdTasks.push({
+        id: tarefaId as unknown as Ref<Issue>,
+        identifier,
+        title: template.title,
+        space: step.project
+      })
       progresso = [...progresso, { label: `${identifier} — ${template.title}`, ok: true }]
       sucessos++
+    }
+
+    // Registro persistente de auditoria — gravado SEMPRE (mesmo 0 tarefas). Falha aqui
+    // não deve quebrar a UI de sucesso: as tarefas já foram criadas.
+    try {
+      await client.createDoc(tracker.class.ScriptExecution, core.space.Workspace, {
+        script: script._id,
+        scriptName: script.name,
+        clientName: cliente,
+        executedBy: getCurrentEmployee(),
+        taskCount: sucessos,
+        tasks: createdTasks
+      })
+    } catch (err) {
+      console.error('ScriptExecution record failed:', err)
     }
 
     executando = false

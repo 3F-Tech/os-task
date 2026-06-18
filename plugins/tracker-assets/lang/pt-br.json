@@ -373,7 +373,23 @@
     "VariantGroupNamePlaceholder": "Ex: Modalidade",
     "RemoveVariantGroup": "Remover grupo",
     "AnyValue": "qualquer",
-    "VariantGroupRequiresHint": "Etapa só roda se a escolha do wizard bater com a opção marcada"
+    "VariantGroupRequiresHint": "Etapa só roda se a escolha do wizard bater com a opção marcada",
+    "ScriptExecutions": "Histórico de execuções",
+    "ScriptLabel": "Script",
+    "ScriptExecutedBy": "Executado por",
+    "ExecutionDate": "Data",
+    "ExecutionTasksTitle": "Tarefas criadas",
+    "ScriptHistoryEmpty": "Nenhuma execução registrada.",
+    "NoExecutionsMatch": "Nenhuma execução corresponde aos filtros.",
+    "FilterByClient": "Cliente",
+    "FilterByScript": "Script",
+    "FilterByPerson": "Pessoa",
+    "FilterDateFrom": "De",
+    "FilterDateTo": "Até",
+    "FilterMinTasks": "Mín. tarefas",
+    "ClearFilters": "Limpar",
+    "IssueNoLongerExists": "Esta tarefa não existe mais.",
+    "PageOf": "{current} / {total}"
   },
   "status": {}
 }

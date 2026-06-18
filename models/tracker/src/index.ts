@@ -38,6 +38,7 @@ import {
   DOMAIN_TRACKER,
   TAutomationScript,
   TAutomationScriptStep,
+  TScriptExecution,
   TClassicProjectTypeData,
   TComponent,
   TIssue,
@@ -447,7 +448,8 @@ export function createModel (builder: Builder): void {
     TTypeRemainingTime,
     TProjectTargetPreference,
     TAutomationScript,
-    TAutomationScriptStep
+    TAutomationScriptStep,
+    TScriptExecution
   )
 
   builder.mixin(tracker.class.Project, core.class.Class, activity.mixin.ActivityDoc, {})

@@ -489,6 +489,35 @@ export interface AutomationScriptStep extends AttachedDoc {
 
 /**
  * @public
+ *
+ * Snapshot de uma tarefa-raiz criada por uma execução de script. Guardado inline no
+ * registro de execução para que o histórico sobreviva à exclusão/movimentação da issue.
+ */
+export interface ScriptExecutionTask {
+  id: Ref<Issue>
+  identifier: string
+  title: string
+  space: Ref<Project>
+}
+
+/**
+ * @public
+ *
+ * Registro persistente de auditoria de uma execução de AutomationScript: quem rodou,
+ * para qual cliente, quantas tarefas-raiz foram criadas e um snapshot delas. Criado uma
+ * única vez ao final de RunAutomationScript.execute(); createdOn/createdBy carregam data/autor.
+ */
+export interface ScriptExecution extends Doc {
+  script: Ref<AutomationScript>
+  scriptName: string
+  clientName: string
+  executedBy: Ref<Person>
+  taskCount: number
+  tasks: ScriptExecutionTask[]
+}
+
+/**
+ * @public
  */
 export const trackerId = 'tracker' as Plugin
 export * from './analytics'
@@ -510,7 +539,8 @@ const pluginState = plugin(trackerId, {
     RelatedIssueTarget: '' as Ref<Class<RelatedIssueTarget>>,
     ProjectTargetPreference: '' as Ref<Class<ProjectTargetPreference>>,
     AutomationScript: '' as Ref<Class<AutomationScript>>,
-    AutomationScriptStep: '' as Ref<Class<AutomationScriptStep>>
+    AutomationScriptStep: '' as Ref<Class<AutomationScriptStep>>,
+    ScriptExecution: '' as Ref<Class<ScriptExecution>>
   },
   mixin: {
     ClassicProjectTypeData: '' as Ref<Mixin<Project>>,
