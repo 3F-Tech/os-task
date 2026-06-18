@@ -380,6 +380,22 @@
     }
     const { labels, description, ...templBase } = template as any
 
+    // O template é um Doc persistido. Seus campos de identidade/coleção NÃO podem
+    // vazar para o draft da issue: editores que persistem pelo `_id`/`_class` do
+    // objeto (ex.: AssigneeEditor) acabariam atualizando o próprio template em vez
+    // da tarefa que está sendo criada — alterando o responsável default do modelo.
+    delete templBase._id
+    delete templBase._class
+    delete templBase.space
+    delete templBase.modifiedOn
+    delete templBase.modifiedBy
+    delete templBase.createdOn
+    delete templBase.createdBy
+    delete templBase.children
+    delete templBase.comments
+    delete templBase.attachments
+    delete templBase.relations
+
     const allLabels = new Set<Ref<TagElement>>()
     for (const label of labels ?? []) {
       allLabels.add(label)
@@ -399,6 +415,7 @@
         space: _space as Ref<Project>,
         subIssues: [],
         dueDate: null,
+        assignee: Array.isArray(p.assignee) ? [...p.assignee] : p.assignee ?? null,
         labels:
           p.labels !== undefined
             ? p.labels
@@ -416,6 +433,7 @@
       ...object,
       description: description ?? EmptyMarkup,
       ...templBase,
+      assignee: Array.isArray(templBase.assignee) ? [...templBase.assignee] : templBase.assignee ?? null,
       template: {
         template: template._id
       }
