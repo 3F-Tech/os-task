@@ -5,10 +5,11 @@
 <script lang="ts">
   import { getCurrentEmployee, type Person } from '@hcengineering/contact'
   import { UserBoxList } from '@hcengineering/contact-resources'
-  import core, { type Ref } from '@hcengineering/core'
-  import presentation, { Card, getClient } from '@hcengineering/presentation'
+  import core, { generateId, makeCollabId, type MarkupBlobRef, type Ref } from '@hcengineering/core'
+  import presentation, { Card, createMarkup, getClient } from '@hcengineering/presentation'
   import tags, { type TagElement } from '@hcengineering/tags'
   import task from '@hcengineering/task'
+  import { isEmptyMarkup } from '@hcengineering/text'
   import type {
     AutomationScript,
     AutomationScriptStep,
@@ -286,6 +287,30 @@
     // Snapshot das tarefas-raiz criadas — persistido no ScriptExecution para o histórico.
     const createdTasks: ScriptExecutionTask[] = []
 
+    // Copia a descrição (Markup inline) do template/child para um blob colaborativo da
+    // issue criada — mesmo caminho do CreateIssue.svelte (createMarkup). Não grava
+    // description por Tx direta (regra do projeto). Resiliente: falha aqui não impede
+    // a criação da tarefa, apenas a deixa sem descrição.
+    const buildDescriptionRef = async (
+      issueId: Ref<Issue>,
+      markup: unknown,
+      label: string
+    ): Promise<MarkupBlobRef | null> => {
+      if (typeof markup !== 'string' || isEmptyMarkup(markup)) return null
+      try {
+        return await createMarkup(makeCollabId(tracker.class.Issue, issueId, 'description'), markup)
+      } catch (err) {
+        // Surface no log de progresso (em vez de silenciar): permite ver se o
+        // collaborator falhou na cópia da descrição sem abortar a criação da tarefa.
+        console.error('copiar descrição do template falhou:', err)
+        progresso = [
+          ...progresso,
+          { label: `Descrição não copiada (${label}): ${String((err as any)?.message ?? err)}`, ok: false }
+        ]
+        return null
+      }
+    }
+
     for (const step of filteredSteps) {
       const projeto = projectsById.get(step.project)
       if (projeto === undefined) {
@@ -347,7 +372,10 @@
         (template as any).assignee
       )
 
-      const tarefaId = await client.addCollection(
+      const tarefaId = generateId<Issue>()
+      const tplDescription = await buildDescriptionRef(tarefaId, (template as any).description, template.title)
+
+      await client.addCollection(
         tracker.class.Issue,
         step.project,
         tracker.ids.NoParent,
@@ -363,6 +391,7 @@
           status: ((template as any).status ?? projeto.defaultIssueStatus) as any,
           estimation: (template as any).estimation ?? 0,
           assignee: tplAssignee,
+          description: tplDescription,
           // Canonical collection fields — must mirror CreateIssue.svelte. A missing
           // `parents` makes the time-report trigger throw and silently drop the
           // reportedTime increment (spent time never shows up).
@@ -385,7 +414,8 @@
           pdcaCycleResetSubIssues: (template as any).pdcaCycleResetSubIssues,
           dueDate: finalDueDate,
           template: { template: step.template }
-        } as any
+        } as any,
+        tarefaId
       )
 
       for (const labelId of (template as any).labels ?? []) {
@@ -420,7 +450,10 @@
             ? Date.now() + childDueDays * 86_400_000
             : null
 
-        const subId = await client.addCollection(
+        const subId = generateId<Issue>()
+        const childDescription = await buildDescriptionRef(subId, (child as any).description, child.title)
+
+        await client.addCollection(
           tracker.class.Issue,
           step.project,
           tarefaId as unknown as Ref<Issue>,
@@ -436,6 +469,7 @@
             status: (child.status ?? projeto.defaultIssueStatus) as any,
             estimation: child.estimation ?? 0,
             assignee: childAssignee,
+            description: childDescription,
             // Link to the parent tarefa so it appears in the breadcrumb and rolls
             // up into the parent's estimation. Canonical fields mirror CreateIssue.
             parents: [
@@ -458,7 +492,8 @@
             clientName: cliente,
             clientStage,
             dueDate: childDueDate
-          } as any
+          } as any,
+          subId
         )
 
         for (const labelId of child.labels ?? []) {
