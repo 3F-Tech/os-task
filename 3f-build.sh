@@ -19,6 +19,7 @@
 #   ./3f-build.sh --pod github            # reconstrói só o github service
 #   ./3f-build.sh --pod mail              # reconstrói só o mail service
 #   ./3f-build.sh --pod calendar          # reconstrói só o calendar service
+#   ./3f-build.sh --pod fulltext          # reconstrói só o fulltext (indexação/busca)
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
 #   ./3f-build.sh --vps --clean --no-cache  # rebuild completo na VPS
@@ -221,6 +222,12 @@ if [[ "$PODS" == *"calendar"* ]]; then
   rushx bundle || fail "bundle calendar"
 fi
 
+if [[ "$PODS" == *"fulltext"* ]]; then
+  info "Bundlando fulltext..."
+  cd "$ROOT_DIR/pods/fulltext"
+  rushx bundle || fail "bundle fulltext"
+fi
+
 done_step $T
 
 # ── Passo 4: Docker build ─────────────────────────────────────────────────────
@@ -289,6 +296,12 @@ if [[ "$PODS" == *"calendar"* ]]; then
   DOCKER_VERSION=3f-local bash ../../../common/scripts/docker_build.sh hardcoreeng/calendar || fail "docker build calendar"
 fi
 
+if [[ "$PODS" == *"fulltext"* ]]; then
+  info "Buildando imagem: hardcoreeng/fulltext:3f-local"
+  cd "$ROOT_DIR/pods/fulltext"
+  DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/fulltext || fail "docker build fulltext"
+fi
+
 done_step $T
 
 # ── Passo 5: Restart dos containers ──────────────────────────────────────────
@@ -308,6 +321,7 @@ SERVICES=""
 [[ "$PODS" == *"github"*       ]] && SERVICES="$SERVICES github"
 [[ "$PODS" == *"mail"*         ]] && SERVICES="$SERVICES mail"
 [[ "$PODS" == *"calendar"*     ]] && SERVICES="$SERVICES calendar"
+[[ "$PODS" == *"fulltext"*     ]] && SERVICES="$SERVICES fulltext_cockroach"
 
 info "Serviços: $SERVICES"
 
