@@ -444,7 +444,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     restart: unless-stopped
   datalake:
-    image: hardcoreeng/datalake
+    image: hardcoreeng/datalake:3f-local
     extra_hosts:
       - 'huly.local:host-gateway'
     depends_on:

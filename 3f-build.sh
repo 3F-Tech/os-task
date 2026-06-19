@@ -20,6 +20,7 @@
 #   ./3f-build.sh --pod mail              # reconstrói só o mail service
 #   ./3f-build.sh --pod calendar          # reconstrói só o calendar service
 #   ./3f-build.sh --pod fulltext          # reconstrói só o fulltext (indexação/busca)
+#   ./3f-build.sh --pod datalake          # reconstrói só o datalake (storage de blobs)
 #   ./3f-build.sh --pod "front account"  # dois pods
 #   ./3f-build.sh --clean --no-cache --skip-webpack --pod server  # combinado
 #   ./3f-build.sh --vps --clean --no-cache  # rebuild completo na VPS
@@ -228,6 +229,12 @@ if [[ "$PODS" == *"fulltext"* ]]; then
   rushx bundle || fail "bundle fulltext"
 fi
 
+if [[ "$PODS" == *"datalake"* ]]; then
+  info "Bundlando datalake..."
+  cd "$ROOT_DIR/services/datalake/pod-datalake"
+  rushx bundle || fail "bundle datalake"
+fi
+
 done_step $T
 
 # ── Passo 4: Docker build ─────────────────────────────────────────────────────
@@ -302,6 +309,12 @@ if [[ "$PODS" == *"fulltext"* ]]; then
   DOCKER_VERSION=3f-local bash ../../common/scripts/docker_build.sh hardcoreeng/fulltext || fail "docker build fulltext"
 fi
 
+if [[ "$PODS" == *"datalake"* ]]; then
+  info "Buildando imagem: hardcoreeng/datalake:3f-local"
+  cd "$ROOT_DIR/services/datalake/pod-datalake"
+  DOCKER_VERSION=3f-local bash ../../../common/scripts/docker_build.sh hardcoreeng/datalake || fail "docker build datalake"
+fi
+
 done_step $T
 
 # ── Passo 5: Restart dos containers ──────────────────────────────────────────
@@ -322,6 +335,7 @@ SERVICES=""
 [[ "$PODS" == *"mail"*         ]] && SERVICES="$SERVICES mail"
 [[ "$PODS" == *"calendar"*     ]] && SERVICES="$SERVICES calendar"
 [[ "$PODS" == *"fulltext"*     ]] && SERVICES="$SERVICES fulltext_cockroach"
+[[ "$PODS" == *"datalake"*     ]] && SERVICES="$SERVICES datalake"
 
 info "Serviços: $SERVICES"
 
