@@ -39,9 +39,15 @@ export function groupTeamData (
   todos: IdMap<ToDo>,
   events: Event[],
   mePerson: Ref<Person>,
-  calendarStore: IdMap<Calendar>
+  calendarStore: IdMap<Calendar>,
+  allowed?: Array<Ref<Person>>
 ): EventPersonMapping[] {
   const result = new Map<Ref<Person>, EventPersonMapping>()
+  // When provided, restrict the resulting rows to the given persons (e.g. the
+  // project members). Events/slots are matched by the query when *any*
+  // participant belongs to the project, so without this filter non-member
+  // participants of a shared event would leak into the team plan.
+  const allowedSet = allowed !== undefined ? new Set(allowed) : undefined
 
   const totalEventsMap = new Map<Ref<Person>, EventVars[]>()
   for (const slot of items) {
@@ -124,7 +130,7 @@ export function groupTeamData (
       }
     }
   }
-  return Array.from(result.values())
+  return Array.from(result.values()).filter((m) => allowedSet === undefined || allowedSet.has(m.user))
 }
 
 /**

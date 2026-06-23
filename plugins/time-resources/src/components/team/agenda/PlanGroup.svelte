@@ -1,9 +1,9 @@
 <script lang="ts">
   import { Event } from '@hcengineering/calendar'
   import { calendarByIdStore } from '@hcengineering/calendar-resources'
-  import { IdMap } from '@hcengineering/core'
+  import { IdMap, Ref } from '@hcengineering/core'
   import { ToDo, WorkSlot } from '@hcengineering/time'
-  import { getCurrentEmployee } from '@hcengineering/contact'
+  import { getCurrentEmployee, Person } from '@hcengineering/contact'
   import { groupTeamData } from '../utils'
   import PlanPerson from './PlanPerson.svelte'
 
@@ -12,10 +12,11 @@
   export let showAssignee: boolean = false
 
   export let todos: IdMap<ToDo>
+  export let persons: Ref<Person>[] = []
 
   const me = getCurrentEmployee()
 
-  $: grouped = groupTeamData(slots, todos, events, me, $calendarByIdStore)
+  $: grouped = groupTeamData(slots, todos, events, me, $calendarByIdStore, persons)
 </script>
 
 <div class="container flex-col background-comp-header-color">

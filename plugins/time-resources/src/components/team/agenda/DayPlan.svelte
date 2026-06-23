@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Event } from '@hcengineering/calendar'
+  import { Person } from '@hcengineering/contact'
   import { IdMap, Ref, Timestamp } from '@hcengineering/core'
   import { IntlString, getEmbeddedLabel } from '@hcengineering/platform'
   import { ToDo, WorkSlot } from '@hcengineering/time'
@@ -12,6 +13,7 @@
   export let events: Event[]
   export let showAssignee: boolean = false
   export let todos: IdMap<ToDo>
+  export let persons: Ref<Person>[] = []
 
   function getTitle (day: Date, now: Timestamp): IntlString {
     const today = new Date(now)
@@ -38,6 +40,6 @@
 </div>
 
 <Scroller padding={'0 1rem'} noStretch shrink>
-  <PlanGroup {slots} {events} {showAssignee} {todos} />
+  <PlanGroup {slots} {events} {showAssignee} {todos} {persons} />
 </Scroller>
 <div class="antiVSpacer x4" />
