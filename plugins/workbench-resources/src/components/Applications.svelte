@@ -22,12 +22,13 @@
   import workbench from '@hcengineering/workbench'
   import { chatId } from '@hcengineering/chat'
   import { inboxId } from '@hcengineering/inbox'
-  import { getMetadata, getResource } from '@hcengineering/platform'
+  import { getEmbeddedLabel, getMetadata, getResource } from '@hcengineering/platform'
   import { InboxNotificationsClientImpl } from '@hcengineering/notification-resources'
   import notification, { DocNotifyContext, InboxNotification } from '@hcengineering/notification'
   import { NotificationType } from '@hcengineering/communication-types'
 
   import AppItem from './AppItem.svelte'
+  import Question from './icons/Question.svelte'
 
   export let active: Ref<Application> | undefined
   export let apps: Application[] = []
@@ -35,6 +36,12 @@
   export let customAppProps: Map<string, any> = new Map<string, any>()
 
   const dispatch = createEventDispatcher()
+
+  const supportUrl = 'https://3ftasks.3fventure.tech/workbench/fventure/tracker/6a088eecb84b623fdfa0af2f/issues'
+
+  function openSupport (): void {
+    window.open(supportUrl, '_blank', 'noopener,noreferrer')
+  }
 
   function getClickHandler (app: Application, customProps: any): () => void {
     return (
@@ -189,6 +196,12 @@
           />
         </NavLink>
       {/each}
+      <AppItem
+        icon={Question}
+        label={getEmbeddedLabel('Suporte')}
+        dataId={'app-sidebar-support'}
+        on:click={openSupport}
+      />
       {#if topApps.length > 0}
         <div class="divider" />
       {/if}
