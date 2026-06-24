@@ -43,7 +43,7 @@ import setting from '@hcengineering/setting'
 import { htmlToMarkup } from '@hcengineering/text'
 import { deepEqual } from 'fast-equals'
 import { calendar_v3 } from 'googleapis'
-import { evictClient, getClient } from './client'
+import { evictClient, evictClientOnConnError, getClient } from './client'
 import { getCalendarsSyncHistory, getEventHistory, setCalendarsSyncHistory, setEventHistory } from './kvsUtils'
 import { OutcomingClient } from './outcomingClient'
 import { evictLock, getLockAge, isLocked, lock, LOCK_STALE_MS } from './mutex'
@@ -116,7 +116,10 @@ export class IncomingSyncManager {
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
       await syncManager.startSync()
     } catch (err) {
-      evictClient(user.workspace)
+      // Why: só evicta se o erro indica conexão quebrada. Antes, qualquer
+      // erro (Google rate limit, parse) evictava o pool e derrubava os outros
+      // syncs concorrentes do workspace via ConnectionClosed cascading.
+      evictClientOnConnError(user.workspace, err)
       throw err
     } finally {
       mutex()
@@ -184,7 +187,9 @@ export class IncomingSyncManager {
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
       return await syncManager.reconcileAllCalendars()
     } catch (err) {
-      evictClient(user.workspace)
+      // Why: só evicta se erro de conexão. Erro de auth/Google não justifica
+      // derrubar o pool — quebraria outros syncs concorrentes.
+      evictClientOnConnError(user.workspace, err)
       throw err
     } finally {
       mutex()

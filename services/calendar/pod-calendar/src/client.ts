@@ -133,3 +133,36 @@ export function getActiveClients (): Array<{ workspace: WorkspaceUuid, endpoint:
     endpoint: endpoints.get(workspace)
   }))
 }
+
+// Why: evictClient é destrutivo — derruba o WebSocket compartilhado por
+// TODOS os syncs concorrentes do mesmo workspace. Antes, qualquer erro
+// (Google API 429, parse, lock stale) caía num catch que evictava o pool,
+// causando ConnectionClosed cascading em até 35 syncs paralelos. Agora só
+// evictamos quando o erro é DA CONEXÃO em si — Google/parsing errors
+// transientes não derrubam o pool dos outros usuários.
+export function isConnectionError (err: any): boolean {
+  if (err == null) return false
+  const code = err?.status?.code ?? ''
+  const msg = (err?.message ?? '').toLowerCase()
+  if (code === 'platform:status:ConnectionClosed') return true
+  if (msg.includes('econnreset')) return true
+  if (msg.includes('econnrefused')) return true
+  if (msg.includes('etimedout')) return true
+  if (msg.includes('eai_again')) return true
+  if (msg.includes('websocket')) return true
+  if (msg.includes('createclient timeout')) return true
+  if (msg.includes('gettransactorendpoint timeout')) return true
+  return false
+}
+
+// Evict só quando o erro indica conexão quebrada — preserva pool em erros
+// transientes (Google rate limit, parse, lock stale). Use em catches de
+// sync/push/reconcile que rodam concorrentemente; o evict blanket
+// (evictClient direto) fica para fluxos administrativos / clicked-refresh.
+export function evictClientOnConnError (workspace: WorkspaceUuid, err: any): boolean {
+  if (isConnectionError(err)) {
+    evictClient(workspace)
+    return true
+  }
+  return false
+}

@@ -16,7 +16,7 @@
 import { AccountClient } from '@hcengineering/account-client'
 import { calendarIntegrationKind } from '@hcengineering/calendar'
 import { MeasureContext, TxOperations } from '@hcengineering/core'
-import { evictClient, getClient } from './client'
+import { evictClientOnConnError, getClient } from './client'
 import { IncomingSyncManager } from './sync'
 import { GoogleEmail, Token } from './types'
 import { getGoogleClient, getUserByEmail, removeIntegrationSecret, removeUserByEmail, setCredentials } from './utils'
@@ -50,7 +50,10 @@ export class PushHandler {
             await IncomingSyncManager.push(this.ctx, this.accountClient, txOp, token, res.google, calendarId)
           }
         } catch (err) {
-          evictClient(token.workspace)
+          // Why: só evicta se erro de conexão. Push handler roda por webhook
+          // do Google e pode encontrar muitos erros transientes; derrubar
+          // o pool em cada um quebra outros syncs do workspace.
+          evictClientOnConnError(token.workspace, err)
           this.ctx.error('Push sync error', {
             user: token.userId,
             workspace: token.workspace,
