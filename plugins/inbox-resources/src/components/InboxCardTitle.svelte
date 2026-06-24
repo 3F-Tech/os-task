@@ -46,6 +46,14 @@
       title = res
     })
 
+  // Para issues com "Nome do Cliente" (F09) preenchido, mostra o nome do cliente
+  // no lugar do identificador (ex: ASDAS-3), mantendo o identificador como fallback.
+  let displayId: string | undefined
+  $: {
+    const clientName = (doc as unknown as { clientName?: string } | undefined)?.clientName
+    displayId = clientName != null && clientName.trim().length > 0 ? clientName : idTitle
+  }
+
   function asCard (doc: Doc): Card {
     return doc as Card
   }
@@ -71,9 +79,9 @@
           showLoading={false}
         />
       {/if}
-    {:else if idTitle}
-      <span class="title--bold overflow-label clear-mins" use:tooltip={{ label: getEmbeddedLabel(idTitle) }}>
-        {idTitle}
+    {:else if displayId}
+      <span class="title--bold overflow-label clear-mins" use:tooltip={{ label: getEmbeddedLabel(displayId) }}>
+        {displayId}
       </span>
     {:else}
       {@const label = client.getHierarchy().getClass(navItem._class).label}

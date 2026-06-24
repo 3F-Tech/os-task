@@ -77,6 +77,14 @@
       idTitle = res
     })
 
+  // Para issues com "Nome do Cliente" (F09) preenchido, mostra o nome do cliente
+  // no lugar do identificador (ex: SUPOR-94), mantendo o identificador como fallback.
+  let displayId: string | undefined
+  $: {
+    const clientName = (object as unknown as { clientName?: string } | undefined)?.clientName
+    displayId = clientName != null && clientName.trim().length > 0 ? clientName : idTitle
+  }
+
   $: object &&
     getDocTitle(client, object._id, object._class, object).then((res) => {
       title = res
@@ -208,8 +216,8 @@
         {#if presenterMixin?.labelPresenter}
           <Component is={presenterMixin.labelPresenter} props={{ context: value, object }} />
         {:else}
-          {#if idTitle}
-            {idTitle}
+          {#if displayId}
+            {displayId}
           {:else}
             <Label label={hierarchy.getClass(value.objectClass).label} />
           {/if}
