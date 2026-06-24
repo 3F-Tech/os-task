@@ -34,7 +34,12 @@ const endpoints = new Map<WorkspaceUuid, string>()
 // caller chama evictClient(workspace) pra forçar reconexão na próxima.
 const clients = new Map<WorkspaceUuid, Promise<Client>>()
 
-const CREATE_CLIENT_TIMEOUT_MS = 30_000
+// Why: 30s não cobre workspaces grandes — createClient resolve só APÓS o
+// model do workspace inteiro carregar, não no handshake (que leva ms).
+// Em fventure (>30 users ativos, semanas de tx) o load chega a 60-80s.
+// 90s dá folga; downside é zero porque o timeout só dispara em casos
+// patológicos onde já deveríamos avisar mesmo.
+const CREATE_CLIENT_TIMEOUT_MS = 90_000
 
 function withTimeout<T> (promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined
