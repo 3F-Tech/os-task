@@ -64,6 +64,17 @@ async function updateSubIssues (
 }
 
 /**
+ * Rótulo exibido para a issue em notificações (email/push). Quando a issue tem
+ * "Nome do Cliente" (F09) preenchido, usa o nome do cliente no lugar do
+ * identificador (ex.: SUPOR-97); o identificador permanece como fallback.
+ * @public
+ */
+export function getIssueNotificationLabel (issue: Issue): string {
+  const clientName = (issue as unknown as { clientName?: string }).clientName
+  return clientName != null && clientName.trim().length > 0 ? clientName : issue.identifier
+}
+
+/**
  * @public
  */
 export async function issueHTMLPresenter (doc: Doc, control: TriggerControl): Promise<string> {
@@ -71,7 +82,7 @@ export async function issueHTMLPresenter (doc: Doc, control: TriggerControl): Pr
   const front = control.branding?.front ?? getMetadata(serverCore.metadata.FrontUrl) ?? ''
   const path = `${workbenchId}/${control.workspace.url}/${trackerId}/${issue.identifier}`
   const link = concatLink(front, path)
-  return `<a href="${link}">${issue.identifier}</a> ${issue.title}`
+  return `<a href="${link}">${getIssueNotificationLabel(issue)}</a> ${issue.title}`
 }
 
 /**
@@ -88,7 +99,7 @@ export async function getIssueId (doc: Issue, control: TriggerControl): Promise<
  */
 export async function issueTextPresenter (doc: Doc): Promise<string> {
   const issue = doc as Issue
-  return `${issue.identifier} ${issue.title}`
+  return `${getIssueNotificationLabel(issue)} ${issue.title}`
 }
 
 /**
