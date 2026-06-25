@@ -30,6 +30,11 @@
   export let currentDate: Date
   export let timeMode: '1hour' | '30mins' | '15mins'
   const maxDays = 1
+  // Base width (rem) for a single hour at 1x zoom. The full day spans
+  // 24 * this, so the timeline overflows the viewport and exposes a
+  // horizontal scrollbar instead of squeezing every hour into the screen.
+  const HOUR_WIDTH_REM = 4
+  const dayWidthRem = HOUR_WIDTH_REM * 24
 
   $: fromDate = new Date(currentDate).setDate(currentDate.getDate() - Math.round(maxDays / 2 + 1))
   $: toDate = new Date(currentDate).setDate(currentDate.getDate() + Math.round(maxDays / 2 + 1))
@@ -43,24 +48,11 @@
 
   $: persons = effectivePlannerPersons(project, $employeeRefByAccountUuidStore, client.getHierarchy())
 
-  function calcHourWidth (events: Event[], totalWidth: number): number[] {
-    const hours = new Map<number, number>()
-    for (const e of events) {
-      const h1 = new Date(e.date).getHours()
-      const h2 = new Date(e.dueDate).getHours()
-      for (let i = h1; i <= h2; i++) {
-        hours.set(i, hours.get(i) ?? 0 + 1)
-      }
-    }
-    const width: number[] = []
-    for (let i = 0; i < 24; i++) {
-      if (!hours.has(i)) {
-        width.push(0)
-      } else {
-        width.push((totalWidth - 1) / hours.size)
-      }
-    }
-    return width
+  function calcHourWidth (_events: Event[], totalWidth: number): number[] {
+    // Distribute the full timeline width evenly across all 24 hours so the
+    // whole day is always rendered (and scrollable), not just hours with events.
+    const per = totalWidth / 24
+    return Array.from({ length: 24 }, () => per)
   }
   const timeModes: Record<typeof timeMode, number> = {
     '15mins': 4,
@@ -90,6 +82,8 @@
   headerHeightRem={2}
   multipler={timeModes[timeMode]}
   highlightToday={false}
+  columnWidthOverrideRem={dayWidthRem}
+  scrollableContent
 >
   <svelte:fragment slot="day-header" let:day let:width>
     {@const dayFrom = new Date(day).setHours(0, 0, 0, 0)}

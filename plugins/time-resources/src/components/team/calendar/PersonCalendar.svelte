@@ -38,6 +38,11 @@
   export let persons: Ref<Person>[]
   export let multipler = 1
   export let highlightToday = true
+  // When set, the grid column uses this fixed width (in rem, before multiplier)
+  // instead of fitting the viewport, so the content can overflow and scroll.
+  export let columnWidthOverrideRem: number | undefined = undefined
+  // Allow the timeline to grow past the viewport and expose a horizontal scrollbar.
+  export let scrollableContent = false
 
   const todayDate = new Date()
 
@@ -73,7 +78,8 @@
     ...Array.from(Array(sideDays).keys()).map((it) => currentDate.getDate() + (it + 1))
   ]
 
-  $: columnWidthRem = getColumnWidth(containerWidthRem - headerWidthRem, currentDate, maxDays) * multipler
+  $: columnWidthRem =
+    (columnWidthOverrideRem ?? getColumnWidth(containerWidthRem - headerWidthRem, currentDate, maxDays)) * multipler
 </script>
 
 <Scroller horizontal fade={{ multipler: { top: headerHeightRem, left: headerWidthRem } }} noFade>
@@ -82,6 +88,7 @@
       containerWidth = evt.clientWidth
     }}
     class="timeline"
+    class:timeline--scrollable={scrollableContent}
   >
     {#key [containerWidthRem, columnWidthRem, headerWidthRem]}
       <!-- Resource Header -->
@@ -181,6 +188,11 @@
     grid-auto-flow: column;
     grid-template-columns: auto 1fr;
     grid-template-rows: auto 1fr;
+
+    &.timeline--scrollable {
+      width: max-content;
+      min-width: 100%;
+    }
   }
 
   .timeline-header {
