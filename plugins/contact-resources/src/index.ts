@@ -233,6 +233,17 @@ async function queryContact (
   return await doContactQuery(_class, q, filter, client)
 }
 
+// Remove diacríticos/acentos e normaliza caixa para comparação tolerante a acento.
+// Ex.: "João" -> "joao". O banco usa ILIKE/$regex case-insensitive, que NÃO
+// ignora acentos, então a comparação acento-insensível precisa ser feita aqui.
+function normalizeForSearch (s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
 async function queryEmployee (
   client: Client,
   search: string,
@@ -254,7 +265,23 @@ async function queryEmployee (
     client
   )
 
-  return q1.concat(q2)
+  const serverResults = q1.concat(q2)
+
+  // Fallback acento-insensível: o ILIKE/$regex do banco não casa "joao" com "João".
+  // Buscamos os funcionários ativos e filtramos pelo nome com diacríticos removidos,
+  // complementando (sem duplicar) o que o servidor já encontrou.
+  const normalized = normalizeForSearch(search)
+  if (normalized === '') {
+    return serverResults
+  }
+
+  const seen = new Set(serverResults.map((it) => it.doc._id))
+  const allActive = await doContactQuery(contact.mixin.Employee, {}, filter, client)
+  const accentMatches = allActive.filter(
+    (it) => !seen.has(it.doc._id) && normalizeForSearch(it.title).includes(normalized)
+  )
+
+  return serverResults.concat(accentMatches)
 }
 
 async function doContactQuery<T extends Contact> (
