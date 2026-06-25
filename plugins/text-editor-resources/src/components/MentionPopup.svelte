@@ -146,43 +146,74 @@
     return false
   }
 
+  // Remove acentos/diacríticos e normaliza caixa, para casar "joao" com "João".
+  function normalizeText (s: string): string {
+    return s
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .trim()
+  }
+
+  // Relevância (menor = mais relevante): nome que COMEÇA com o texto primeiro,
+  // depois quem tem alguma palavra começando com o texto, e por fim quem só
+  // contém o texto no meio. Ninguém é descartado — só reordenado.
+  function relevanceRank (title: string, normalizedQuery: string): number {
+    if (normalizedQuery === '') return 0
+    const n = normalizeText(title)
+    if (n.startsWith(normalizedQuery)) return 0
+    if (n.split(/\s+/).some((w) => w.startsWith(normalizedQuery))) return 1
+    return 2
+  }
+
   const updateItems = reduceCalls(async function (localQuery: string): Promise<void> {
     const r = await searchFor('mention', localQuery)
-    if (r.query === query) {
-      let latestIndex = r.items.findLastIndex((it) => it.category.classToSearch === contact.mixin.Employee)
+    if (r.query !== query) return
 
-      let directEmployeeItems: SearchItem[] = []
-      if (latestIndex === -1 && employeeSearchCategory !== undefined) {
-        try {
-          const queryFn = await getResource(employeeSearchCategory.query)
-          const employeeResults = await queryFn(client, localQuery)
-          directEmployeeItems = employeeResults.slice(0, 5).map((result, idx) => ({
-            num: idx,
-            category: employeeSearchCategory,
-            item: {
-              id: result.doc._id as Ref<Doc>,
-              title: result.title,
-              iconComponent: {
-                component: contact.component.AvatarRef as any,
-                props: { _id: result.doc._id as string }
-              },
-              doc: result.doc
-            } as SearchResultDoc
-          }))
-        } catch {}
-      }
+    // O @ busca apenas PESSOAS — descartamos tarefas e demais categorias.
+    const fulltextEmployees = r.items.filter((it) => it.category.classToSearch === contact.mixin.Employee)
 
-      const effectiveLastIndex = directEmployeeItems.length > 0 ? directEmployeeItems.length - 1 : latestIndex
-      const multipleEmployeeSearchItems = await getMultipleEmployeeSearchItems(localQuery, effectiveLastIndex)
-
-      if (latestIndex === -1 && directEmployeeItems.length > 0) {
-        items = [...directEmployeeItems, ...multipleEmployeeSearchItems, ...r.items]
-      } else if (latestIndex === -1) {
-        items = [...multipleEmployeeSearchItems, ...r.items]
-      } else {
-        items = [...r.items.slice(0, latestIndex + 1), ...multipleEmployeeSearchItems, ...r.items.slice(latestIndex + 1)]
-      }
+    // Lista determinística de pessoas: substring + acento-insensível, sempre
+    // executada (o fulltext sozinho perde acentos e tem ranking imprevisível).
+    let employeeItems: SearchItem[] = []
+    if (localQuery !== '' && employeeSearchCategory !== undefined) {
+      try {
+        const queryFn = await getResource(employeeSearchCategory.query)
+        const employeeResults = await queryFn(client, localQuery)
+        const nq = normalizeText(localQuery)
+        employeeResults.sort((a, b) => relevanceRank(a.title, nq) - relevanceRank(b.title, nq))
+        employeeItems = employeeResults.slice(0, 20).map((result) => ({
+          num: 0,
+          category: employeeSearchCategory,
+          item: {
+            id: result.doc._id as Ref<Doc>,
+            title: result.title,
+            iconComponent: {
+              component: contact.component.AvatarRef as any,
+              props: { _id: result.doc._id as string }
+            },
+            doc: result.doc
+          } as SearchResultDoc
+        }))
+      } catch {}
     }
+
+    // Acrescenta funcionários que só o fulltext achou (ex.: por e-mail), sem duplicar.
+    if (employeeItems.length > 0) {
+      const seen = new Set(employeeItems.map((it) => it.item.doc._id))
+      for (const it of fulltextEmployees) {
+        if (!seen.has(it.item.doc._id)) employeeItems.push(it)
+      }
+    } else {
+      employeeItems = fulltextEmployees
+    }
+
+    // Renumera para o cabeçalho da categoria aparecer uma única vez.
+    employeeItems = employeeItems.map((it, idx) => ({ ...it, num: idx }))
+
+    const multipleEmployeeSearchItems = await getMultipleEmployeeSearchItems(localQuery, employeeItems.length - 1)
+
+    items = [...employeeItems, ...multipleEmployeeSearchItems]
   })
   $: void updateItems(query)
 </script>
