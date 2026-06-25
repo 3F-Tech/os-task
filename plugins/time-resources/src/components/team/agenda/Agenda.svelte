@@ -6,9 +6,10 @@
   import Border from '../../Border.svelte'
   import Header from '../../Header.svelte'
   import WithTeamData from '../WithTeamData.svelte'
-  import { toSlots } from '../utils'
+  import { effectivePlannerPersons, toSlots } from '../utils'
   import DayPlan from './DayPlan.svelte'
   import { employeeRefByAccountUuidStore } from '@hcengineering/contact-resources'
+  import { getClient } from '@hcengineering/presentation'
 
   export let space: Ref<Project>
   export let currentDate: Date
@@ -38,9 +39,9 @@
     todayTo
   )
 
-  $: persons = (project?.members ?? [])
-    .map((it) => $employeeRefByAccountUuidStore.get(it))
-    .filter((it) => it !== undefined)
+  const client = getClient()
+
+  $: persons = effectivePlannerPersons(project, $employeeRefByAccountUuidStore, client.getHierarchy())
 </script>
 
 <WithTeamData

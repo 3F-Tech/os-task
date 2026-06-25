@@ -32,6 +32,7 @@
   import time from '../../plugin'
   import { teamSeparators } from '../../utils'
   import TeamNavigator from './TeamNavigator.svelte'
+  import VisibleMembersEditor from './VisibleMembersEditor.svelte'
   import Agenda from './agenda/Agenda.svelte'
   import Calendar from './calendar/Calendar.svelte'
   import { IconWithEmoji, getClient } from '@hcengineering/presentation'
@@ -107,6 +108,9 @@
       <Breadcrumbs {items} currentOnly />
 
       <svelte:fragment slot="actions">
+        {#if space}
+          <VisibleMembersEditor {space} />
+        {/if}
         <ModeSelector
           kind={'subtle'}
           props={{

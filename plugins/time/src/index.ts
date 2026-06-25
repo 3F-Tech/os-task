@@ -15,6 +15,7 @@
 
 import type { Asset, Plugin, Resource } from '@hcengineering/platform'
 import {
+  AccountUuid,
   AttachedDoc,
   Class,
   CollectionSize,
@@ -117,6 +118,16 @@ export interface TodoAutomationHelper extends Doc {
   onDoneTester: Resource<TodoDoneTester>
 }
 
+/**
+ * Per-project curated list of members shown in the Team Planner.
+ * Mixin applied to `task.class.Project`. When `visibleMembers` is empty or
+ * undefined, all project members are shown.
+ * @public
+ */
+export interface TeamPlannerSettings extends Doc {
+  visibleMembers?: AccountUuid[]
+}
+
 export default plugin(timeId, {
   component: {
     Me: '' as AnyComponent,
@@ -132,7 +143,8 @@ export default plugin(timeId, {
     TodoAutomationHelper: '' as Ref<Class<TodoAutomationHelper>>
   },
   mixin: {
-    ItemPresenter: '' as Ref<Mixin<ItemPresenter>>
+    ItemPresenter: '' as Ref<Mixin<ItemPresenter>>,
+    TeamPlannerSettings: '' as Ref<Mixin<TeamPlannerSettings>>
   },
   ids: {
     NotAttached: '' as Ref<Doc>,
@@ -167,6 +179,8 @@ export default plugin(timeId, {
     UnassignToDo: '' as IntlString,
     UnassignToDoConfirm: '' as IntlString,
     ReassignToDo: '' as IntlString,
-    ReassignToDoConfirm: '' as IntlString
+    ReassignToDoConfirm: '' as IntlString,
+    RegisterUsers: '' as IntlString,
+    VisibleMembers: '' as IntlString
   }
 })

@@ -17,10 +17,11 @@
   import { calendarByIdStore } from '@hcengineering/calendar-resources'
   import { getCurrentEmployee, Person } from '@hcengineering/contact'
   import { IdMap, Ref } from '@hcengineering/core'
+  import { getClient } from '@hcengineering/presentation'
   import { Project } from '@hcengineering/task'
   import { ToDo, WorkSlot } from '@hcengineering/time'
   import WithTeamData from '../WithTeamData.svelte'
-  import { groupTeamData, toSlots } from '../utils'
+  import { effectivePlannerPersons, groupTeamData, toSlots } from '../utils'
   import EventElement from './EventElement.svelte'
   import PersonCalendar from './PersonCalendar.svelte'
   import { employeeRefByAccountUuidStore } from '@hcengineering/contact-resources'
@@ -33,15 +34,14 @@
   $: fromDate = new Date(currentDate).setDate(currentDate.getDate() - Math.round(maxDays / 2 + 1))
   $: toDate = new Date(currentDate).setDate(currentDate.getDate() + Math.round(maxDays / 2 + 1))
   const me = getCurrentEmployee()
+  const client = getClient()
 
   let project: Project | undefined
   let slots: WorkSlot[] = []
   let events: Event[] = []
   let todos: IdMap<ToDo> = new Map()
 
-  $: persons = (project?.members ?? [])
-    .map((it) => $employeeRefByAccountUuidStore.get(it))
-    .filter((it) => it !== undefined)
+  $: persons = effectivePlannerPersons(project, $employeeRefByAccountUuidStore, client.getHierarchy())
 
   function calcHourWidth (events: Event[], totalWidth: number): number[] {
     const hours = new Map<number, number>()

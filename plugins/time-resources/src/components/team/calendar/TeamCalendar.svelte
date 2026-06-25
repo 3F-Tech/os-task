@@ -38,7 +38,7 @@
   import time from '../../../plugin'
   import TimePresenter from '../../presenters/TimePresenter.svelte'
   import WithTeamData from '../WithTeamData.svelte'
-  import { groupTeamData, toSlots } from '../utils'
+  import { effectivePlannerPersons, groupTeamData, toSlots } from '../utils'
   import PersonCalendar from './PersonCalendar.svelte'
   import TxPanel from './TxPanel.svelte'
 
@@ -49,15 +49,14 @@
   $: fromDate = new Date(currentDate).setDate(currentDate.getDate() - Math.round(maxDays / 2 + 1))
   $: toDate = new Date(currentDate).setDate(currentDate.getDate() + Math.round(maxDays / 2 + 1))
   const me = getCurrentEmployee()
+  const client = getClient()
 
   let project: Project | undefined
   let slots: WorkSlot[] = []
   let events: Event[] = []
   let todos: IdMap<ToDo> = new Map()
 
-  $: personsRefs = (project?.members ?? [])
-    .map((it) => $employeeRefByAccountUuidStore.get(it))
-    .filter((it) => it !== undefined)
+  $: personsRefs = effectivePlannerPersons(project, $employeeRefByAccountUuidStore, client.getHierarchy())
 
   const txCreateQuery = createQuery()
 
@@ -91,8 +90,6 @@
     }
     txesMap = map
   })
-
-  const client = getClient()
 
   function group (
     txes: Tx[],

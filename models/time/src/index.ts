@@ -18,6 +18,7 @@ import board from '@hcengineering/board'
 import calendarPlugin, { type Visibility } from '@hcengineering/calendar'
 import contactPlugin, { type Employee } from '@hcengineering/contact'
 import {
+  type AccountUuid,
   AccountRole,
   DOMAIN_MODEL,
   DateRangeMode,
@@ -33,12 +34,14 @@ import {
 } from '@hcengineering/core'
 import lead from '@hcengineering/lead'
 import {
+  ArrOf,
   Collection,
   Hidden,
   Index,
   Mixin,
   Model,
   Prop,
+  TypeAccountUuid,
   TypeDate,
   TypeRef,
   TypeString,
@@ -150,8 +153,24 @@ export class TTodoAutomationHelper extends TDoc implements TodoAutomationHelper 
   onDoneTester!: Resource<TodoDoneTester>
 }
 
+// Mixin holds only the added attribute; it is attached to task.class.Project.
+@Mixin(time.mixin.TeamPlannerSettings, task.class.Project)
+@UX(time.string.VisibleMembers)
+export class TTeamPlannerSettings extends TDoc {
+  @Prop(ArrOf(TypeAccountUuid()), time.string.VisibleMembers)
+    visibleMembers?: AccountUuid[]
+}
+
 export function createModel (builder: Builder): void {
-  builder.createModel(TWorkSlot, TItemPresenter, TToDo, TProjectToDo, TTypeToDoPriority, TTodoAutomationHelper)
+  builder.createModel(
+    TWorkSlot,
+    TItemPresenter,
+    TToDo,
+    TProjectToDo,
+    TTypeToDoPriority,
+    TTodoAutomationHelper,
+    TTeamPlannerSettings
+  )
 
   builder.mixin(time.class.ToDo, core.class.Class, activity.mixin.IgnoreActivity, {})
   builder.mixin(time.class.ProjectToDo, core.class.Class, activity.mixin.IgnoreActivity, {})

@@ -13,10 +13,38 @@
 
 import { type Calendar, type Event } from '@hcengineering/calendar'
 import { isVisible } from '@hcengineering/calendar-resources'
-import { type Contact, type Person } from '@hcengineering/contact'
-import { type IdMap, type Ref } from '@hcengineering/core'
-import { type ToDo, type WorkSlot } from '@hcengineering/time'
+import { type Contact, type Employee, type Person } from '@hcengineering/contact'
+import { type AccountUuid, type Doc, type Hierarchy, type IdMap, type Ref } from '@hcengineering/core'
+import { type Project } from '@hcengineering/task'
+import time, { type TeamPlannerSettings, type ToDo, type WorkSlot } from '@hcengineering/time'
 import { type EventPersonMapping } from '../../types'
+
+/**
+ * Resolves which persons should be shown in the Team Planner for a project.
+ *
+ * The coordinator (maintainer+) may curate a visibility list via the
+ * `TeamPlannerSettings` mixin. When that list is empty or unset, every project
+ * member is shown. Otherwise the result is the intersection of project members
+ * with the curated list, so removing someone from the project also drops them.
+ *
+ * @public
+ */
+export function effectivePlannerPersons (
+  project: Project | undefined,
+  accToPerson: Map<AccountUuid, Ref<Employee>>,
+  hierarchy: Hierarchy
+): Array<Ref<Person>> {
+  if (project === undefined) {
+    return []
+  }
+  const members = project.members ?? []
+  const visible = hierarchy.hasMixin(project, time.mixin.TeamPlannerSettings)
+    ? hierarchy.as<Doc, TeamPlannerSettings>(project, time.mixin.TeamPlannerSettings).visibleMembers
+    : undefined
+  const allowed: AccountUuid[] =
+    visible !== undefined && visible.length > 0 ? members.filter((m) => visible.includes(m)) : members
+  return allowed.map((m) => accToPerson.get(m)).filter((p): p is Ref<Employee> => p !== undefined)
+}
 
 export function isVisibleMe (value: Event, me: Ref<Contact>): boolean {
   if (value.participants.includes(me)) {
