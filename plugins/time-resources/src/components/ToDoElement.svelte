@@ -41,16 +41,29 @@
 
   let events: WorkSlot[] = []
   const query = createQuery()
-  $: query.query(
-    plugin.class.WorkSlot,
-    {
-      attachedTo: todo._id
-    },
-    (res) => {
-      events = res
-    },
-    { sort: { date: SortingOrder.Descending } }
-  )
+  // Evita uma query lenta de WorkSlot por ToDo (attachedTo nao e indexado e a tabela
+  // de eventos e grande): usa os workslots ja trazidos no $lookup do pai; so consulta
+  // diretamente quando o lookup nao esta disponivel.
+  $: updateEvents(todo)
+
+  function updateEvents (td: WithLookup<ToDo>): void {
+    const looked = td.$lookup?.workslots as WorkSlot[] | undefined
+    if (looked !== undefined) {
+      query.unsubscribe()
+      events = [...looked].sort((a, b) => (b.date ?? 0) - (a.date ?? 0))
+    } else {
+      query.query(
+        plugin.class.WorkSlot,
+        {
+          attachedTo: td._id
+        },
+        (res) => {
+          events = res
+        },
+        { sort: { date: SortingOrder.Descending } }
+      )
+    }
+  }
 
   let hovered = false
   async function onMenuClick (ev: MouseEvent): Promise<void> {
