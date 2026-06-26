@@ -103,6 +103,10 @@ export class InboxNotificationsClientImpl implements InboxNotificationsClient {
         this.contexts.set(result)
         this._contextByDoc = new Map(result.map((updates) => [updates.objectId, updates]))
         this.contextByDoc.set(this._contextByDoc)
+      },
+      {
+        sort: { modifiedOn: SortingOrder.Descending },
+        limit: 500
       }
     )
     this.otherInboxNotificationsQuery.query(
@@ -114,6 +118,10 @@ export class InboxNotificationsClientImpl implements InboxNotificationsClient {
       (result: InboxNotification[]) => {
         result.sort((a, b) => (b.createdOn ?? b.modifiedOn) - (a.createdOn ?? a.modifiedOn))
         this.otherInboxNotifications.set(result)
+      },
+      {
+        sort: { createdOn: SortingOrder.Descending },
+        limit: 500
       }
     )
 
@@ -133,7 +141,7 @@ export class InboxNotificationsClientImpl implements InboxNotificationsClient {
         lookup: {
           attachedTo: activity.class.ActivityMessage
         },
-        limit: 1000
+        limit: 500
       }
     )
   }

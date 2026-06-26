@@ -75,7 +75,7 @@
         subscribed = { _id: { $in: newSub } }
       }
     },
-    { sort: { attachedTo: 1 }, projection: { attachedTo: 1 } }
+    { sort: { attachedTo: 1 }, projection: { attachedTo: 1 }, limit: 500 }
   )
 
   $: queries = { assigned, active, backlog, created, subscribed }

@@ -227,14 +227,15 @@
       },
       {
         sort: {
-          createdOn: SortingOrder.Ascending
+          createdOn: SortingOrder.Descending
         },
         lookup: {
           _id: {
             reactions: activity.class.Reaction
           }
         },
-        showArchived: true
+        showArchived: true,
+        limit: 200
       }
     )
     if (!res) {
