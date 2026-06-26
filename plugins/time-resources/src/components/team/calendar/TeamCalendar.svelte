@@ -22,6 +22,7 @@
     IdMap,
     PersonId,
     Ref,
+    SortingOrder,
     Timestamp,
     Tx,
     TxCreateDoc,
@@ -78,7 +79,8 @@
     { modifiedBy: { $in: personsSocialIds }, modifiedOn: { $gt: fromDate, $lt: toDate } },
     (res) => {
       txes = res
-    }
+    },
+    { sort: { modifiedOn: SortingOrder.Descending }, limit: 1000 }
   )
   $: getPersonRefsByPersonIdsCb(unique(txes.map((it) => it.createdBy ?? it.modifiedBy)), (res) => {
     const map = new Map<Ref<Person>, Tx[]>()
