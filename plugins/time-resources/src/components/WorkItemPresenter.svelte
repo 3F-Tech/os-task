@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import type { ItemPresenter, ToDo } from '@hcengineering/time'
-  import type { Class, Doc } from '@hcengineering/core'
+  import type { Class, Doc, WithLookup } from '@hcengineering/core'
   import type { ObjectPanel } from '@hcengineering/view'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import { Component, showPanel } from '@hcengineering/ui'
@@ -22,7 +22,7 @@
   import time from '../plugin'
   import { DocReferencePresenter, getObjectLinkId } from '@hcengineering/view-resources'
 
-  export let todo: ToDo
+  export let todo: WithLookup<ToDo>
   export let kind: 'default' | 'todo-line' = 'default'
   export let withoutSpace: boolean = false
 
@@ -35,9 +35,21 @@
 
   let doc: Doc | undefined = undefined
   const docQuery = createQuery()
-  $: docQuery.query(todo.attachedToClass, { _id: todo.attachedTo }, (res) => {
-    doc = res[0]
-  })
+  // Usa a Issue ja trazida no $lookup do ToDo (batelada na query do Planner) e evita uma
+  // query por linha; so consulta diretamente quando o lookup nao esta disponivel.
+  $: updateDoc(todo)
+
+  function updateDoc (td: WithLookup<ToDo>): void {
+    const looked = td.$lookup?.attachedTo as Doc | undefined
+    if (looked !== undefined) {
+      docQuery.unsubscribe()
+      doc = looked
+    } else {
+      docQuery.query(td.attachedToClass, { _id: td.attachedTo }, (res) => {
+        doc = res[0]
+      })
+    }
+  }
 
   async function click (event: MouseEvent): Promise<void> {
     event.stopPropagation()

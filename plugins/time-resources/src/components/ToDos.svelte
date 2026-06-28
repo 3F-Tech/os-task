@@ -152,7 +152,7 @@
         {
           limit: 200,
           sort: { rank: SortingOrder.Ascending },
-          lookup: { _id: { workslots: time.class.WorkSlot } }
+          lookup: { _id: { workslots: time.class.WorkSlot }, attachedTo: tracker.class.Issue }
         }
       )
     } else {
@@ -169,7 +169,8 @@
         },
         {
           limit: 200,
-          sort: { rank: SortingOrder.Ascending }
+          sort: { rank: SortingOrder.Ascending },
+          lookup: { attachedTo: tracker.class.Issue }
         }
       )
     } else {
@@ -184,7 +185,11 @@
         (res) => {
           done = res
         },
-        { limit: 200, sort: { doneOn: SortingOrder.Descending }, lookup: { _id: { workslots: time.class.WorkSlot } } }
+        {
+          limit: 200,
+          sort: { doneOn: SortingOrder.Descending },
+          lookup: { _id: { workslots: time.class.WorkSlot }, attachedTo: tracker.class.Issue }
+        }
       )
     } else {
       doneQuery.unsubscribe()
