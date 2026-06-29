@@ -170,7 +170,7 @@
         {
           limit: 200,
           sort: { rank: SortingOrder.Ascending },
-          lookup: { attachedTo: tracker.class.Issue }
+          lookup: { _id: { workslots: time.class.WorkSlot }, attachedTo: tracker.class.Issue }
         }
       )
     } else {
