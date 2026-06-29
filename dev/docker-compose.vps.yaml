@@ -311,7 +311,7 @@ services:
       - BRANDING_PATH=/var/cfg/branding.json
       - AI_BOT_URL=http://huly.local:4010
       - COMMUNICATION_TIME_LOGGING_ENABLED=true
-      - RATE_LIMIT_MAX=250
+      - RATE_LIMIT_MAX=1500
       - RATE_LIMIT_WINDOW=30000
       - FILES_URL=https://3ftasks.3fventure.tech/files/blob/:workspace/:blobId/:filename
       # Communication API desabilitada — depende do hulylake (não publicado no Docker Hub)

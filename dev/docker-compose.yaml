@@ -338,7 +338,7 @@ services:
       - BRANDING_PATH=/var/cfg/branding.json
       - AI_BOT_URL=http://huly.local:4010
       - COMMUNICATION_TIME_LOGGING_ENABLED=true
-      - RATE_LIMIT_MAX=250 # 250 requests per 30 seconds
+      - RATE_LIMIT_MAX=1500 # 1500 requests per 30 seconds (250 era baixo demais: o burst do Planner em contas pesadas estourava o rate-limit e travava a conexão até F5)
       - RATE_LIMIT_WINDOW=30000
       - FILES_URL=http://datalake:4030/blob/:workspace/:blobId/:filename
       - COMMUNICATION_API_ENABLED=true
