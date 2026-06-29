@@ -68,6 +68,15 @@
     }
   }
 
+  // Enter na descrição também envia (sem Ctrl/Cmd, que o Card já trata).
+  function onDescriptionKeydown (ev: KeyboardEvent): void {
+    if (ev.key === 'Enter' && !ev.ctrlKey && !ev.metaKey) {
+      ev.preventDefault()
+      ev.stopPropagation()
+      void submit()
+    }
+  }
+
   async function create (): Promise<void> {
     if (value === undefined) {
       if (space && issueId) {
@@ -147,7 +156,12 @@
       <span slot="content">8<Label label={tracker.string.HourLabel} /></span>
     </Button>
   </div>
-  <EditBox bind:value={data.description} placeholder={tracker.string.TimeSpendReportDescription} kind={'editbox'} />
+  <EditBox
+    bind:value={data.description}
+    placeholder={tracker.string.TimeSpendReportDescription}
+    kind={'editbox'}
+    on:keydown={onDescriptionKeydown}
+  />
   <svelte:fragment slot="pool">
     <UserBox
       _class={contact.mixin.Employee}

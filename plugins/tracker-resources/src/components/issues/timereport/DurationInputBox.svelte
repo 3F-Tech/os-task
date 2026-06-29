@@ -161,7 +161,7 @@
     } else if (ev.code === 'ArrowRight') {
       ev.preventDefault()
       selected = segs[Math.min(segs.length - 1, idx + 1)]
-    } else if (ev.code === 'Enter') {
+    } else if (ev.key === 'Enter') {
       ev.preventDefault()
       ev.stopPropagation()
       dispatch('submit')
