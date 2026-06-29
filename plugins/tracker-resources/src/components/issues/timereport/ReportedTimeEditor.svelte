@@ -57,6 +57,12 @@
     if (readonly) return
     showPopup(ReportsPopup, { issue: object }, eventToHTMLElement(event))
   }
+  // Ao clicar no editor, abre a lista de relatórios e, por cima, o formulário de adição.
+  function showReportsAndAdd (event: MouseEvent): void {
+    if (readonly) return
+    showReports(event)
+    addTimeReport(event)
+  }
   $: childTime = floorFractionDigits(
     (object.childInfo ?? []).map((it) => it.reportedTime).reduce((a, b) => a + b, 0),
     3
@@ -70,7 +76,7 @@
     id="ReportedTimeEditor"
     class="link-container antiButton link {size} flex-grow flex-between"
     class:readonly
-    on:click={showReports}
+    on:click={showReportsAndAdd}
   >
     {#if value !== undefined}
       <span class="flex-row-center">

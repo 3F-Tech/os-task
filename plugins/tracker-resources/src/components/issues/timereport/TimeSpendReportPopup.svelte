@@ -24,7 +24,9 @@
   import { getTimeReportDate, getTimeReportDayType } from '../../../utils'
   import TitlePresenter from '../TitlePresenter.svelte'
   import TimeReportDayDropdown from './TimeReportDayDropdown.svelte'
+  import DurationInputBox from './DurationInputBox.svelte'
   import { Analytics } from '@hcengineering/analytics'
+  import { createEventDispatcher } from 'svelte'
 
   export let issue: Issue | undefined = undefined
   export let issueId: Ref<Issue> | undefined = issue?._id
@@ -50,6 +52,21 @@
   }
 
   const client = getClient()
+  const dispatch = createEventDispatcher()
+
+  let submitting = false
+
+  // Enter no campo de tempo cria o relatório e fecha o popup.
+  async function submit (): Promise<void> {
+    if (!canSave || submitting) return
+    submitting = true
+    try {
+      await create()
+      dispatch('close')
+    } finally {
+      submitting = false
+    }
+  }
 
   async function create (): Promise<void> {
     if (value === undefined) {
@@ -103,15 +120,8 @@
     {/if}
   </svelte:fragment>
   <div class="flex-row-center gap-2">
-    <EditBox
-      autoFocus
-      bind:value={data.value}
-      {placeholder}
-      maxWidth={'9rem'}
-      format={'number'}
-      maxDigitsAfterPoint={3}
-      kind={'editbox'}
-    />
+    <span class="content-dark-color"><Label label={placeholder} /></span>
+    <DurationInputBox autoFocus bind:value={data.value} on:submit={submit} />
     <Button kind={'link-bordered'} on:click={() => (data.value = 0.25)}>
       <span slot="content">15<Label label={tracker.string.MinuteLabel} /></span>
     </Button>
