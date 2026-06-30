@@ -24,6 +24,9 @@
 
   export let value: Doc | undefined
   export let compact = false
+  // When provided, this text replaces the resolved object label (e.g. the issue
+  // identifier) while keeping the same pill styling and object icon.
+  export let overrideLabel: string | undefined = undefined
 
   const client = getClient()
   const hierarchy = client.getHierarchy()
@@ -53,8 +56,14 @@
       <ObjectIcon {value} {size} />
     </div>
   {/if}
-  <span class="label overflow-label font-medium-12 text-left max-w-20 secondary-textColor">
-    {#if presenter && value}
+  <span
+    class="label overflow-label font-medium-12 text-left secondary-textColor"
+    class:max-w-20={!overrideLabel}
+    class:client-label={overrideLabel}
+  >
+    {#if overrideLabel}
+      {overrideLabel}
+    {:else if presenter && value}
       <svelte:component
         this={presenter.presenter}
         {value}
@@ -92,6 +101,12 @@
     align-items: center;
     flex-shrink: 0;
     height: var(--global-extra-small-Size);
+  }
+
+  // Client name shown in place of the issue identifier: allow a wider badge
+  // than the 5rem id cap, still ellipsizing if the name is extremely long.
+  .client-label {
+    max-width: 15rem;
   }
 
   .label {

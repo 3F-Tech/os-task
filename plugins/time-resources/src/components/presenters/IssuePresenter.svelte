@@ -5,6 +5,6 @@
   export let value: Issue
 </script>
 
-<DocReferencePresenter {value} on:click>
+<DocReferencePresenter {value} overrideLabel={value.clientName} on:click>
   <slot />
 </DocReferencePresenter>
