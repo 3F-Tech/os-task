@@ -15,7 +15,7 @@
 <script lang="ts">
   import contact, { combineName, getFirstName, getLastName } from '@hcengineering/contact'
   import { ChannelsEditor, EditableAvatar, getAccountClient, myEmployeeStore } from '@hcengineering/contact-resources'
-  import { AccountRole, getCurrentAccount, SocialIdType } from '@hcengineering/core'
+  import { AccountRole, getCurrentAccount, hasAccountRole, SocialIdType } from '@hcengineering/core'
   import login, { loginId } from '@hcengineering/login'
   import platform, { getResource, PlatformError } from '@hcengineering/platform'
   import { AttributeEditor, createQuery, getClient, hasResource, MessageBox } from '@hcengineering/presentation'
@@ -208,18 +208,20 @@
       {/if}
       <SocialIdsEditor rating={personRating} />
       <div class="separator" />
-      <div class="flex-col flex-gap-4">
-        <div class="title"><Label label={setting.string.ApiAccess} /></div>
-        <div class="w-32">
-          <Button
-            label={setting.string.GenerateApiToken}
-            kind="regular"
-            disabled={workspaceUrl === ''}
-            showTooltip={{ label: setting.string.GenerateApiToken }}
-            on:click={handleGenerateApiToken}
-          />
+      {#if hasAccountRole(account, AccountRole.User)}
+        <div class="flex-col flex-gap-4">
+          <div class="title"><Label label={setting.string.ApiAccess} /></div>
+          <div class="w-32">
+            <Button
+              label={setting.string.GenerateApiToken}
+              kind="regular"
+              disabled={workspaceUrl === ''}
+              showTooltip={{ label: setting.string.GenerateApiToken }}
+              on:click={handleGenerateApiToken}
+            />
+          </div>
         </div>
-      </div>
+      {/if}
       <div class="footer">
         <Button
           icon={setting.icon.Signout}

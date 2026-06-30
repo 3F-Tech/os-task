@@ -6,7 +6,7 @@
   import recorder from '../plugin'
   import { AccountRole, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
 
-  const readonly = !hasAccountRole(getCurrentAccount(), AccountRole.Guest)
+  const readonly = !hasAccountRole(getCurrentAccount(), AccountRole.User)
 
   onMount(() => {
     const endpoint = getMetadata(recorder.metadata.StreamUrl) ?? ''

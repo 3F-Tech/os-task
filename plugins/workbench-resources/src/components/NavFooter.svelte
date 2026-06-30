@@ -13,6 +13,7 @@
 // limitations under the License.
 -->
 <script lang="ts">
+  import { AccountRole, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
   import { getMetadata } from '@hcengineering/platform'
   import presentation from '@hcengineering/presentation'
   import setting from '@hcengineering/setting'
@@ -25,6 +26,8 @@
   let selected: boolean = false
 
   const version = getMetadata(presentation.metadata.FrontVersion)
+  // Convidados (role abaixo de User) não veem o botão de Ajuda e Suporte.
+  const canSeeSupport = hasAccountRole(getCurrentAccount(), AccountRole.User)
 </script>
 
 <div class="antiNav-footer-line" />
@@ -32,28 +35,30 @@
 <div class="antiNav-footer">
   <slot />
   {#if split}<div class="antiNav-space" />{/if}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div
-    class="antiNav-element"
-    class:selected
-    on:click={() => {
-      selected = true
-      showPopup(HelpAndSupport, {}, 'help-center', () => {
-        selected = false
-      })
-    }}
-  >
-    <div class="an-element__icon">
-      <Icon icon={setting.icon.Support} size={'small'} />
+  {#if canSeeSupport}
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div
+      class="antiNav-element"
+      class:selected
+      on:click={() => {
+        selected = true
+        showPopup(HelpAndSupport, {}, 'help-center', () => {
+          selected = false
+        })
+      }}
+    >
+      <div class="an-element__icon">
+        <Icon icon={setting.icon.Support} size={'small'} />
+      </div>
+      <span class="an-element__label">
+        <Label label={workbench.string.HelpAndSupport} />
+      </span>
+      {#if version}
+        <span class="version-label">{version}</span>
+      {/if}
     </div>
-    <span class="an-element__label">
-      <Label label={workbench.string.HelpAndSupport} />
-    </span>
-    {#if version}
-      <span class="version-label">{version}</span>
-    {/if}
-  </div>
+  {/if}
 </div>
 
 <style lang="scss">

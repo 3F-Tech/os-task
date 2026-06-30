@@ -257,7 +257,10 @@
   }
 
   onMount(() => {
-    pushRootBarComponent('right', view.component.SearchSelector)
+    // Convidados (role abaixo de User) não têm busca global no topo.
+    if (hasAccountRole(account, AccountRole.User)) {
+      pushRootBarComponent('right', view.component.SearchSelector)
+    }
     pushRootBarComponent('left', workbench.component.WorkbenchTabs, 30)
     void getResource(login.function.GetWorkspaces).then(async (getWorkspaceFn) => {
       $workspacesStore = await getWorkspaceFn()
@@ -852,7 +855,7 @@
             on:click={toggleNav}
           />
         </div>
-        {#if !isExcludedApp(activeInboxId)}
+        {#if !isExcludedApp(activeInboxId) && hasAccountRole(account, AccountRole.User)}
           {#if !isCommunicationEnabled}
             <NavLink
               app={notificationId}

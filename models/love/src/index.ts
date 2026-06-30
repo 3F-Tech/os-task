@@ -300,7 +300,7 @@ export function createModel (builder: Builder): void {
       type: WidgetType.Fixed,
       icon: love.icon.Love,
       component: love.component.LoveWidget,
-      accessLevel: AccountRole.DocGuest
+      accessLevel: AccountRole.User
     },
     love.ids.LoveWidget
   )

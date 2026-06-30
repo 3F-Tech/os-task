@@ -26,6 +26,7 @@
     fillDefaults,
     generateId,
     getCurrentAccount,
+    hasAccountRole,
     makeCollabId,
     makeDocCollabId,
     type PersonId,
@@ -128,6 +129,8 @@
     })
   )
   const me = getCurrentAccount()
+  // Convidados (role abaixo de User) veem um formulário enxuto: só título, descrição e prioridade.
+  const isGuest = !hasAccountRole(me, AccountRole.User)
   const client = getClient()
   const hierarchy = client.getHierarchy()
   const parentQuery = createQuery()
@@ -249,7 +252,7 @@
     descriptionBox != null &&
     getTitle(object.title ?? '').length > 0 &&
     object.status !== undefined &&
-    (!projectUsesClientName || isSubIssue || getTitle((object as any).clientName ?? '').length > 0) &&
+    (isGuest || !projectUsesClientName || isSubIssue || getTitle((object as any).clientName ?? '').length > 0) &&
     kind !== undefined &&
     currentProject !== undefined
 
@@ -1013,24 +1016,26 @@
       clearInvalidValue={true}
       {findDefaultSpace}
     />
-    <ObjectBox
-      _class={tracker.class.IssueTemplate}
-      value={templateId}
-      docQuery={{
-        space: _space
-      }}
-      on:change={handleTemplateChange}
-      kind={'regular'}
-      size={'small'}
-      label={tracker.string.NoIssueTemplate}
-      icon={tracker.icon.IssueTemplates}
-      searchField={'title'}
-      allowDeselect={true}
-      showNavigate={false}
-      docProps={{ disabled: true, noUnderline: true }}
-      focusIndex={20000}
-    />
-    <DocCreateExtComponent manager={docCreateManager} kind={'header'} space={currentProject} props={extraProps} />
+    {#if !isGuest}
+      <ObjectBox
+        _class={tracker.class.IssueTemplate}
+        value={templateId}
+        docQuery={{
+          space: _space
+        }}
+        on:change={handleTemplateChange}
+        kind={'regular'}
+        size={'small'}
+        label={tracker.string.NoIssueTemplate}
+        icon={tracker.icon.IssueTemplates}
+        searchField={'title'}
+        allowDeselect={true}
+        showNavigate={false}
+        docProps={{ disabled: true, noUnderline: true }}
+        focusIndex={20000}
+      />
+      <DocCreateExtComponent manager={docCreateManager} kind={'header'} space={currentProject} props={extraProps} />
+    {/if}
   </svelte:fragment>
   <svelte:fragment slot="title" let:label>
     <div class="flex-row-center gap-2 pt-1 pb-1 pr-1">
@@ -1059,7 +1064,9 @@
           }}
         />
       {/if}
-      <DocCreateExtComponent manager={docCreateManager} kind={'title'} space={currentProject} props={extraProps} />
+      {#if !isGuest}
+        <DocCreateExtComponent manager={docCreateManager} kind={'title'} space={currentProject} props={extraProps} />
+      {/if}
     </div>
   </svelte:fragment>
   <svelte:fragment slot="subheader">
@@ -1100,7 +1107,7 @@
       />
     {/key}
   </div>
-  {#if _space}
+  {#if _space && !isGuest}
     <SubIssues
       bind:this={subIssuesComponent}
       projectId={_space}
@@ -1112,9 +1119,11 @@
       bind:subIssues={object.subIssues}
     />
   {/if}
-  <DocCreateExtComponent manager={docCreateManager} kind={'body'} space={currentProject} props={extraProps} />
+  {#if !isGuest}
+    <DocCreateExtComponent manager={docCreateManager} kind={'body'} space={currentProject} props={extraProps} />
+  {/if}
   <svelte:fragment slot="pool">
-    {#if showClientFields}
+    {#if showClientFields && !isGuest}
       <div id="client-name-editor" class="pool-item">
         <EditBox
           focusIndex={2.5}
@@ -1132,6 +1141,7 @@
         />
       </div>
     {/if}
+    {#if !isGuest}
     <div id="status-editor" class="pool-item">
       {#if kind !== undefined}
         <StatusEditor
@@ -1149,6 +1159,7 @@
         />
       {/if}
     </div>
+    {/if}
     <div id="priority-editor" class="pool-item">
       <PriorityEditor
         focusIndex={4}
@@ -1162,6 +1173,7 @@
         on:change={onPriorityChanged}
       />
     </div>
+    {#if !isGuest}
     <div id="assignee-editor" class="pool-item">
       <AssigneeEditor
         focusIndex={5}
@@ -1276,6 +1288,7 @@
       </div>
     {/each}
     <DocCreateExtComponent manager={docCreateManager} kind={'pool'} space={currentProject} props={extraProps} />
+    {/if}
   </svelte:fragment>
   <svelte:fragment slot="attachments">
     {#if attachments.size > 0}
@@ -1290,18 +1303,22 @@
     {/if}
   </svelte:fragment>
   <svelte:fragment slot="footer">
-    <Button
-      focusIndex={12}
-      icon={IconAttachment}
-      iconProps={{ fill: 'var(--theme-dark-color)' }}
-      size={'large'}
-      kind={'ghost'}
-      on:click={onAttachClick}
-    />
-    <DocCreateExtComponent manager={docCreateManager} kind={'footer'} space={currentProject} props={extraProps} />
+    {#if !isGuest}
+      <Button
+        focusIndex={12}
+        icon={IconAttachment}
+        iconProps={{ fill: 'var(--theme-dark-color)' }}
+        size={'large'}
+        kind={'ghost'}
+        on:click={onAttachClick}
+      />
+      <DocCreateExtComponent manager={docCreateManager} kind={'footer'} space={currentProject} props={extraProps} />
+    {/if}
   </svelte:fragment>
   <svelte:fragment slot="buttons">
-    <DocCreateExtComponent manager={docCreateManager} kind={'buttons'} space={currentProject} props={extraProps} />
+    {#if !isGuest}
+      <DocCreateExtComponent manager={docCreateManager} kind={'buttons'} space={currentProject} props={extraProps} />
+    {/if}
   </svelte:fragment>
   <svelte:fragment slot="after-buttons" let:handleOkClick let:okProcessing let:focusIndex let:canSave let:okLabel>
     <DocCreateExtComponent

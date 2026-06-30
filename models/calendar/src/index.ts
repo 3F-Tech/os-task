@@ -215,7 +215,8 @@ export function createModel (builder: Builder): void {
       label: calendar.string.Calendar,
       type: WidgetType.Fixed,
       icon: calendar.icon.Calendar,
-      component: calendar.component.CalendarWidget
+      component: calendar.component.CalendarWidget,
+      accessLevel: AccountRole.User
     },
     calendar.ids.CalendarWidget
   )

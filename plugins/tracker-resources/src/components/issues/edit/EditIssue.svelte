@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { AttachmentStyleBoxCollabEditor } from '@hcengineering/attachment-resources'
-  import { Class, Doc, Ref, WithLookup } from '@hcengineering/core'
+  import { AccountRole, Class, Doc, getCurrentAccount, hasAccountRole, Ref, WithLookup } from '@hcengineering/core'
   import { Panel } from '@hcengineering/panel'
   import presentation, {
     ActionContext,
@@ -66,6 +66,11 @@
   const dispatch = createEventDispatcher()
   const client = getClient()
   const hierarchy = client.getHierarchy()
+
+  // Comentar é independente de editar a tarefa: o servidor já permite ChatMessage para
+  // role >= Guest (models/chunter TxAccessLevel). Espelhamos isso aqui para que convidados
+  // vejam o campo de comentário mesmo sem poder editar a tarefa (canEditIssue = false).
+  const canComment = hasAccountRole(getCurrentAccount(), AccountRole.Guest)
 
   let issue: WithLookup<Issue> | undefined
   let title = ''
@@ -211,7 +216,7 @@
   <Panel
     object={issue}
     isHeader={false}
-    withoutInput={effectiveReadonly}
+    withoutInput={readonly || !canComment}
     allowClose={!embedded}
     isAside={true}
     isSub={false}
