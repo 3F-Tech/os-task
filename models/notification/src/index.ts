@@ -82,6 +82,7 @@ import {
   type NotificationTemplate,
   type NotificationType,
   type NotificationTypeSetting,
+  type OnlyAssignedTasksSetting,
   type PushSubscription,
   type PushSubscriptionKeys,
   type ReactionInboxNotification
@@ -156,6 +157,11 @@ export class TNotificationTypeSetting extends TPreference implements Notificatio
 @Model(notification.class.NotificationProviderSetting, preference.class.Preference)
 export class TNotificationProviderSetting extends TPreference implements NotificationProviderSetting {
   declare attachedTo: Ref<TNotificationProvider>
+  enabled!: boolean
+}
+
+@Model(notification.class.OnlyAssignedTasksSetting, preference.class.Preference)
+export class TOnlyAssignedTasksSetting extends TPreference implements OnlyAssignedTasksSetting {
   enabled!: boolean
 }
 
@@ -370,6 +376,7 @@ export function createModel (builder: Builder): void {
     TNotificationProvider,
     TNotificationProviderSetting,
     TNotificationTypeSetting,
+    TOnlyAssignedTasksSetting,
     TNotificationProviderDefaults,
     TReactionInboxNotification
   )
@@ -580,6 +587,12 @@ export function createModel (builder: Builder): void {
   })
 
   builder.mixin(notification.class.NotificationProviderSetting, core.class.Class, core.mixin.TxAccessLevel, {
+    createAccessLevel: AccountRole.Guest,
+    updateAccessLevel: AccountRole.Guest,
+    removeAccessLevel: AccountRole.Guest
+  })
+
+  builder.mixin(notification.class.OnlyAssignedTasksSetting, core.class.Class, core.mixin.TxAccessLevel, {
     createAccessLevel: AccountRole.Guest,
     updateAccessLevel: AccountRole.Guest,
     removeAccessLevel: AccountRole.Guest

@@ -189,6 +189,16 @@ export interface NotificationTypeSetting extends Preference {
 
 /**
  * @public
+ * Per-user preference: when enabled, inbox notifications are created only for
+ * tasks (docs with an `assignee` attribute) where the user is the assignee.
+ * Mentions are always preserved. Other channels (email/push) are not affected.
+ */
+export interface OnlyAssignedTasksSetting extends Preference {
+  enabled: boolean
+}
+
+/**
+ * @public
  */
 export interface NotificationObjectPresenter extends Class<Doc> {
   presenter: AnyComponent
@@ -370,7 +380,8 @@ const notification = plugin(notificationId, {
     NotificationTypeSetting: '' as Ref<Class<NotificationTypeSetting>>,
     NotificationProviderSetting: '' as Ref<Class<NotificationProviderSetting>>,
     NotificationProviderDefaults: '' as Ref<Mixin<NotificationProviderDefaults>>,
-    ReactionInboxNotification: '' as Ref<Class<ReactionInboxNotification>>
+    ReactionInboxNotification: '' as Ref<Class<ReactionInboxNotification>>,
+    OnlyAssignedTasksSetting: '' as Ref<Class<OnlyAssignedTasksSetting>>
   },
   ids: {
     NotificationSettings: '' as Ref<Doc>,
@@ -446,7 +457,9 @@ const notification = plugin(notificationId, {
     Sound: '' as IntlString,
     NoAccessToObject: '' as IntlString,
     ViewIn: '' as IntlString,
-    Collaborators: '' as IntlString
+    Collaborators: '' as IntlString,
+    OnlyAssignedTasks: '' as IntlString,
+    OnlyAssignedTasksDescription: '' as IntlString
   },
   function: {
     Notify: '' as Resource<NotifyFunc>,

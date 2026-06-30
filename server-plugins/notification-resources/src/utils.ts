@@ -52,7 +52,8 @@ import notification, {
   NotificationProvider,
   type NotificationProviderSetting,
   NotificationType,
-  type NotificationTypeSetting
+  type NotificationTypeSetting,
+  type OnlyAssignedTasksSetting
 } from '@hcengineering/notification'
 import { getMetadata, getResource, IntlString, translate } from '@hcengineering/platform'
 import { getPersonSpaces } from '@hcengineering/server-contact'
@@ -257,7 +258,36 @@ export async function isShouldNotifyTx (
     }
   }
 
+  applyOnlyAssignedFilter(control, object, receiver, notificationControl, result)
+
   return result
+}
+
+// "Only notify me for tasks assigned to me": when enabled, drop inbox notifications
+// for tasks (docs with an `assignee` attribute) where the receiver is not the assignee.
+// Mentions are always preserved.
+function applyOnlyAssignedFilter (
+  control: TriggerControl,
+  object: Doc,
+  receiver: ReceiverInfo,
+  notificationControl: NotificationProviderControl,
+  result: NotifyResult
+): void {
+  const inboxTypes = result.get(notification.providers.InboxNotificationProvider)
+  if (inboxTypes === undefined || inboxTypes.length === 0) return
+  if (!notificationControl.isOnlyAssigned(receiver.socialIds)) return
+  if (control.hierarchy.findAttribute(object._class, 'assignee') === undefined) return
+
+  const assignee = (object as any).assignee
+  const isAssignee = assignee != null && assignee === receiver.employee
+  if (isAssignee) return
+
+  const kept = inboxTypes.filter((it) => it._id === notification.ids.MentionNotificationType)
+  if (kept.length > 0) {
+    result.set(notification.providers.InboxNotificationProvider, kept)
+  } else {
+    result.delete(notification.providers.InboxNotificationProvider)
+  }
 }
 
 function getMatchedTypes (
@@ -632,14 +662,23 @@ export class NotificationProviderControl {
   public settingsByProvider: Map<Ref<NotificationProvider>, NotificationTypeSetting[]>
   constructor (
     readonly providersSettings: NotificationProviderSetting[],
-    readonly typesSettings: NotificationTypeSetting[]
+    readonly typesSettings: NotificationTypeSetting[],
+    readonly onlyAssignedTasksSettings: OnlyAssignedTasksSetting[] = []
   ) {
     this.byProvider = groupByArray(providersSettings, (it) => it.attachedTo)
     this.settingsByProvider = groupByArray(typesSettings, (it) => it.attachedTo)
   }
+
+  // True when the receiver enabled "only notify me for tasks assigned to me".
+  isOnlyAssigned (receiverIds: PersonId[]): boolean {
+    return this.onlyAssignedTasksSettings.some(
+      (it) => it.enabled && it.createdBy !== undefined && receiverIds.includes(it.createdBy)
+    )
+  }
 }
 const notificationProvidersKey = 'notification_provider_settings'
 const typesSettingsKey = 'notification_type_settings'
+const onlyAssignedTasksKey = 'notification_only_assigned_tasks_settings'
 export async function getNotificationProviderControl (
   ctx: MeasureContext,
   control: TriggerControl
@@ -658,7 +697,14 @@ export async function getNotificationProviderControl (
     })
     control.contextCache.set(typesSettingsKey, typesSettings)
   }
-  return new NotificationProviderControl(providersSettings, typesSettings)
+  let onlyAssignedTasksSettings: OnlyAssignedTasksSetting[] = control.contextCache.get(onlyAssignedTasksKey)
+  if (onlyAssignedTasksSettings === undefined) {
+    onlyAssignedTasksSettings = await control.queryFind(ctx, notification.class.OnlyAssignedTasksSetting, {
+      space: core.space.Workspace
+    })
+    control.contextCache.set(onlyAssignedTasksKey, onlyAssignedTasksSettings)
+  }
+  return new NotificationProviderControl(providersSettings, typesSettings, onlyAssignedTasksSettings)
 }
 
 export async function getObjectSpace (control: TriggerControl, doc: Doc, cache: Map<Ref<Doc>, Doc>): Promise<Space> {

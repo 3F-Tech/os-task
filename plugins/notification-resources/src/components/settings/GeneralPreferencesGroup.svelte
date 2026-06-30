@@ -14,15 +14,36 @@
 -->
 
 <script lang="ts">
-  import { getClient } from '@hcengineering/presentation'
-  import notification, { NotificationProvider } from '@hcengineering/notification'
+  import { createQuery, getClient } from '@hcengineering/presentation'
+  import notification, { NotificationProvider, OnlyAssignedTasksSetting } from '@hcengineering/notification'
   import core, { Ref } from '@hcengineering/core'
   import { getResource } from '@hcengineering/platform'
+  import { Icon, Label, ModernToggle } from '@hcengineering/ui'
 
   import { providersSettings } from '../../utils'
   import ProviderPreferences from './ProviderPreferences.svelte'
 
   const client = getClient()
+
+  const onlyAssignedQuery = createQuery()
+  let onlyAssignedSetting: OnlyAssignedTasksSetting | undefined
+  onlyAssignedQuery.query(notification.class.OnlyAssignedTasksSetting, { space: core.space.Workspace }, (res) => {
+    onlyAssignedSetting = res[0]
+  })
+  $: onlyAssignedEnabled = onlyAssignedSetting?.enabled ?? false
+
+  async function toggleOnlyAssigned (): Promise<void> {
+    const enabled = !onlyAssignedEnabled
+    if (onlyAssignedSetting !== undefined) {
+      await client.update(onlyAssignedSetting, { enabled })
+      onlyAssignedSetting.enabled = enabled
+    } else {
+      await client.createDoc(notification.class.OnlyAssignedTasksSetting, core.space.Workspace, {
+        attachedTo: notification.providers.InboxNotificationProvider,
+        enabled
+      })
+    }
+  }
   const providers = client
     .getModel()
     .findAllSync(notification.class.NotificationProvider, {})
@@ -85,4 +106,29 @@
       <ProviderPreferences {provider} on:toggle={onToggle} />
     {/if}
   {/each}
+
+  <div class="flex-row-top flex-gap-2">
+    <div class="flex-col flex-gap-2 w-120">
+      <div class="flex-row-center flex-gap-2">
+        <Icon icon={notification.icon.Notifications} size="medium" />
+        <span class="label font-semi-bold">
+          <Label label={notification.string.OnlyAssignedTasks} />
+        </span>
+      </div>
+      <span class="description">
+        <Label label={notification.string.OnlyAssignedTasksDescription} />
+      </span>
+    </div>
+    <ModernToggle size="small" checked={onlyAssignedEnabled} on:change={toggleOnlyAssigned} />
+  </div>
 </div>
+
+<style lang="scss">
+  .label {
+    color: var(--global-primary-TextColor);
+  }
+
+  .description {
+    color: var(--global-secondary-TextColor);
+  }
+</style>
