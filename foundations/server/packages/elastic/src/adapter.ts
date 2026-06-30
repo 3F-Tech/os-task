@@ -103,6 +103,35 @@ const mappings = {
   }
 }
 
+// Settings de análise compartilhados entre o index template e o create explícito.
+// asciifolding remove acentos na indexação e na busca → "Joao" encontra "João".
+const analysisSettings = {
+  filter: {
+    english_stemmer: {
+      type: 'stemmer',
+      language: 'english'
+    },
+    english_possessive_stemmer: {
+      type: 'stemmer',
+      language: 'possessive_english'
+    }
+  },
+  analyzer: {
+    rebuilt_english: {
+      type: 'custom',
+      tokenizer: 'standard',
+      filter: ['english_possessive_stemmer', 'lowercase', 'asciifolding', 'english_stemmer']
+    },
+    // Analyzer padrão de todos os campos de texto (inclui dinâmicos como
+    // clientName/searchTitle).
+    default: {
+      type: 'custom',
+      tokenizer: 'standard',
+      filter: ['lowercase', 'asciifolding']
+    }
+  }
+}
+
 class ElasticAdapter implements FullTextAdapter {
   private readonly getFulltextDocId: (workspaceId: WorkspaceUuid, doc: Ref<Doc>) => Ref<Doc>
   private readonly getDocId: (workspaceId: WorkspaceUuid, fulltext: Ref<Doc>) => Ref<Doc>
@@ -121,6 +150,24 @@ class ElasticAdapter implements FullTextAdapter {
   async initMapping (ctx: MeasureContext): Promise<boolean> {
     const indexName = this.indexName
     try {
+      // Template durável: garante que QUALQUER índice <base>_* criado herde o analyzer
+      // com asciifolding — seja pelo create explícito abaixo, por auto-create em um write
+      // (reindex/consumer com índice ausente) ou por um pod recriando o índice. Sem isto,
+      // um índice criado fora do create abaixo volta ao analyzer padrão e a busca sem
+      // acento quebra silenciosamente (já regrediu na VPS por esse motivo).
+      try {
+        await ctx.with('put-index-template', {}, () =>
+          this.client.indices.putTemplate({
+            name: `${this.indexBaseName}_template`,
+            body: {
+              index_patterns: [`${this.indexBaseName}_*`],
+              settings: { analysis: analysisSettings }
+            }
+          })
+        )
+      } catch (err: any) {
+        ctx.warn('failed to register elastic index template', { err })
+      }
       const existingVersions = await ctx.withSync('get-indexes', {}, () =>
         this.client.indices.get({
           index: [`${this.indexBaseName}_*`]
@@ -156,33 +203,7 @@ class ElasticAdapter implements FullTextAdapter {
             index: indexName,
             body: {
               settings: {
-                analysis: {
-                  filter: {
-                    english_stemmer: {
-                      type: 'stemmer',
-                      language: 'english'
-                    },
-                    english_possessive_stemmer: {
-                      type: 'stemmer',
-                      language: 'possessive_english'
-                    }
-                  },
-                  analyzer: {
-                    rebuilt_english: {
-                      type: 'custom',
-                      tokenizer: 'standard',
-                      filter: ['english_possessive_stemmer', 'lowercase', 'asciifolding', 'english_stemmer']
-                    },
-                    // Analyzer padrão de todos os campos de texto (inclui os dinâmicos como
-                    // clientName/searchTitle). asciifolding remove acentos na indexação e na
-                    // busca → "Joao" encontra "João", "Diario" encontra "Diário".
-                    default: {
-                      type: 'custom',
-                      tokenizer: 'standard',
-                      filter: ['lowercase', 'asciifolding']
-                    }
-                  }
-                }
+                analysis: analysisSettings
               },
               mappings
             }
