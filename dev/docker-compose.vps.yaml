@@ -63,6 +63,16 @@ services:
       - --default-log-level=info
       - --memory 512M
     container_name: redpanda
+    # Sem isto o redpanda herda nofile soft=1024 do daemon e esgota os file
+    # descriptors sob carga (34+ consumer groups + reconexões) → "accept4: Too
+    # many open files", e todo client (fulltext/transactor/workers) leva timeout
+    # ao (re)conectar. Ocorreu na VPS em 2026-07-01: busca ficou vazia porque o
+    # pod fulltext não consumia a fila. O hard limit já é 524288; só o soft
+    # precisa subir.
+    ulimits:
+      nofile:
+        soft: 524288
+        hard: 524288
     volumes:
       - /opt/apps/os-tasks/data/redpanda:/var/lib/redpanda/data
     ports:
