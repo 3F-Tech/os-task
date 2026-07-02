@@ -278,8 +278,11 @@ function applyOnlyAssignedFilter (
   if (!notificationControl.isOnlyAssigned(receiver.socialIds)) return
   if (control.hierarchy.findAttribute(object._class, 'assignee') === undefined) return
 
+  // `assignee` no tracker é multi-responsável (Ref<Person>[]); trata array e escalar.
   const assignee = (object as any).assignee
-  const isAssignee = assignee != null && assignee === receiver.employee
+  const isAssignee = Array.isArray(assignee)
+    ? assignee.includes(receiver.employee)
+    : assignee != null && assignee === receiver.employee
   if (isAssignee) return
 
   const kept = inboxTypes.filter((it) => it._id === notification.ids.MentionNotificationType)
