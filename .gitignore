@@ -63,7 +63,11 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-# .env
+# '.env' NÃO é ignorado globalmente de propósito (há .env versionados em
+# testes/exemplos que devem continuar no repo). Ignoramos apenas os arquivos
+# de ambiente que carregam credenciais locais. Os .example ficam versionados.
+dev/.env
+dev/local-mongo/.env
 *.secrets
 .env.secrets
 dev/.env.github
