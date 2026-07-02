@@ -232,6 +232,23 @@ class ElasticAdapter implements FullTextAdapter {
     await this.client.close()
   }
 
+  // Retorna se o workspace tem ALGUM doc indexado. Usado pelo pod fulltext para
+  // detectar índice vazio (recriado por version bump/incidente de elastic) e
+  // auto-disparar reindex. Em erro (ES indisponível/índice ausente) retorna `true`
+  // (= "não sei, não mexe") para NUNCA provocar reindex indevido.
+  async checkWorkspaceIndexed (ctx: MeasureContext, workspaceId: WorkspaceUuid): Promise<boolean> {
+    try {
+      const result = await this.client.count({
+        index: this.indexName,
+        body: { query: { term: { workspaceId } } }
+      })
+      return (result.body?.count ?? 0) > 0
+    } catch (err: any) {
+      ctx.warn('checkWorkspaceIndexed failed', { workspaceId, err: err?.message })
+      return true
+    }
+  }
+
   async searchString (
     ctx: MeasureContext,
     workspaceId: WorkspaceUuid,

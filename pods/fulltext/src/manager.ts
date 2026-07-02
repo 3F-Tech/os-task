@@ -44,6 +44,8 @@ export class WorkspaceManager {
   indexers = new Map<string, WorkspaceIndexer | Promise<WorkspaceIndexer>>()
 
   restoring = new Set<WorkspaceUuid>()
+  // Workspaces já checados para auto-reindex neste processo (dispara no máx. 1x cada).
+  autoReindexChecked = new Set<WorkspaceUuid>()
   sysHierarchy = new Hierarchy()
 
   workspaceConsumer?: ConsumerHandle
@@ -338,6 +340,27 @@ export class WorkspaceManager {
         throw new Error('Workspace limit reached')
       }
       ctx.warn('indexer created', { workspace })
+
+      // Auto-cura de índice vazio: restart de pod NÃO dispara reindex no Huly (só o
+      // evento FullReindex). Se o índice do workspace ficou vazio — recriado por
+      // version bump/incidente de elastic e nunca reindexado — a busca fica morta até
+      // reindex manual. Aqui, 1x por processo por workspace, se não houver NENHUM doc
+      // indexado, enfileira um FullReindex. Só dispara quando genuinamente vazio; em
+      // erro/indeterminado NÃO dispara (evita tempestade de reindex).
+      if (!this.autoReindexChecked.has(workspace)) {
+        this.autoReindexChecked.add(workspace)
+        const wsKey = (workspaceInfo.dataId as unknown as WorkspaceUuid) ?? workspace
+        try {
+          const indexed = await (this.fulltextAdapter as any).checkWorkspaceIndexed?.(ctx, wsKey)
+          if (indexed === false) {
+            ctx.warn('empty fulltext index detected, enqueuing auto full-reindex', { workspace })
+            await this.fulltextProducer.send(ctx, workspace, [workspaceEvents.fullReindex()])
+          }
+        } catch (err: any) {
+          ctx.warn('auto-reindex check failed', { workspace, err: err?.message })
+        }
+      }
+
       return await WorkspaceIndexer.create(
         ctx,
         this.model,

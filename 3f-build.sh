@@ -42,7 +42,9 @@ SKIP_RUSH=false
 SKIP_WEBPACK=false
 CLEAN=false
 VPS=false
-PODS="server front account collaborator workspace"
+# fulltext e worker carregam o modelo → precisam ser rebuildados junto num version
+# bump, senão ficam stale (ex.: fulltext em 0.7.356 vs workspace 0.7.358 → busca morre).
+PODS="server front account collaborator workspace fulltext worker"
 
 # ── Parse de argumentos ───────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
