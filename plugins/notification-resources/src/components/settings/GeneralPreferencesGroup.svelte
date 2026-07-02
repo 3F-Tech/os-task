@@ -26,22 +26,27 @@
   const client = getClient()
 
   const onlyAssignedQuery = createQuery()
-  let onlyAssignedSetting: OnlyAssignedTasksSetting | undefined
+  let onlyAssignedSettings: OnlyAssignedTasksSetting[] = []
   onlyAssignedQuery.query(notification.class.OnlyAssignedTasksSetting, { space: core.space.Workspace }, (res) => {
-    onlyAssignedSetting = res[0]
+    onlyAssignedSettings = res
   })
-  $: onlyAssignedEnabled = onlyAssignedSetting?.enabled ?? false
+  // Espelha a regra do servidor: ligada se QUALQUER doc estiver enabled.
+  $: onlyAssignedEnabled = onlyAssignedSettings.some((s) => s.enabled)
 
   async function toggleOnlyAssigned (): Promise<void> {
     const enabled = !onlyAssignedEnabled
-    if (onlyAssignedSetting !== undefined) {
-      await client.update(onlyAssignedSetting, { enabled })
-      onlyAssignedSetting.enabled = enabled
-    } else {
+    if (onlyAssignedSettings.length === 0) {
       await client.createDoc(notification.class.OnlyAssignedTasksSetting, core.space.Workspace, {
         attachedTo: notification.providers.InboxNotificationProvider,
         enabled
       })
+    } else {
+      // Pode haver docs duplicados (corridas antigas). Mantém o 1o com o novo
+      // valor e remove os demais, garantindo estado consistente com o servidor.
+      await client.update(onlyAssignedSettings[0], { enabled })
+      for (const dup of onlyAssignedSettings.slice(1)) {
+        await client.removeDoc(dup._class, dup.space, dup._id)
+      }
     }
   }
   const providers = client
