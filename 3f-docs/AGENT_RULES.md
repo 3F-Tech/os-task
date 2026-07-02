@@ -23,13 +23,8 @@ Guia obrigatório para qualquer agente que vá fazer alterações no repositóri
 
 ## 2. Regras absolutas (nunca viole)
 
-- **NUNCA use `pnpm install` diretamente** — use `rush install`
-- **NUNCA edite o banco de dados diretamente** — toda mutação é uma `Tx` (transação)
-- **NUNCA crie uma classe `SubIssue`** — sub-issues são Issues com `attachedTo` preenchido
-- **NUNCA edite `description` de Issue via transação direta** — use o collaborator service (gerenciado por Yjs)
-- **NUNCA use `git push --force` na branch `develop`**
-- **NUNCA commite arquivos de segredos** (`.env`, credenciais)
-- **Mudanças de schema requerem migration transactions** — não é um ORM com `ALTER TABLE`
+As regras de ouro consolidadas vivem no **`CLAUDE.md` → "Regras de ouro (NUNCA viole)"**
+(dono único, para não divergir). Consulte-as lá antes de editar qualquer arquivo.
 
 ---
 
@@ -175,14 +170,8 @@ Use o script `3f-build.sh` na raiz do projeto. Roda no **Git Bash** (não no cmd
 
 ### Referência rápida: o que mudou → qual pod rebuildar
 
-| Arquivos alterados | Pod(s) |
-|---|---|
-| `plugins/*-resources/`, `plugins/workbench-resources/` | `pods/front` |
-| `plugins/*/src/index.ts` (sem resources) | `pods/front` + `pods/server` |
-| `models/*/`, `server-plugins/*/` | `pods/server` (transactor) |
-| `server/account/`, `server/account-service/` | `pods/account` |
-| `server/server-pipeline/` | `pods/server` (transactor) |
-| Tudo (não sabe ao certo) | Os 3 pods |
+Tabela "arquivo alterado → pod" no **`CLAUDE.md` → "Mapa: arquivo alterado → pod"**
+(dono único). As flags e tempos desta seção complementam esse mapa.
 
 ---
 
@@ -199,42 +188,11 @@ O `rush validate` deve terminar com `SUCCESS` em todos os pacotes relevantes. O 
 
 ## 7. Padrões de código
 
-### Decorators obrigatórios nos models
-```typescript
-@Model(pluginId.class.MinhaClasse, core.class.Doc, DOMAIN_MINHA_FEATURE)
-@Prop(TypeString(), pluginId.string.MeuCampo)
-@Index(IndexKind.FullText)
-@Mixin(pluginId.mixin.MeuMixin, baseClass)
-```
-
-### IDs de plugin
-```
-pluginId:kind:name
-// Exemplo:
-tagSharing.class.UserTag
-tagSharing.mixin.TaggedProfile
-tracker.mixin.IssueCompletionConfig
-```
-
-### Nunca crie um campo `space` redeclarado num model class
-Use `declare` para anotar sem criar nova propriedade:
-```typescript
-// ERRADO
-space!: Ref<Space>
-
-// CORRETO
-declare space: Ref<Space>
-```
-
-### Adicionando um novo plugin (checklist)
-1. Definir IDs em `plugins/meu-plugin/src/index.ts`
-2. Definir modelo em `models/model-meu-plugin/src/types.ts`
-3. Criar `createModel` em `models/model-meu-plugin/src/index.ts`
-4. Registrar em `models/all/src/index.ts`
-5. Registrar pacotes no `rush.json`
-6. Se tiver server plugin: adicionar `addLocation` em `server/server-pipeline/src/serverPlugins.ts`
-7. Se tiver UI: registrar `addLocation` em `dev/prod/src/platform.ts`
-8. Criar `tsconfig.json` em cada pacote novo (ver exemplos em `server-plugins/tag-sharing/tsconfig.json`)
+Templates completos (cabeçalho de licença, IDs de plugin, schema/decorators, mixin,
+migration, trigger em 3 camadas, componente Svelte, service/worker,
+`tsconfig.json`/`package.json`) no **`archive-context.md` §20**. Os checklists de
+"adicionar campo em Issue" e "adicionar plugin completo" estão nas **§14–15** do
+mesmo arquivo. Exemplos reais de feature: skills `f02-tag-sharing` e `f04-pdca-cycle`.
 
 ---
 
@@ -258,15 +216,7 @@ docker compose -f dev/docker-compose.yaml ps
 
 ## 9. Arquivos críticos — cuidado ao editar
 
-| Arquivo | Risco |
-|---|---|
-| `foundations/core/packages/core/src/classes.ts` | Interfaces base de tudo |
-| `foundations/core/packages/core/src/tx.ts` | Sistema de transações |
-| `models/all/src/index.ts` | Registry master — erro aqui quebra o build inteiro |
-| `server/server-pipeline/src/serverPlugins.ts` | Plugin não registrado = `NoLocationForPlugin` |
-| `dev/prod/src/platform.ts` | Plugin sem `addLocation` = UI não carrega |
-| `common/config/rush/pnpm-lock.yaml` | Nunca edite manualmente |
-| `plugins/workbench/src/plugin.ts` | Navegação principal |
+Lista mantida no **`archive-context.md` §19** (dono único).
 
 ---
 

@@ -537,3 +537,277 @@ docker logs -f dev-account-1
 | `plugins/tracker-resources/src/components/settings/onboarding-config.ts` | Config de onboarding de clientes |
 | `rush.json` | Registry de pacotes — novo pacote não registrado aqui não existe |
 | `common/config/rush/pnpm-lock.yaml` | Nunca edite manualmente |
+
+---
+
+## 20. Padrões de criação de código
+
+Referência detalhada de como escrever código novo no 3F Tasks. As regras de ouro
+(o que **nunca** fazer) estão no `CLAUDE.md`; os checklists de "adicionar campo" e
+"adicionar plugin" estão nas §14–15 acima. Esta seção traz os **templates**.
+
+### 20.1 Cabeçalho de licença (obrigatório em todo `.ts` / `.svelte` novo)
+
+```typescript
+//
+// Copyright © 2025 Hardcore Engineering Inc.
+//
+// Licensed under the Eclipse Public License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License. You may
+// obtain a copy of the License at https://www.eclipse.org/legal/epl-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+```
+
+Para `.svelte`, use `<!--` / `-->`.
+
+### 20.2 IDs de plugin
+
+Formato `dominio:kind:nome` — ex.: `tracker.class.Issue`, `tracker.mixin.IssueCompletionConfig`,
+`tagSharing.class.UserTag`. Registre todos em `plugins/meu-plugin/src/index.ts`:
+
+```typescript
+export const meuPluginId = 'meu-plugin' as Plugin
+
+export default plugin(meuPluginId, {
+  class: { MinhaClasse: '' as Ref<Class<MinhaClasse>> },
+  mixin: { MeuMixin: '' as Ref<Mixin<MeuMixin>> },
+  trigger: { OnMeuEvento: '' as Resource<TriggerFunc> },
+  function: { MinhaFunc: '' as Resource<(doc: Doc) => Promise<string>> }
+})
+```
+
+### 20.3 Tipos e interfaces (`plugins/X/src/index.ts`)
+
+```typescript
+/** @public */
+export interface MinhaInterface extends Doc {
+  campo: string
+  campoOpcional?: number
+  referencia: Ref<OutraInterface>
+}
+
+/** @public */
+export enum MeuEnum { ValorA = 'valorA', ValorB = 'valorB' }
+```
+
+- Sempre `/** @public */` em exports públicos.
+- Interfaces estendem `Doc`, `AttachedDoc`, `Space` ou tipos de `@hcengineering/task`.
+- Enums usam string literals lowercase.
+
+### 20.4 Schema (`models/X/src/types.ts`)
+
+```typescript
+@Model(pluginId.class.MinhaClasse, core.class.Doc, DOMAIN_MEU_PLUGIN)
+@UX(pluginId.string.MinhaClasse, pluginId.icon.MinhaClasse, 'ALIAS', 'name')
+export class TMinhaClasse extends TDoc implements MinhaClasse {
+  @Prop(TypeString(), pluginId.string.CampoTitulo)
+  @Index(IndexKind.FullText)
+    titulo!: string
+
+  @Prop(TypeNumber(), pluginId.string.CampoNumero)
+  @Hidden()
+    numero!: number
+
+  @Prop(TypeRef(core.class.Space), pluginId.string.CampoRef)
+  @Index(IndexKind.Indexed)
+    referencia!: Ref<Space>
+
+  // Campos herdados: NUNCA redeclare — use `declare`
+  declare space: Ref<MinhaClasse>
+  declare attachedTo: Ref<OutroDoc>
+}
+```
+
+- Classe TS tem prefixo `T` (`TIssue`, `TProject`).
+- Campo que implementa a interface e já existe no pai: `declare campo: Tipo`.
+- `@Index(IndexKind.FullText)` = pesquisável · `@Index(IndexKind.Indexed)` = filtrável/ordenável.
+- `@Hidden()` = interno (sem UI) · `@ReadOnly()` = somente-leitura.
+- `DOMAIN_X` definido como `'x' as Domain` no topo do arquivo.
+
+Decorators de tipo:
+```typescript
+TypeString() TypeNumber() TypeBoolean() TypeDate()          // primitivos + Timestamp
+TypeRef(classe) TypeMarkup() TypeCollaborativeDoc()         // ref / markup / Yjs (description)
+TypeRecord() ArrOf(TypeRef(...)) Collection(classe)         // record / array / coleção com count
+```
+
+### 20.5 Mixin
+
+```typescript
+@Mixin(pluginId.mixin.MeuMixin, baseClass.class.MinhaClasse)
+@UX(pluginId.string.MeuMixin)
+export class TMeuMixin extends TMinhaClasse implements MeuMixin {
+  @Prop(ArrOf(TypeRecord()), pluginId.string.MinhasRegras)
+    minhasRegras!: MinhaRegra[]
+}
+```
+
+### 20.6 Migration (`models/X/src/migration.ts`)
+
+```typescript
+import { tryMigrate, tryUpgrade, type MigrateOperation } from '@hcengineering/model'
+
+export const meuPluginOperation: MigrateOperation = {
+  async migrate (client, logger): Promise<void> {
+    await tryMigrate(client, 'meu-plugin', [
+      { state: 'add-novo-campo', mode: 'upgrade',
+        func: async (client) => {
+          await client.update(DOMAIN_MEU_PLUGIN, {}, { novoCampo: defaultValue })
+        } }
+    ])
+  },
+  async upgrade (state, client): Promise<void> {
+    await tryUpgrade(state, client, 'meu-plugin', [
+      { state: 'init-dados',
+        func: async (client) => {
+          const tx = new TxOperations(client, core.account.System)
+          await createOrUpdate(tx, /* ... */)
+        } }
+    ])
+  }
+}
+```
+
+Registre em `models/all/src/index.ts` (import + adicionar ao array de operations).
+
+### 20.7 Trigger (3 camadas — faltando qualquer uma, falha silenciosa)
+
+1. **Declaração** do ID em `plugins/server-X/src/index.ts`:
+   ```typescript
+   export default plugin(serverMeuPluginId, {
+     trigger: { OnMeuEvento: '' as Resource<TriggerFunc> }
+   })
+   ```
+2. **Implementação** em `server-plugins/X-resources/src/index.ts`:
+   ```typescript
+   export const OnMeuEvento: TriggerFunc = async (tx, control): Promise<Tx[]> => {
+     const actualTx = tx as TxUpdateDoc<MinhaClasse>
+     if (actualTx._class !== core.class.TxUpdateDoc) return []
+     if (actualTx.objectClass !== pluginId.class.MinhaClasse) return []
+     const resultado: Tx[] = []
+     // lógica
+     return resultado
+   }
+   export default async () => ({ trigger: { OnMeuEvento } })
+   ```
+3. **Registro no model** em `models/server-X/src/index.ts` via `builder.createDoc(serverCore.class.Trigger, ...)`.
+
+E registre o pacote em `server/server-pipeline/src/serverPlugins.ts`:
+```typescript
+addLocation(serverMeuPluginId, () => import('@hcengineering/server-meu-plugin-resources'))
+```
+Exemplo real completo: feature F02 (skill `f02-tag-sharing`).
+
+### 20.8 Componente Svelte
+
+```svelte
+<script lang="ts">
+  import { createQuery, getClient } from '@hcengineering/presentation'
+  import type { Issue } from '@hcengineering/tracker'
+  import { Label } from '@hcengineering/ui'
+  import tracker from '../../../plugin'
+
+  export let issue: Issue
+  export let readonly = false
+
+  const client = getClient()
+  const query = createQuery()
+  let dados: MinhaInterface[] = []
+
+  $: query.query(tracker.class.MinhaInterface, { issue: issue._id }, (res) => { dados = res })
+
+  async function handleAction (): Promise<void> {
+    if (readonly) return
+    await client.updateDoc(tracker.class.Issue, issue.space, issue._id, { campo: novoValor })
+  }
+</script>
+```
+
+- `export let prop: Tipo` para props · `export let readonly = false` em todo editor · cheque `readonly` antes de qualquer mutação.
+- `createQuery()` + store reativo para ler · `getClient()` para mutar (nunca acesse o banco direto).
+- UI: `@hcengineering/ui` · apresentação: `@hcengineering/presentation` · view: `@hcengineering/view-resources`.
+
+### 20.9 Service / Worker (`services/X/src/`)
+
+```typescript
+import { MeasureMetricsContext } from '@hcengineering/core'
+import { createRestTxOperations } from '@hcengineering/api-client'
+import { generateToken } from '@hcengineering/server-token'
+import config from './config'
+
+const ctx = new MeasureMetricsContext('meu-servico', {})
+
+export async function executarTarefa (workspaceId: WorkspaceUuid): Promise<void> {
+  const token = generateToken(config.serverSecret, systemAccountUuid, workspaceId)
+  const client = await createRestTxOperations(config.serverUrl, token)
+  try { /* lógica */ } finally { await client.close() }
+}
+```
+
+### 20.10 `tsconfig.json` (padrão de pacote novo)
+
+```json
+{
+  "extends": "./node_modules/@hcengineering/platform-rig/profiles/default/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src", "outDir": "./lib",
+    "declarationDir": "./types", "tsBuildInfoFile": ".build/build.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "lib", "dist", "types", "bundle"]
+}
+```
+
+### 20.11 `package.json` (padrão de pacote novo)
+
+```json
+{
+  "name": "@hcengineering/meu-plugin",
+  "version": "0.7.0",
+  "main": "lib/index.js",
+  "types": "types/index.d.ts",
+  "files": ["lib/**/*", "types/**/*", "tsconfig.json"],
+  "scripts": {
+    "build": "compile",
+    "_phase:build": "compile transpile src",
+    "_phase:test": "jest --passWithNoTests --silent",
+    "_phase:format": "format src",
+    "_phase:validate": "compile validate"
+  },
+  "devDependencies": {
+    "@hcengineering/platform-rig": "workspace:^0.7.21",
+    "typescript": "^5.9.3", "jest": "^29.7.0",
+    "ts-jest": "^29.1.1", "@types/jest": "^29.5.5"
+  },
+  "dependencies": {
+    "@hcengineering/core": "workspace:^0.7.26",
+    "@hcengineering/platform": "workspace:^0.7.20"
+  }
+}
+```
+
+Pacote Svelte: adicione `"svelte": "src/index.ts"` e a dependência `"svelte": "^4.2.20"`.
+
+### 20.12 Calendar Event / WorkSlot → `findPrimaryCalendar()`
+
+Ao criar `calendar.class.Event` ou `time.class.WorkSlot` em qualquer componente do
+front, **sempre** resolva o calendário via `findPrimaryCalendar()` de
+`plugins/time-resources/src/utils.ts`:
+
+```typescript
+import { findPrimaryCalendar } from '../utils'
+const _calendar = await findPrimaryCalendar()
+await client.addCollection(time.class.WorkSlot, calendar.space.Calendar, todoId,
+  time.class.ToDo, 'workslots', { calendar: _calendar /* ...resto */ })
+```
+
+- Nunca hardcode `` `${acc.uuid}_calendar` `` — é o calendário interno, ignora a
+  preferência do usuário e quebra a integração com Google Calendar.
+- Nunca filtre `ExternalCalendar` só por `user: primarySocialId` — use `user: { $in: acc.socialIds }`.
