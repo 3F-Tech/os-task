@@ -5,6 +5,32 @@ Escrito para agentes IA ou desenvolvedores que precisam diagnosticar falhas.
 
 ---
 
+## 0. Infraestrutura da VPS (produção)
+
+Plano **Hostinger KVM 4** — upgrade em **2026-07-02** (antes: KVM de 2 núcleos).
+
+| Recurso | Valor |
+|---|---|
+| vCPU | **4 núcleos** |
+| RAM | **16 GB** |
+| Disco | **200 GB NVMe** |
+| Banda | 16 TB/mês |
+| Snapshot | 1 |
+| Backup | semanal (provedor) + serviço `backup-cockroach` no compose |
+| Rede/acesso | IP dedicado · acesso root completo |
+
+Dados persistentes em **bind-mounts** sob `/opt/apps/os-tasks/data/` (`cockroach`, `minio`,
+`redpanda`, `elastic`) — sobrevivem a reboot; todos os serviços de estado usam `restart: unless-stopped`.
+
+> Docs de performance (`3f-docs/calendar/performance-plan.md`, `3f-docs/pod-calendar-issues.md`)
+> foram escritos para os **2 núcleos** antigos — as severidades de CPU descritas lá são
+> agora mais brandas, mas os fixes estruturais seguem válidos.
+> Nota: com 4 cores, a gravação do LiveKit (livekit-egress, mín. 3 cores) ficou
+> **desbloqueada** — ver bloco `love-service` em `dev/docker-compose.vps.yaml` (segue
+> desativada por decisão).
+
+---
+
 ## 1. Arquitetura de Versionamento
 
 O 3F Tasks usa **dois números de versão distintos e independentes**:
