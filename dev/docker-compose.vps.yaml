@@ -543,7 +543,10 @@ services:
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
       - REGION=cockroach
       - BUCKET_NAME=backups
-      - INTERVAL=60
+      # Segundos entre backups por workspace. 86400 = 1x/dia (madrugada).
+      # NAO baixar: valores pequenos (ex. 60) re-fazem backup em loop continuo
+      # e saturam a VPS (incidente 2026-07-01). Ver 3f-docs/BUILD_AND_DEPLOY.md.
+      - INTERVAL=86400
       - STORAGE=minio|minio?accessKey=minioadmin&secretKey=minioadmin
       - WORKSPACE_STORAGE=datalake|http://datalake:4030
       - QUEUE_CONFIG=redpanda:9092
