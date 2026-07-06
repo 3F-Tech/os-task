@@ -127,6 +127,7 @@ import {
   restoreTrustedV6Workspace
 } from './db'
 import { ensureMissingSocialIdentities } from './contact'
+import { makeRank } from '@hcengineering/rank'
 import { performGithubAccountMigrations } from './github'
 import { performGmailAccountMigrations } from './gmail'
 import { getToolToken, getWorkspace, getWorkspaceTransactorEndpoint } from './utils'
@@ -3008,6 +3009,103 @@ export function devTool (
             cmd.dryRun
               ? `ensure-missing-social-identities dry-run: persons without personUuid skipped=${skippedPersons}, social identities that would be created=${wouldCreate}`
               : `ensure-missing-social-identities: persons without personUuid skipped=${skippedPersons}, SocialIdentity docs created=${created}`
+          )
+        } finally {
+          await connection.close()
+        }
+      })
+    })
+
+  program
+    .command('backfill-todos <workspace>')
+    .description(
+      'Create missing time.ProjectToDo for active-status assigned issues (the time trigger only creates ToDos going forward; there is no backfill). ToDos land Unplanned in the Planner.'
+    )
+    .option('-d, --dry-run', 'Only count what would be created, do not write', false)
+    .option('-u, --user <ref>', 'Limit to a single assignee Person ref')
+    .action(async (workspace: string, cmd: { dryRun: boolean, user?: string }) => {
+      await withAccountDatabase(async (db) => {
+        const info = await getWorkspace(db, workspace)
+        if (info === null) {
+          throw new Error(`Workspace ${workspace} not found`)
+        }
+        const wsUuid = info.uuid
+        const endpoint = await getWorkspaceTransactorEndpoint(wsUuid)
+        // Conexão normal (sem claim model:'upgrade' no token, que colocaria o
+        // workspace em modo upgrade e bloquearia os demais clientes com
+        // "connect during upgrade").
+        const connection = await connect(endpoint, wsUuid, undefined, {})
+        const ops = new TxOperations(connection, core.account.ConfigUser)
+        try {
+          // Mesmo critério do trigger time (server-plugins/time-resources): só
+          // status categoria Active ou ToDo geram ToDo (Backlog/Done/Cancelled não).
+          const activeCats = new Set(['task:statusCategory:Active', 'task:statusCategory:ToDo'])
+          const statuses = await ops.findAll(core.class.Status, {})
+          const activeStatus = new Set(
+            statuses.filter((s) => activeCats.has(s.category as unknown as string)).map((s) => s._id)
+          )
+          // ToDo.user precisa ser um Employee.
+          const employees = await ops.findAll('contact:mixin:Employee' as any, {})
+          const isEmployee = new Set(employees.map((e: any) => e._id))
+          // ToDos abertos existentes → chave attachedTo|user (idempotência).
+          const existing = await ops.findAll('time:class:ToDo' as any, {})
+          const openKey = new Set<string>(
+            existing.filter((t: any) => t.doneOn == null).map((t: any) => `${t.attachedTo}|${t.user}`)
+          )
+          // Issues em status ativo.
+          const issues =
+            activeStatus.size > 0
+              ? ((await ops.findAll('tracker:class:Issue' as any, {
+                  status: { $in: [...activeStatus] }
+                } as any)) as any[])
+              : []
+          let created = 0
+          let already = 0
+          let skippedNonEmployee = 0
+          // Ranks por usuário — cada novo ToDo entra após o anterior gerado aqui.
+          const lastRankByUser = new Map<string, string | undefined>()
+          for (const issue of issues) {
+            const assignees: string[] = Array.isArray(issue.assignee) ? issue.assignee : []
+            for (const a of assignees) {
+              if (cmd.user != null && a !== cmd.user) continue
+              if (!isEmployee.has(a)) {
+                skippedNonEmployee++
+                continue
+              }
+              const key = `${issue._id}|${a}`
+              if (openKey.has(key)) {
+                already++
+                continue
+              }
+              const prev = lastRankByUser.get(a)
+              const rank = makeRank(prev, undefined)
+              lastRankByUser.set(a, rank)
+              if (!cmd.dryRun) {
+                await ops.addCollection(
+                  'time:class:ProjectToDo' as any,
+                  'time:space:ToDos' as any,
+                  issue._id,
+                  issue._class,
+                  'todos',
+                  {
+                    attachedSpace: issue.space,
+                    workslots: 0,
+                    description: '',
+                    priority: 3, // ToDoPriority.NoPriority
+                    visibility: 'public',
+                    title: issue.title,
+                    user: a,
+                    doneOn: null,
+                    rank
+                  } as any
+                )
+              }
+              openKey.add(key)
+              created++
+            }
+          }
+          console.log(
+            `backfill-todos${cmd.dryRun ? ' (dry-run)' : ''}: activeIssues=${issues.length}, todosCreated=${created}, alreadyHadOpenToDo=${already}, skippedNonEmployeeAssignee=${skippedNonEmployee}`
           )
         } finally {
           await connection.close()
