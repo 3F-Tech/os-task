@@ -180,14 +180,14 @@ services:
       - MAILBOX_MAX_COUNT_PER_ACCOUNT=2
       - MAX_FAILED_LOGIN_ATTEMPTS=0
       # ── Login Universal 3F Core (F11) ─────────────────────────────────────
-      # DESLIGADO na VPS até ter a API key (login) e o workspace de produção.
-      # Para ativar: setar THREEF_CORE_WORKSPACE, colocar THREEF_CORE_API_KEY
-      # em .env.secrets na VPS e trocar ENABLED para true.
+      # LIGADO. Senha validada pela 3F Core; admins (ADMIN_EMAILS) seguem no
+      # login local como bypass de recuperação. Rollback: ENABLED=false + rebuild.
+      # THREEF_CORE_API_KEY vem do .env.secrets (não versionado) na VPS.
       - DISABLE_SIGNUP=true
-      - THREEF_CORE_ENABLED=false
+      - THREEF_CORE_ENABLED=true
       - THREEF_CORE_URL=https://3f-core.3fventure.tech
-      # url (slug) OU uuid do workspace fixo do 3F Tasks de produção:
-      - THREEF_CORE_WORKSPACE=CHANGE_ME
+      # uuid do workspace fixo do 3F Tasks de produção (url: fventure):
+      - THREEF_CORE_WORKSPACE=b001f439-0561-4eea-b40d-5d6df7972a79
       - THREEF_CORE_DEFAULT_ROLE=USER
       # THREEF_CORE_API_KEY: definido em .env.secrets (não versionado)
     healthcheck:
