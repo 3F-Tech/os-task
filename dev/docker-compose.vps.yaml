@@ -152,6 +152,9 @@ services:
       - 13000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
+    env_file:
+      # Fonte do segredo THREEF_CORE_API_KEY (arquivo não versionado).
+      - .env.secrets
     environment:
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=redpanda:9092
@@ -176,6 +179,17 @@ services:
       - MAILBOX_DOMAINS=huly.dev.local
       - MAILBOX_MAX_COUNT_PER_ACCOUNT=2
       - MAX_FAILED_LOGIN_ATTEMPTS=0
+      # ── Login Universal 3F Core (F11) ─────────────────────────────────────
+      # DESLIGADO na VPS até ter a API key (login) e o workspace de produção.
+      # Para ativar: setar THREEF_CORE_WORKSPACE, colocar THREEF_CORE_API_KEY
+      # em .env.secrets na VPS e trocar ENABLED para true.
+      - DISABLE_SIGNUP=true
+      - THREEF_CORE_ENABLED=false
+      - THREEF_CORE_URL=https://3f-core.3fventure.tech
+      # url (slug) OU uuid do workspace fixo do 3F Tasks de produção:
+      - THREEF_CORE_WORKSPACE=CHANGE_ME
+      - THREEF_CORE_DEFAULT_ROLE=USER
+      # THREEF_CORE_API_KEY: definido em .env.secrets (não versionado)
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
       interval: 10s
@@ -648,8 +662,9 @@ services:
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - STORAGE_PROVIDER_NAME=datalake
-      # Gravação desativada — VPS atual tem 2 cores e o livekit-egress exige mínimo 3.
-      # Reativar quando a VPS for upgrade para 4+ cores:
+      # Gravação desativada. A VPS agora tem 4 cores (upgrade 2026-07-02, KVM 4) —
+      # o livekit-egress (mín. 3 cores) está DESBLOQUEADO. Segue desativada por decisão;
+      # para reativar, descomente as 2 linhas abaixo (grava no MinIO/S3):
       # - S3_STORAGE_CONFIG=s3|http://minio:9000?accessKey=minioadmin&secretKey=minioadmin&region=local&rootBucket=recordings
       # - RECORDING_PRESET=720p
     restart: unless-stopped

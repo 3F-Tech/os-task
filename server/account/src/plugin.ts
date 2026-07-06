@@ -17,7 +17,13 @@ export const accountPlugin = plugin(accountId, {
     Transactors: '' as Metadata<string>,
     OtpTimeToLiveSec: '' as Metadata<number>,
     OtpRetryDelaySec: '' as Metadata<number>,
-    WsLivenessDays: '' as Metadata<number>
+    WsLivenessDays: '' as Metadata<number>,
+    // 3F Core universal login (F11)
+    ThreeFCoreEnabled: '' as Metadata<boolean>,
+    ThreeFCoreUrl: '' as Metadata<string>,
+    ThreeFCoreApiKey: '' as Metadata<string>,
+    ThreeFCoreWorkspace: '' as Metadata<string>,
+    ThreeFCoreDefaultRole: '' as Metadata<string>
   },
   string: {
     ConfirmationText: '' as IntlString,

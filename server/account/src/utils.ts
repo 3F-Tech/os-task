@@ -621,13 +621,26 @@ export async function createAccount (
   automatic = false,
   createdOn = Date.now()
 ): Promise<PersonId> {
-  // Create Huly social id and account
-  const socialId = await db.socialId.insertOne({
-    type: SocialIdType.HULY,
-    value: personUuid,
-    personUuid,
-    ...(confirmed ? { verifiedOn: Date.now() } : {})
-  })
+  // Find or create the Huly social id. Re-creating an account whose social ids were kept
+  // (e.g. after deleteAccount, which removes the account row but leaves person/social ids)
+  // must reuse the existing huly social id instead of inserting a duplicate (which would
+  // violate social_id_key_unique and crash the login/provisioning flow).
+  let socialId: PersonId
+  const existingHulyId = await db.socialId.findOne({ type: SocialIdType.HULY, value: personUuid })
+  if (existingHulyId != null) {
+    socialId = existingHulyId._id
+    if (confirmed && existingHulyId.verifiedOn == null) {
+      await db.socialId.update({ _id: existingHulyId._id }, { verifiedOn: Date.now() })
+    }
+  } else {
+    socialId = await db.socialId.insertOne({
+      type: SocialIdType.HULY,
+      value: personUuid,
+      personUuid,
+      ...(confirmed ? { verifiedOn: Date.now() } : {})
+    })
+  }
+
   await db.account.insertOne({ uuid: personUuid as AccountUuid, automatic })
   await db.accountEvent.insertOne({
     accountUuid: personUuid as AccountUuid,
@@ -635,11 +648,15 @@ export async function createAccount (
     time: createdOn
   })
 
-  // Create user profile with default values (private by default)
-  await db.userProfile.insertOne({
-    personUuid,
-    isPublic: false
-  })
+  // Create user profile with default values (private by default), unless one already exists
+  // (deleteAccount does not remove the profile, so an account re-creation would duplicate it).
+  const existingProfile = await db.userProfile.findOne({ personUuid })
+  if (existingProfile == null) {
+    await db.userProfile.insertOne({
+      personUuid,
+      isPublic: false
+    })
+  }
 
   return socialId
 }
@@ -1594,17 +1611,26 @@ export async function loginOrSignUpWithProvider (
       socialIdId = targetSocialId._id
     }
 
-    if (emailSocialId == null) {
-      if (normalizedEmail !== '') {
-        await db.socialId.insertOne({
-          type: SocialIdType.EMAIL,
-          value: normalizedEmail,
-          personUuid,
-          verifiedOn: Date.now()
-        })
+    // When the provider social id IS the email social id (3F Core universal login passes the
+    // e-mail itself as the provider key), targetSocialId and emailSocialId are the SAME record.
+    // The target block above already created/confirmed it; running the email block too would
+    // INSERT the same key a second time and violate social_id_key_unique on first-time accounts.
+    const targetIsEmail =
+      normalizedSocialId.type === SocialIdType.EMAIL && normalizedSocialId.value === normalizedEmail
+
+    if (!targetIsEmail) {
+      if (emailSocialId == null) {
+        if (normalizedEmail !== '') {
+          await db.socialId.insertOne({
+            type: SocialIdType.EMAIL,
+            value: normalizedEmail,
+            personUuid,
+            verifiedOn: Date.now()
+          })
+        }
+      } else if (emailSocialId.verifiedOn == null) {
+        await db.socialId.update({ key: emailSocialId.key }, { verifiedOn: Date.now() })
       }
-    } else if (emailSocialId.verifiedOn == null) {
-      await db.socialId.update({ key: emailSocialId.key }, { verifiedOn: Date.now() })
     }
 
     await confirmHulyIds(ctx, db, personUuid as AccountUuid)

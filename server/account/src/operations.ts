@@ -126,8 +126,11 @@ import {
   checkPasswordAging,
   generateTotpSecret,
   verifyTotpCode,
-  getTotpUrl
+  getTotpUrl,
+  loginOrSignUpWithProvider,
+  getWorkspaceByUrl
 } from './utils'
+import { is3FCoreEnabled, validate3FCore } from './threefcore'
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000' as AccountUuid
 
@@ -184,71 +187,243 @@ export async function login (
 
   const normalizedEmail = cleanEmail(email)
 
+  // 3F Core universal login: delegate password validation to the central identity API.
+  // Admin/system emails keep local password auth as a bootstrap/recovery bypass so a
+  // 3F Core outage can never lock the operator out.
+  if (is3FCoreEnabled() && !isAdminEmail(normalizedEmail)) {
+    return await loginWith3FCore(ctx, db, branding, normalizedEmail, password)
+  }
+
   try {
-    const emailSocialId = await getEmailSocialId(db, normalizedEmail)
-
-    if (emailSocialId == null) {
-      throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
-    }
-
-    const existingAccount = await db.account.findOne({ uuid: emailSocialId.personUuid as AccountUuid })
-
-    if (existingAccount == null) {
-      throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
-    }
-
-    // Check if account is locked due to too many failed login attempts
-    if (isAccountPasswordLocked(existingAccount)) {
-      ctx.warn('Login attempt on locked account - password login locked', {
-        email: normalizedEmail,
-        failedAttempts: existingAccount.failedLoginAttempts
-      })
-      throw new PlatformError(
-        new Status(Severity.ERROR, platform.status.PasswordLoginLocked, { account: normalizedEmail })
-      )
-    }
-
-    const person = await db.person.findOne({ uuid: emailSocialId.personUuid })
-    if (person == null) {
-      throw new PlatformError(new Status(Severity.ERROR, platform.status.InternalServerError, {}))
-    }
-
-    if (!verifyPassword(password, existingAccount.hash, existingAccount.salt)) {
-      try {
-        await recordFailedLoginAttempt(db, existingAccount.uuid)
-      } catch (err) {
-        ctx.warn('Failed to record failed login attempt', { error: err, account: existingAccount.uuid })
-      }
-      throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
-    }
-
-    // Successful login - reset failed attempts counter
-    await resetFailedLoginAttempts(db, existingAccount.uuid)
-
-    const isConfirmed = emailSocialId.verifiedOn != null
-
-    const extraToken: Record<string, string> = isAdminEmail(normalizedEmail)
-      ? { admin: 'true', authMethod: 'password' }
-      : { authMethod: 'password' }
-    ctx.info('Login succeeded', { email, normalizedEmail, isConfirmed, emailSocialId, ...extraToken })
-
-    return {
-      account: existingAccount.uuid,
-      token: isConfirmed
-        ? generateToken(
-          existingAccount.tfaSecret != null ? NIL_UUID : existingAccount.uuid,
-          undefined,
-          existingAccount.tfaSecret != null ? { ...extraToken, tfaAccount: existingAccount.uuid } : extraToken
-        )
-        : undefined,
-      name: getPersonName(person),
-      socialId: emailSocialId._id,
-      tfaRequired: isConfirmed && existingAccount.tfaSecret != null
-    }
+    return await loginLocal(ctx, db, normalizedEmail, password)
   } catch (err: any) {
     Analytics.handleError(err)
     ctx.error('Login failed', { email, normalizedEmail, err })
     throw err
+  }
+}
+
+/**
+ * Validates an email/password against the local Huly account store and issues a session token.
+ * This is the classic password login — used directly when 3F Core universal login is off, and as
+ * the fallback inside {@link loginWith3FCore} when an e-mail is unknown to 3F Core (genuinely
+ * internal users: bots, guests, or accounts never registered in 3F Core).
+ *
+ * Throws PlatformError on failure: AccountNotFound (no such account / wrong password — kept
+ * deliberately ambiguous to avoid e-mail enumeration), PasswordLoginLocked, or InternalServerError.
+ * Does NOT log via Analytics/ctx.error — callers decide how to report failure (a fallback miss is
+ * an expected outcome, not an error).
+ */
+async function loginLocal (
+  ctx: MeasureContext,
+  db: AccountDB,
+  normalizedEmail: string,
+  password: string
+): Promise<LoginInfo> {
+  const emailSocialId = await getEmailSocialId(db, normalizedEmail)
+
+  if (emailSocialId == null) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
+  }
+
+  const existingAccount = await db.account.findOne({ uuid: emailSocialId.personUuid as AccountUuid })
+
+  if (existingAccount == null) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
+  }
+
+  // Check if account is locked due to too many failed login attempts
+  if (isAccountPasswordLocked(existingAccount)) {
+    ctx.warn('Login attempt on locked account - password login locked', {
+      email: normalizedEmail,
+      failedAttempts: existingAccount.failedLoginAttempts
+    })
+    throw new PlatformError(
+      new Status(Severity.ERROR, platform.status.PasswordLoginLocked, { account: normalizedEmail })
+    )
+  }
+
+  const person = await db.person.findOne({ uuid: emailSocialId.personUuid })
+  if (person == null) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.InternalServerError, {}))
+  }
+
+  if (!verifyPassword(password, existingAccount.hash, existingAccount.salt)) {
+    try {
+      await recordFailedLoginAttempt(db, existingAccount.uuid)
+    } catch (err) {
+      ctx.warn('Failed to record failed login attempt', { error: err, account: existingAccount.uuid })
+    }
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
+  }
+
+  // Successful login - reset failed attempts counter
+  await resetFailedLoginAttempts(db, existingAccount.uuid)
+
+  const isConfirmed = emailSocialId.verifiedOn != null
+
+  const extraToken: Record<string, string> = isAdminEmail(normalizedEmail)
+    ? { admin: 'true', authMethod: 'password' }
+    : { authMethod: 'password' }
+  ctx.info('Login succeeded', { normalizedEmail, isConfirmed, socialId: emailSocialId._id, ...extraToken })
+
+  return {
+    account: existingAccount.uuid,
+    token: isConfirmed
+      ? generateToken(
+        existingAccount.tfaSecret != null ? NIL_UUID : existingAccount.uuid,
+        undefined,
+        existingAccount.tfaSecret != null ? { ...extraToken, tfaAccount: existingAccount.uuid } : extraToken
+      )
+      : undefined,
+    name: getPersonName(person),
+    socialId: emailSocialId._id,
+    tfaRequired: isConfirmed && existingAccount.tfaSecret != null
+  }
+}
+
+/**
+ * Logs a user in by delegating credential validation to the 3F Core universal login API.
+ * On success, finds-or-creates the local Huly account (JIT provisioning, mirroring the OAuth
+ * provider flow) and ensures membership in the fixed 3F Tasks workspace.
+ */
+async function loginWith3FCore (
+  ctx: MeasureContext,
+  db: AccountDB,
+  branding: Branding | null,
+  normalizedEmail: string,
+  password: string
+): Promise<LoginInfo> {
+  const result = await validate3FCore(ctx, normalizedEmail, password)
+
+  if (!result.ok) {
+    switch (result.code) {
+      case 'INVALID_CREDENTIALS': {
+        // 3F Core returns 401 both for "e-mail unknown to 3F Core" and "wrong password for an
+        // existing 3F Core user". Since the API can't tell us which, fall back to the local Huly
+        // password check so genuinely internal users (bots, guests, or accounts never registered
+        // in 3F Core) can still sign in. Accounts provisioned purely through 3F Core have no local
+        // password hash, so this fallback only succeeds for real internal users — it is NOT a way
+        // around 3F Core access control (revocation/disable surface as 403, handled below).
+        try {
+          const localInfo = await loginLocal(ctx, db, normalizedEmail, password)
+          ctx.info('3F Core rejected; logged in via local internal account', { email: normalizedEmail })
+          return localInfo
+        } catch (fallbackErr: any) {
+          if (
+            fallbackErr instanceof PlatformError &&
+            fallbackErr.status.code === platform.status.PasswordLoginLocked
+          ) {
+            // Local account exists but is locked — surface it so the user knows to unlock via OTP.
+            throw fallbackErr
+          }
+          // No matching local account either → keep the generic "Senha inválida" (don't reveal
+          // whether the e-mail exists in 3F Core or locally).
+          throw new PlatformError(
+            new Status(Severity.ERROR, platform.status.InvalidPassword, { account: normalizedEmail })
+          )
+        }
+      }
+      case 'NO_SYSTEM_ACCESS':
+      case 'ACCOUNT_INACTIVE':
+        // User exists in 3F Core but is denied (no 3F Tasks link / account disabled). Centralized
+        // revocation is authoritative — NO local fallback here.
+        throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+      default:
+        // SERVICE_UNAVAILABLE — fail closed; active sessions are unaffected.
+        throw new PlatformError(new Status(Severity.ERROR, platform.status.InternalServerError, {}))
+    }
+  }
+
+  const { firstName, lastName } = splitPersonName(result.user.name)
+
+  // The person may already exist under a NON-email login identity — e.g. Google OAuth stores the
+  // address as `google:<email>` (see pods/authProviders/src/google.ts), not `email:<email>`.
+  // loginOrSignUpWithProvider only resolves a person by the exact (type, value) we hand it, so if
+  // we always passed EMAIL we'd miss a Google/GitHub/OIDC identity and create a DUPLICATE person
+  // for the same human. Every login-type social id carries the e-mail as its value, so resolve the
+  // existing one (EMAIL first) and pass ITS type; the provider flow then matches the existing
+  // person and additionally attaches the EMAIL social id. Falls back to EMAIL for brand-new users.
+  const normalizedValue = normalizeValue(normalizedEmail)
+  let providerSocialId: { type: SocialIdType, value: string } = { type: SocialIdType.EMAIL, value: normalizedEmail }
+  for (const type of loginSocialTypes) {
+    const existing = await db.socialId.findOne({ type, value: normalizedValue })
+    if (existing != null) {
+      providerSocialId = { type: existing.type, value: existing.value }
+      break
+    }
+  }
+
+  // signUpDisabled = false: auto-provision. The 3F Core `systems_users` link is the gate —
+  // a 200 already means this person is authorized for 3F Tasks.
+  const loginInfo = await loginOrSignUpWithProvider(
+    ctx,
+    db,
+    branding,
+    normalizedEmail,
+    firstName,
+    lastName,
+    providerSocialId,
+    false
+  )
+
+  if (loginInfo == null) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.AccountNotFound, {}))
+  }
+
+  await ensure3FCoreWorkspaceMembership(ctx, db, loginInfo.account)
+
+  return loginInfo
+}
+
+/**
+ * Ensures the account is a member of the fixed 3F Tasks workspace configured for 3F Core login.
+ * No-op when the workspace is not configured or the account is already a member.
+ */
+async function ensure3FCoreWorkspaceMembership (
+  ctx: MeasureContext,
+  db: AccountDB,
+  account: AccountUuid
+): Promise<void> {
+  const wsRef = getMetadata(accountPlugin.metadata.ThreeFCoreWorkspace)
+  if (wsRef == null || wsRef === '') {
+    return
+  }
+
+  const workspace = (await getWorkspaceByUrl(db, wsRef)) ?? (await getWorkspaceById(db, wsRef as WorkspaceUuid))
+  if (workspace == null) {
+    ctx.error('3F Core fixed workspace not found', { workspace: wsRef })
+    return
+  }
+
+  const existingRole = await db.getWorkspaceRole(account, workspace.uuid)
+  if (existingRole == null) {
+    const role = parse3FCoreRole(getMetadata(accountPlugin.metadata.ThreeFCoreDefaultRole))
+    await db.assignWorkspace(account, workspace.uuid, role)
+    ctx.info('Assigned account to 3F Core workspace', { account, workspace: workspace.uuid, role })
+  }
+}
+
+function splitPersonName (fullName: string | undefined): { firstName: string, lastName: string } {
+  const name = (fullName ?? '').trim()
+  if (name === '') {
+    return { firstName: '', lastName: '' }
+  }
+  const parts = name.split(/\s+/)
+  const firstName = parts.shift() ?? ''
+  return { firstName, lastName: parts.join(' ') }
+}
+
+function parse3FCoreRole (value: string | undefined): AccountRole {
+  switch ((value ?? '').toUpperCase()) {
+    case 'OWNER':
+      return AccountRole.Owner
+    case 'MAINTAINER':
+      return AccountRole.Maintainer
+    case 'GUEST':
+      return AccountRole.Guest
+    default:
+      return AccountRole.User
   }
 }
 
@@ -270,6 +445,13 @@ export async function loginOtp (
 
   // Note: can support OTP based on any other social logins later
   const normalizedEmail = cleanEmail(email)
+
+  // When 3F Core universal login is on, passwordless OTP would bypass the central credential
+  // check. Refuse it for everyone except the admin/system bootstrap accounts.
+  if (is3FCoreEnabled() && !isAdminEmail(normalizedEmail)) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+  }
+
   const emailSocialId = await getEmailSocialId(db, normalizedEmail)
 
   if (emailSocialId == null) {
@@ -308,6 +490,11 @@ export async function signUp (
 
   if (email == null || password == null || firstName == null || email === '' || password === '' || firstName === '') {
     throw new PlatformError(new Status(Severity.ERROR, platform.status.BadRequest, {}))
+  }
+
+  // 3F Core universal login is the source of truth — refuse local self-service signup.
+  if (is3FCoreEnabled() && !isAdminEmail(cleanEmail(email))) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
   }
 
   const { account, socialId } = await signUpByEmail(ctx, db, branding, email, password, firstName, lastName ?? '')
@@ -356,6 +543,12 @@ export async function signUpOtp (
 
   // Note: can support OTP based on any other social logins later
   const normalizedEmail = cleanEmail(email)
+
+  // 3F Core universal login is the source of truth — refuse local self-service signup.
+  if (is3FCoreEnabled() && !isAdminEmail(normalizedEmail)) {
+    throw new PlatformError(new Status(Severity.ERROR, platform.status.Forbidden, {}))
+  }
+
   let emailSocialId = await getEmailSocialId(db, normalizedEmail)
   let personUuid: PersonUuid
 

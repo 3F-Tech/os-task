@@ -158,6 +158,9 @@ services:
       - 3000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
+    env_file:
+      # Fonte do segredo THREEF_CORE_API_KEY (arquivo não versionado).
+      - .env.secrets
     environment:
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=${QUEUE_CONFIG}
@@ -165,6 +168,9 @@ services:
       - ADMIN_EMAILS=admin,${PLATFORM_ADMIN_EMAILS}
       - STATS_URL=http://stats:4900
       - WORKSPACE_LIMIT_PER_USER=10000
+      # 0 = sem limite de tentativas de senha (igual à VPS). Evita travar a
+      # conta durante testes; remova esta linha para restaurar o lock (default 5).
+      - MAX_FAILED_LOGIN_ATTEMPTS=0
       - DB_URL=${DB_CR_URL}
       # - DB_NS=account-2
       # Pass only one region to disallow selection for new workspaces.
@@ -180,7 +186,14 @@ services:
       # - WS_LIVENESS_DAYS=1
       - ACCOUNTS_URL=http://account:3000
       - BRANDING_PATH=/var/cfg/branding.json
-      # - DISABLE_SIGNUP=true
+      # ── Login Universal 3F Core (F11) ─────────────────────────────────────
+      - DISABLE_SIGNUP=true
+      - THREEF_CORE_ENABLED=true
+      - THREEF_CORE_URL=https://3f-core.3fventure.tech
+      # url (slug) OU uuid do workspace fixo do 3F Tasks
+      - THREEF_CORE_WORKSPACE=teste3fventure
+      - THREEF_CORE_DEFAULT_ROLE=USER
+      # THREEF_CORE_API_KEY: definido em dev/.env.secrets (não versionado)
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
       - MAILBOX_DOMAINS=huly.dev.local
       - MAILBOX_MAX_COUNT_PER_ACCOUNT=2

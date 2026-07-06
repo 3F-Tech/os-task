@@ -11,7 +11,8 @@ import account, {
   getAccountDB,
   getAllTransactors,
   getMethods,
-  cleanExpiredOtp
+  cleanExpiredOtp,
+  fetchOrgStructure
 } from '@hcengineering/account'
 import accountEn from '@hcengineering/account/lang/en.json'
 import accountRu from '@hcengineering/account/lang/ru.json'
@@ -133,6 +134,18 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
   setMetadata(serverToken.metadata.Secret, serverSecret)
   // Force undefied, for user tokens do not include service
   setMetadata(serverToken.metadata.Service, undefined)
+
+  // 3F Core universal login (F11) — delegated password validation.
+  // The API Key is a secret: only ever read from the environment, never committed.
+  const threeFCoreEnabled = process.env.THREEF_CORE_ENABLED === 'true'
+  setMetadata(account.metadata.ThreeFCoreEnabled, threeFCoreEnabled)
+  setMetadata(account.metadata.ThreeFCoreUrl, process.env.THREEF_CORE_URL ?? 'https://3f-core.3fventure.tech')
+  setMetadata(account.metadata.ThreeFCoreApiKey, process.env.THREEF_CORE_API_KEY)
+  setMetadata(account.metadata.ThreeFCoreWorkspace, process.env.THREEF_CORE_WORKSPACE)
+  setMetadata(account.metadata.ThreeFCoreDefaultRole, process.env.THREEF_CORE_DEFAULT_ROLE ?? 'USER')
+  if (threeFCoreEnabled && (process.env.THREEF_CORE_API_KEY == null || process.env.THREEF_CORE_WORKSPACE == null)) {
+    measureCtx.warn('3F Core login enabled but THREEF_CORE_API_KEY/THREEF_CORE_WORKSPACE not fully set')
+  }
 
   const hasSignUp = process.env.DISABLE_SIGNUP !== 'true'
   const methods = getMethods(hasSignUp)
@@ -383,6 +396,37 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
       Analytics.handleError(err)
       req.res.writeHead(404, {})
       req.res.end()
+    }
+  })
+
+  // 3F Core org-structure proxy (Painel Operacional). Lê BU/squad/cargo da 3F
+  // Core server-side (a API Key é secreta) e devolve a estrutura enxuta. Exige
+  // um token Huly válido — sem token / token inválido → 401.
+  router.get('/api/v1/org-structure', async (ctx) => {
+    const token = extractToken(ctx.request.headers)
+    let valid = false
+    if (token !== undefined) {
+      try {
+        decodeToken(token)
+        valid = true
+      } catch {
+        valid = false
+      }
+    }
+    if (!valid) {
+      ctx.res.writeHead(401, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.Unauthorized, {}) }))
+      return
+    }
+
+    try {
+      const data = await fetchOrgStructure(measureCtx)
+      ctx.res.writeHead(200, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ data }))
+    } catch (err: any) {
+      measureCtx.error('org-structure proxy failed', { error: err?.message })
+      ctx.res.writeHead(502, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.InternalServerError, {}) }))
     }
   })
 
