@@ -151,17 +151,21 @@ class ElasticAdapter implements FullTextAdapter {
     const indexName = this.indexName
     try {
       // Template durável: garante que QUALQUER índice <base>_* criado herde o analyzer
-      // com asciifolding — seja pelo create explícito abaixo, por auto-create em um write
-      // (reindex/consumer com índice ausente) ou por um pod recriando o índice. Sem isto,
-      // um índice criado fora do create abaixo volta ao analyzer padrão e a busca sem
-      // acento quebra silenciosamente (já regrediu na VPS por esse motivo).
+      // com asciifolding E os mappings explícitos (campos keyword como _class/workspaceId/
+      // space) — seja pelo create explícito abaixo, por auto-create em um write
+      // (reindex/consumer com índice ausente) ou por um pod recriando o índice. Sem os
+      // `mappings` aqui, um índice auto-criado por uma escrita cai no mapping DINÂMICO
+      // (string → text) e os campos keyword viram `text`: o `term: {workspaceId}` e o
+      // filtro de `_class` da busca deixam de casar e TODA busca volta vazia (já regrediu
+      // na VPS por esse motivo — índice recriado no dinâmico após incidente do redpanda).
       try {
         await ctx.with('put-index-template', {}, () =>
           this.client.indices.putTemplate({
             name: `${this.indexBaseName}_template`,
             body: {
               index_patterns: [`${this.indexBaseName}_*`],
-              settings: { analysis: analysisSettings }
+              settings: { analysis: analysisSettings },
+              mappings
             }
           })
         )
