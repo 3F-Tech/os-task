@@ -26,6 +26,12 @@ export interface BusinessUnit extends Doc {
   head?: Ref<Person>
   color: number
   archived: boolean
+  // Config por BU (CP2) — metas e baseline de capacity. Opcionais: quando
+  // ausentes, as métricas usam o comportamento/limiar padrão (fallback).
+  onTimeTarget?: number // meta de entrega no prazo, em %
+  baselineHoursPerDay?: number // horas disponíveis por pessoa/dia (capacity)
+  capacityLowPct?: number // alerta de ociosidade quando ocupação < este %
+  capacityHighPct?: number // alerta de sobrecarga quando ocupação > este %
 }
 
 /** @public */
@@ -45,7 +51,10 @@ export interface Team extends Doc {
 
 /** @public */
 export interface ProjectWithBU extends Project {
+  /** @deprecated cadastro local antigo; usar `coreBuId` (BU do 3F Core). */
   businessUnit?: Ref<BusinessUnit>
+  /** Id da BU no 3F Core (read-through). Vínculo projeto→BU mantido no Huly. */
+  coreBuId?: number
 }
 
 /** @public */
@@ -54,6 +63,68 @@ export interface ProjectDashboardConfig extends Project {
   reworkStatuses: Ref<IssueStatus>[]
   waitingApprovalStatuses?: Ref<IssueStatus>[]
   cycleStartStatus?: Ref<IssueStatus>
+  /** Quando true, as métricas de prazo/atraso do painel contam também as
+   * SUBTAREFAS (pelo vencimento próprio). Ausente/false → só tarefas-raiz
+   * (decisão #6, comportamento padrão). */
+  subtaskDueDates?: boolean
+}
+
+/**
+ * Configuração global do dashboard (singleton — uma única instância em
+ * core.space.Workspace, id fixo operationalDashboard.ids.DashboardSettings).
+ * Hoje só guarda a meta de eficiência (estimativa vs tempo gasto), aplicada a
+ * TODAS as eficiências/cargos. Ausente → default no código (85%).
+ * @public
+ */
+export interface DashboardSettings extends Doc {
+  efficiencyTarget?: number
+  /** Dias sem tarefa de Retenção concluída p/ marcar o cliente em risco de
+   * abandono (alerta do Coordenador). Ausente → default no código (15). */
+  retentionAlertDays?: number
+  /** Override explícito do cargo: id do `position` (3F Core) → Cargo. Vence o
+   * seed automático por nome. Ausente → só o seed por nome vale. */
+  positionCargoMap?: Record<number, Cargo>
+}
+
+/**
+ * Config de dashboard por BU (metas e baseline de capacity), indexada pelo
+ * **id da BU no 3F Core** (`coreBuId`). Substitui os campos que viviam no
+ * antigo BusinessUnit local. Ausência de instância (ou de um campo) → usa o
+ * fallback global/código.
+ * @public
+ */
+export interface BuDashboardSettings extends Doc {
+  coreBuId: number
+  onTimeTarget?: number
+  baselineHoursPerDay?: number
+  capacityLowPct?: number
+  capacityHighPct?: number
+  /** Limiar de WIP (tarefas ativas simultâneas) abaixo do qual a pessoa é
+   * considerada ociosa no gráfico de eficiência. Ausente → default 3. */
+  wipLow?: number
+  /** Limiar de WIP acima do qual a pessoa é considerada sobrecarregada.
+   * Ausente → default 8. */
+  wipHigh?: number
+}
+
+/** @public */
+export enum Cargo {
+  Account = 'account',
+  GT = 'gt',
+  SocialMedia = 'socialMedia',
+  Designer = 'designer',
+  Editor = 'editor',
+  Coordinator = 'coordinator',
+  QGLeader = 'qgLeader'
+}
+
+/**
+ * Cargo (papel operacional) global da pessoa — define quais métricas aparecem
+ * na visão Individual e alimenta os rollups "por cargo".
+ * @public
+ */
+export interface WithCargo extends Person {
+  cargo?: Cargo
 }
 
 /** @public */
@@ -62,11 +133,18 @@ export const operationalDashboardId = 'operational-dashboard' as Plugin
 export default plugin(operationalDashboardId, {
   class: {
     BusinessUnit: '' as Ref<Class<BusinessUnit>>,
-    Team: '' as Ref<Class<Team>>
+    Team: '' as Ref<Class<Team>>,
+    DashboardSettings: '' as Ref<Class<DashboardSettings>>,
+    BuDashboardSettings: '' as Ref<Class<BuDashboardSettings>>
+  },
+  ids: {
+    // Singleton de configuração global (uma instância só).
+    DashboardSettings: '' as Ref<DashboardSettings>
   },
   mixin: {
     ProjectWithBU: '' as Ref<Mixin<ProjectWithBU>>,
-    ProjectDashboardConfig: '' as Ref<Mixin<ProjectDashboardConfig>>
+    ProjectDashboardConfig: '' as Ref<Mixin<ProjectDashboardConfig>>,
+    Cargo: '' as Ref<Mixin<WithCargo>>
   },
   string: {
     DashboardApplication: '' as IntlString,
@@ -173,7 +251,99 @@ export default plugin(operationalDashboardId, {
     RankBy: '' as IntlString,
     NoTeamsForRanking: '' as IntlString,
     ActiveTasks: '' as IntlString,
-    Position: '' as IntlString
+    Position: '' as IntlString,
+    Cargos: '' as IntlString,
+    Cargo: '' as IntlString,
+    NoCargo: '' as IntlString,
+    NoPersonsFound: '' as IntlString,
+    SearchPerson: '' as IntlString,
+    CargoAccount: '' as IntlString,
+    CargoGT: '' as IntlString,
+    CargoSocialMedia: '' as IntlString,
+    CargoDesigner: '' as IntlString,
+    CargoEditor: '' as IntlString,
+    CargoCoordinator: '' as IntlString,
+    CargoQGLeader: '' as IntlString,
+    TargetsSection: '' as IntlString,
+    OnTimeTarget: '' as IntlString,
+    BaselineHoursPerDay: '' as IntlString,
+    CapacityLowPct: '' as IntlString,
+    CapacityHighPct: '' as IntlString,
+    Individual: '' as IntlString,
+    OnTimeOverall: '' as IntlString,
+    OnTimeByStageTitle: '' as IntlString,
+    PerPersonSection: '' as IntlString,
+    OnTimePct: '' as IntlString,
+    ChangesAdjustments: '' as IntlString,
+    ChangesAdjustmentsHint: '' as IntlString,
+    ReworkPct: '' as IntlString,
+    WaitingApprovalCount: '' as IntlString,
+    WaitingApprovalHint: '' as IntlString,
+    WaitingApprovalTitle: '' as IntlString,
+    PdcaOnTime: '' as IntlString,
+    PdcaOnTimeTitle: '' as IntlString,
+    NoPdcaTasks: '' as IntlString,
+    CapacityTitle: '' as IntlString,
+    CapacityHint: '' as IntlString,
+    EfficiencyTitle: '' as IntlString,
+    CapacityPct: '' as IntlString,
+    StatusIdle: '' as IntlString,
+    StatusOptimal: '' as IntlString,
+    StatusOverloaded: '' as IntlString,
+    NoEventsInMetric: '' as IntlString,
+    QGLeader: '' as IntlString,
+    ByCargoTitle: '' as IntlString,
+    ByBUTitle: '' as IntlString,
+    QGExecutionTitle: '' as IntlString,
+    QGTeam: '' as IntlString,
+    SelectQGTeam: '' as IntlString,
+    Coordinator: '' as IntlString,
+    AssignedTasks: '' as IntlString,
+    GeneralSettings: '' as IntlString,
+    EfficiencyTarget: '' as IntlString,
+    EfficiencyTargetHint: '' as IntlString,
+    EfficiencyTimeTitle: '' as IntlString,
+    Estimation: '' as IntlString,
+    SpentTime: '' as IntlString,
+    EfficiencyShort: '' as IntlString,
+    EfficiencyEmptyHint: '' as IntlString,
+    SquadSection: '' as IntlString,
+    NoSquad: '' as IntlString,
+    Total: '' as IntlString,
+    OnTimeFraction: '' as IntlString,
+    ClientsAtRiskTitle: '' as IntlString,
+    Client: '' as IntlString,
+    LastRetention: '' as IntlString,
+    DaysWithoutRetention: '' as IntlString,
+    Never: '' as IntlString,
+    NoClientsAtRisk: '' as IntlString,
+    RetentionAlertDays: '' as IntlString,
+    RetentionAlertDaysHint: '' as IntlString,
+    ProjectsBU: '' as IntlString,
+    ProjectsBUHint: '' as IntlString,
+    PreviousBU: '' as IntlString,
+    NoCoreBUs: '' as IntlString,
+    OrgLoading: '' as IntlString,
+    OrgError: '' as IntlString,
+    CargoMapping: '' as IntlString,
+    CargoMappingHint: '' as IntlString,
+    AutoSeeded: '' as IntlString,
+    CorePosition: '' as IntlString,
+    BuTargets: '' as IntlString,
+    BuTargetsHint: '' as IntlString,
+    WipShort: '' as IntlString,
+    WipLoad: '' as IntlString,
+    Score: '' as IntlString,
+    ScoreHint: '' as IntlString,
+    WipLow: '' as IntlString,
+    WipHigh: '' as IntlString,
+    WipThresholdsHint: '' as IntlString,
+    PrecisionShort: '' as IntlString,
+    WipExplainHint: '' as IntlString,
+    MyView: '' as IntlString,
+    BuTeamSection: '' as IntlString,
+    SubtaskDueDates: '' as IntlString,
+    SubtaskDueDatesHint: '' as IntlString
   },
   icon: {
     Dashboard: '' as Asset,
@@ -182,12 +352,9 @@ export default plugin(operationalDashboardId, {
   },
   component: {
     Dashboard: '' as AnyComponent,
-    BUManagement: '' as AnyComponent,
-    EditBusinessUnit: '' as AnyComponent,
+    ProjectBUAssignment: '' as AnyComponent,
     MetricsConfig: '' as AnyComponent,
     EditProjectMetricsConfig: '' as AnyComponent,
-    TeamManagement: '' as AnyComponent,
-    EditTeam: '' as AnyComponent,
     TeamRanking: '' as AnyComponent
   }
 })

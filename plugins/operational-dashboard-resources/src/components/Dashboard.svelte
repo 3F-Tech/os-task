@@ -13,44 +13,104 @@
 // limitations under the License.
 -->
 <script lang="ts">
+  import { Cargo } from '@hcengineering/operational-dashboard'
   import { Label } from '@hcengineering/ui'
+  import { getMyPersonRef, isDashboardAdmin } from '../permissions'
   import operationalDashboard from '../plugin'
-  import BUManagement from './BUManagement.svelte'
+  import IndividualView from './IndividualView.svelte'
+  import EfficiencyView from './EfficiencyView.svelte'
+  import QGView from './QGView.svelte'
   import MetricsConfig from './MetricsConfig.svelte'
   import OverviewMetrics from './OverviewMetrics.svelte'
-  import TeamManagement from './TeamManagement.svelte'
+  import ProjectBUAssignment from './ProjectBUAssignment.svelte'
+  import { ensureOrgStructure, orgStore } from '../orgStructure'
 
-  type Tab = 'overview' | 'businessUnits' | 'teams' | 'metricsConfig'
-  let activeTab: Tab = 'overview'
+  // Carrega a org structure da 3F Core (BU/squad/cargo) uma vez.
+  void ensureOrgStructure()
+
+  type Tab =
+    | 'overview'
+    | 'individual'
+    | 'efficiency'
+    | 'qgLeader'
+    | 'projectsBU'
+    | 'metricsConfig'
+
+  const admin = isDashboardAdmin()
+  const myPersonRef = getMyPersonRef()
+
+  // Cargo do usuário logado (position do 3F Core → Cargo) libera as abas extras
+  // (Líder QG). Vem do store de org structure.
+  $: myCargo = $orgStore.indexes?.cargoByPersonRef.get(myPersonRef) ?? ''
+
+  // Visibilidade das abas por nível (Cargo + AccountRole). User normal → só
+  // Individual; Líder QG → sua aba; Maintainer+ → tudo + admin. A visão do
+  // Coordenador NÃO é mais aba: vive dentro da Individual (seção de squad),
+  // liberada pelo cargo do logado.
+  $: visible = {
+    overview: admin,
+    individual: true,
+    efficiency: admin,
+    qgLeader: admin || myCargo === Cargo.QGLeader,
+    projectsBU: admin,
+    metricsConfig: admin
+  }
+
+  let activeTab: Tab = admin ? 'overview' : 'individual'
+  // Se a aba ativa deixar de ser visível (ex.: cargo carregou depois), cai para
+  // a Individual, que é sempre visível.
+  $: if (!visible[activeTab]) activeTab = 'individual'
 </script>
 
 <div class="dashboard-root">
   <header class="dashboard-header">
     <h1><Label label={operationalDashboard.string.OperationalDashboard} /></h1>
+    {#if $orgStore.status === 'error'}
+      <div class="diag err"><Label label={operationalDashboard.string.OrgError} /> — {$orgStore.error}</div>
+    {/if}
   </header>
 
   <nav class="dashboard-tabs">
-    <button class:active={activeTab === 'overview'} on:click={() => (activeTab = 'overview')}>
-      <Label label={operationalDashboard.string.Overview} />
+    {#if visible.overview}
+      <button class:active={activeTab === 'overview'} on:click={() => (activeTab = 'overview')}>
+        <Label label={operationalDashboard.string.Overview} />
+      </button>
+    {/if}
+    <button class:active={activeTab === 'individual'} on:click={() => (activeTab = 'individual')}>
+      <Label label={operationalDashboard.string.Individual} />
     </button>
-    <button class:active={activeTab === 'businessUnits'} on:click={() => (activeTab = 'businessUnits')}>
-      <Label label={operationalDashboard.string.BusinessUnits} />
-    </button>
-    <button class:active={activeTab === 'teams'} on:click={() => (activeTab = 'teams')}>
-      <Label label={operationalDashboard.string.Teams} />
-    </button>
-    <button class:active={activeTab === 'metricsConfig'} on:click={() => (activeTab = 'metricsConfig')}>
-      <Label label={operationalDashboard.string.MetricsConfig} />
-    </button>
+    {#if visible.efficiency}
+      <button class:active={activeTab === 'efficiency'} on:click={() => (activeTab = 'efficiency')}>
+        <Label label={operationalDashboard.string.EfficiencyTitle} />
+      </button>
+    {/if}
+    {#if visible.qgLeader}
+      <button class:active={activeTab === 'qgLeader'} on:click={() => (activeTab = 'qgLeader')}>
+        <Label label={operationalDashboard.string.QGLeader} />
+      </button>
+    {/if}
+    {#if admin}
+      <div class="nav-spacer" />
+      <button class:active={activeTab === 'projectsBU'} on:click={() => (activeTab = 'projectsBU')}>
+        <Label label={operationalDashboard.string.ProjectsBU} />
+      </button>
+      <button class:active={activeTab === 'metricsConfig'} on:click={() => (activeTab = 'metricsConfig')}>
+        <Label label={operationalDashboard.string.MetricsConfig} />
+      </button>
+    {/if}
   </nav>
 
   <section class="dashboard-content">
     {#if activeTab === 'overview'}
       <OverviewMetrics />
-    {:else if activeTab === 'businessUnits'}
-      <BUManagement />
-    {:else if activeTab === 'teams'}
-      <TeamManagement />
+    {:else if activeTab === 'individual'}
+      <IndividualView />
+    {:else if activeTab === 'efficiency'}
+      <EfficiencyView />
+    {:else if activeTab === 'qgLeader'}
+      <QGView />
+    {:else if activeTab === 'projectsBU'}
+      <ProjectBUAssignment />
     {:else if activeTab === 'metricsConfig'}
       <MetricsConfig />
     {/if}
@@ -76,6 +136,17 @@
       font-size: 1.5rem;
       color: var(--theme-caption-color);
     }
+
+    .diag {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      font-family: var(--mono-font, monospace);
+      color: var(--theme-dark-color);
+
+      &.err {
+        color: var(--theme-error-color, #c4314b);
+      }
+    }
   }
 
   .dashboard-tabs {
@@ -83,6 +154,10 @@
     gap: 0.25rem;
     padding: 0 2rem;
     border-bottom: 1px solid var(--theme-divider-color);
+
+    .nav-spacer {
+      flex: 1;
+    }
 
     button {
       background: none;

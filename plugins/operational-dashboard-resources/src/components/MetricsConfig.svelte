@@ -13,24 +13,61 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { type ProjectDashboardConfig } from '@hcengineering/operational-dashboard'
+  import core from '@hcengineering/core'
+  import { type DashboardSettings, type ProjectDashboardConfig } from '@hcengineering/operational-dashboard'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tracker, { type Project } from '@hcengineering/tracker'
-  import { Label, showPopup } from '@hcengineering/ui'
+  import { Button, EditBox, Label, showPopup } from '@hcengineering/ui'
   import { canEditDashboard } from '../permissions'
   import operationalDashboard from '../plugin'
+  import BuTargetsConfig from './BuTargetsConfig.svelte'
+  import CargoMappingConfig from './CargoMappingConfig.svelte'
   import EditProjectMetricsConfig from './EditProjectMetricsConfig.svelte'
 
   const canEdit = canEditDashboard()
   const client = getClient()
   const hierarchy = client.getHierarchy()
   const query = createQuery()
+  const settingsQuery = createQuery()
 
   let projects: Project[] = []
 
   $: query.query(tracker.class.Project, { archived: false }, (res) => {
     projects = res
   })
+
+  // Config global (singleton). targetInput é semeado uma vez da instância salva
+  // para não sobrescrever a digitação quando a live query reemitir.
+  let settings: DashboardSettings | undefined
+  let targetInput: number | undefined
+  let daysInput: number | undefined
+  let seeded = false
+  $: settingsQuery.query(operationalDashboard.class.DashboardSettings, {}, (res) => {
+    settings = res[0]
+    if (!seeded) {
+      targetInput = settings?.efficiencyTarget
+      daysInput = settings?.retentionAlertDays
+      seeded = true
+    }
+  })
+
+  const num = (v: number | undefined): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? v : undefined
+
+  async function saveGeneral (): Promise<void> {
+    if (!canEdit) return
+    const data = { efficiencyTarget: num(targetInput), retentionAlertDays: num(daysInput) }
+    if (settings == null) {
+      await client.createDoc(
+        operationalDashboard.class.DashboardSettings,
+        core.space.Workspace,
+        data,
+        operationalDashboard.ids.DashboardSettings
+      )
+    } else {
+      await client.updateDoc(operationalDashboard.class.DashboardSettings, settings.space, settings._id, data)
+    }
+  }
 
   function isConfigured (p: Project): boolean {
     const config = hierarchy.as(p, operationalDashboard.mixin.ProjectDashboardConfig) as ProjectDashboardConfig
@@ -47,6 +84,36 @@
   <div class="config-header">
     <h2><Label label={operationalDashboard.string.MetricsConfig} /></h2>
   </div>
+
+  <!-- Configuração global (singleton): aplicada a todos os cargos. -->
+  <div class="general-section">
+    <h3><Label label={operationalDashboard.string.GeneralSettings} /></h3>
+    <div class="general-field">
+      <span class="field-label"><Label label={operationalDashboard.string.EfficiencyTarget} /></span>
+      <div class="field-input">
+        <EditBox bind:value={targetInput} format={'number'} maxWidth={'5rem'} kind={'editbox'} disabled={!canEdit} />
+        <span class="suffix">%</span>
+      </div>
+    </div>
+    <div class="hint"><Label label={operationalDashboard.string.EfficiencyTargetHint} /></div>
+    <div class="general-field">
+      <span class="field-label"><Label label={operationalDashboard.string.RetentionAlertDays} /></span>
+      <div class="field-input">
+        <EditBox bind:value={daysInput} format={'number'} maxWidth={'5rem'} kind={'editbox'} disabled={!canEdit} />
+        <span class="suffix">d</span>
+      </div>
+    </div>
+    <div class="hint"><Label label={operationalDashboard.string.RetentionAlertDaysHint} /></div>
+    {#if canEdit}
+      <div class="field-input">
+        <Button kind={'primary'} label={operationalDashboard.string.Save} on:click={saveGeneral} />
+      </div>
+    {/if}
+  </div>
+
+  <!-- Cargo (3F Core → papel do painel) e metas por BU (read-through da 3F Core). -->
+  <CargoMappingConfig />
+  <BuTargetsConfig />
 
   <p class="hint">
     Para cada projeto, marque quais status indicam aprovação final, retrabalho e início da
@@ -89,6 +156,48 @@
       margin: 0;
       font-size: 1.125rem;
       color: var(--theme-caption-color);
+    }
+  }
+
+  .general-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+    background: var(--theme-button-bg);
+    border: 1px solid var(--theme-divider-color);
+    border-radius: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--theme-dark-color);
+      font-weight: 500;
+    }
+
+    .general-field {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .field-label {
+      color: var(--theme-caption-color);
+      font-size: 0.9375rem;
+    }
+
+    .field-input {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      .suffix {
+        color: var(--theme-dark-color);
+      }
     }
   }
 

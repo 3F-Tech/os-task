@@ -36,11 +36,14 @@
     "@hcengineering/core": "workspace:^0.7.26",
     "@hcengineering/platform": "workspace:^0.7.20",
     "@hcengineering/presentation": "workspace:^0.7.0",
+    "@hcengineering/login": "workspace:^0.7.0",
     "@hcengineering/ui": "workspace:^0.7.0",
     "@hcengineering/view-resources": "workspace:^0.7.0",
     "@hcengineering/task": "workspace:^0.7.0",
     "@hcengineering/tracker": "workspace:^0.7.0",
     "@hcengineering/operational-dashboard": "workspace:^0.7.0",
+    "@hcengineering/calendar": "workspace:^0.7.0",
+    "@hcengineering/time": "workspace:^0.7.0",
     "svelte": "^4.2.20"
   }
 }

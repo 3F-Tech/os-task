@@ -14,12 +14,14 @@
 -->
 <script lang="ts">
   import contact, { formatName, type Person } from '@hcengineering/contact'
-  import { type BusinessUnit, type ProjectWithBU, type Team } from '@hcengineering/operational-dashboard'
+  import { type Ref } from '@hcengineering/core'
+  import { type ProjectWithBU } from '@hcengineering/operational-dashboard'
   import { createQuery, getClient } from '@hcengineering/presentation'
   import tracker, { ClientStage, type Project } from '@hcengineering/tracker'
   import { Button, Label } from '@hcengineering/ui'
   import { onDestroy } from 'svelte'
   import operationalDashboard from '../plugin'
+  import { orgStore } from '../orgStructure'
   import {
     dashboardFilters,
     lastRefreshedAt,
@@ -33,23 +35,33 @@
   const client = getClient()
   const hierarchy = client.getHierarchy()
 
-  const busQuery = createQuery()
+  // Quando true, oculta o seletor de Etapa. Usado na aba Individual, que já
+  // separa as métricas por etapa nos próprios cards — o filtro global seria
+  // redundante/confuso lá (e o computeGreen o ignora de propósito).
+  export let hideClientStage = false
+  // Quando true, oculta os seletores de Usuário e Equipe (o chamador trava o
+  // userId no próprio usuário). Usado na Individual para que o user normal não
+  // consiga trocar o filtro e ver dados de outra pessoa.
+  export let lockUser = false
+  // Quando true, o seletor de BU ganha a opção "— Todos —" (value vazio = todas
+  // as BUs). Usado na Individual, cujo cálculo suporta buId vazio.
+  export let allowAllBU = false
+
   const projectsQuery = createQuery()
   const personsQuery = createQuery()
-  const teamsQuery = createQuery()
 
-  let bus: BusinessUnit[] = []
   let allProjects: Project[] = []
   let persons: Person[] = []
-  let teams: Team[] = []
 
-  $: busQuery.query(operationalDashboard.class.BusinessUnit, { archived: false }, (res) => {
-    bus = res.slice().sort((a, b) => a.name.localeCompare(b.name))
-  })
-
-  $: teamsQuery.query(operationalDashboard.class.Team, { archived: false }, (res) => {
-    teams = res.slice().sort((a, b) => a.name.localeCompare(b.name))
-  })
+  // BUs e squads vêm do 3F Core (read-through) via store; value do <select> = id (string).
+  $: bus = ($orgStore.indexes?.busList ?? [])
+    .filter((b) => b.is_active)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+  $: teams = ($orgStore.indexes?.raw.squads ?? [])
+    .filter((s) => s.is_active)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   $: projectsQuery.query(tracker.class.Project, { archived: false }, (res) => {
     allProjects = res
@@ -66,7 +78,7 @@
       : allProjects.filter((p) => {
         if (!hierarchy.hasMixin(p, operationalDashboard.mixin.ProjectWithBU)) return false
         const m = hierarchy.as(p, operationalDashboard.mixin.ProjectWithBU) as ProjectWithBU
-        return m.businessUnit === ($dashboardFilters.buId as BusinessUnit['_id'])
+        return m.coreBuId === Number($dashboardFilters.buId)
       })
 
   // Ao trocar BU, limpa o projeto selecionado se ele não pertence à nova BU.
@@ -78,12 +90,13 @@
     }
   }
 
-  // Com equipe selecionada, o select de usuário lista só os membros.
-  $: selectedTeam = teams.find((t) => t._id === $dashboardFilters.teamId)
+  // Com squad selecionado, o select de usuário lista só os membros (refs do store).
+  $: selectedSquadMembers =
+    $dashboardFilters.teamId !== '' && $orgStore.indexes != null
+      ? new Set($orgStore.indexes.memberRefsBySquadId.get(Number($dashboardFilters.teamId)) ?? [])
+      : undefined
   $: filteredPersons =
-    selectedTeam != null
-      ? persons.filter((p) => selectedTeam?.members.some((m) => m.person === p._id))
-      : persons
+    selectedSquadMembers != null ? persons.filter((p) => selectedSquadMembers?.has(p._id)) : persons
 
   // Ao trocar de equipe, limpa o usuário se não for membro da nova equipe.
   // Busca a equipe localmente (não via selectedTeam) para não criar ciclo
@@ -91,11 +104,14 @@
   let prevTeamId = $dashboardFilters.teamId
   $: if ($dashboardFilters.teamId !== prevTeamId) {
     prevTeamId = $dashboardFilters.teamId
-    const team = teams.find((t) => t._id === $dashboardFilters.teamId)
+    const memberRefs =
+      $dashboardFilters.teamId !== '' && $orgStore.indexes != null
+        ? new Set($orgStore.indexes.memberRefsBySquadId.get(Number($dashboardFilters.teamId)) ?? [])
+        : undefined
     if (
       $dashboardFilters.userId !== '' &&
-      team != null &&
-      !team.members.some((m) => m.person === $dashboardFilters.userId)
+      memberRefs != null &&
+      !memberRefs.has($dashboardFilters.userId as Ref<Person>)
     ) {
       $dashboardFilters.userId = ''
     }
@@ -140,11 +156,19 @@
 
 <div class="filters-bar">
   <div class="filter">
-    <span class="filter-label required"><Label label={operationalDashboard.string.BusinessUnit} /> *</span>
-    <select bind:value={$dashboardFilters.buId} class:required-empty={$dashboardFilters.buId === ''}>
-      <option value="" disabled>— Selecione uma BU —</option>
-      {#each bus as bu (bu._id)}
-        <option value={bu._id}>{bu.name}</option>
+    {#if allowAllBU}
+      <span class="filter-label"><Label label={operationalDashboard.string.BusinessUnit} /></span>
+    {:else}
+      <span class="filter-label required"><Label label={operationalDashboard.string.BusinessUnit} /> *</span>
+    {/if}
+    <select bind:value={$dashboardFilters.buId} class:required-empty={!allowAllBU && $dashboardFilters.buId === ''}>
+      {#if allowAllBU}
+        <option value="">— Todos —</option>
+      {:else}
+        <option value="" disabled>— Selecione uma BU —</option>
+      {/if}
+      {#each bus as bu (bu.id)}
+        <option value={String(bu.id)}>{bu.name}</option>
       {/each}
     </select>
   </div>
@@ -159,35 +183,39 @@
     </select>
   </div>
 
-  <div class="filter">
-    <span class="filter-label"><Label label={operationalDashboard.string.ClientStage} /></span>
-    <select bind:value={$dashboardFilters.clientStage}>
-      <option value="">— Todas —</option>
-      {#each stages as s (s.value)}
-        <option value={s.value}>{s.label}</option>
-      {/each}
-    </select>
-  </div>
+  {#if !hideClientStage}
+    <div class="filter">
+      <span class="filter-label"><Label label={operationalDashboard.string.ClientStage} /></span>
+      <select bind:value={$dashboardFilters.clientStage}>
+        <option value="">— Todas —</option>
+        {#each stages as s (s.value)}
+          <option value={s.value}>{s.label}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
 
-  <div class="filter">
-    <span class="filter-label"><Label label={operationalDashboard.string.Team} /></span>
-    <select bind:value={$dashboardFilters.teamId}>
-      <option value="">— Todas —</option>
-      {#each teams as t (t._id)}
-        <option value={t._id}>{t.name}</option>
-      {/each}
-    </select>
-  </div>
+  {#if !lockUser}
+    <div class="filter">
+      <span class="filter-label"><Label label={operationalDashboard.string.Team} /></span>
+      <select bind:value={$dashboardFilters.teamId}>
+        <option value="">— Todas —</option>
+        {#each teams as t (t.id)}
+          <option value={String(t.id)}>{t.name}</option>
+        {/each}
+      </select>
+    </div>
 
-  <div class="filter">
-    <span class="filter-label"><Label label={operationalDashboard.string.User} /></span>
-    <select bind:value={$dashboardFilters.userId}>
-      <option value="">— Todos —</option>
-      {#each filteredPersons as p (p._id)}
-        <option value={p._id}>{formatName(p.name ?? '')}</option>
-      {/each}
-    </select>
-  </div>
+    <div class="filter">
+      <span class="filter-label"><Label label={operationalDashboard.string.User} /></span>
+      <select bind:value={$dashboardFilters.userId}>
+        <option value="">— Todos —</option>
+        {#each filteredPersons as p (p._id)}
+          <option value={p._id}>{formatName(p.name ?? '')}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
 
   <div class="filter spacer">
     <span class="filter-label">
@@ -211,7 +239,9 @@
           on:click={triggerRefresh}
         />
       </div>
-      <Button label={operationalDashboard.string.Reset} on:click={resetFilters} />
+      {#if !lockUser}
+        <Button label={operationalDashboard.string.Reset} on:click={resetFilters} />
+      {/if}
     </div>
   </div>
 </div>
@@ -291,6 +321,11 @@
 
     &.required-empty {
       border-color: var(--theme-warning-color, #f39c12);
+    }
+
+    option {
+      background: var(--theme-popup-color);
+      color: var(--theme-content-color);
     }
   }
 

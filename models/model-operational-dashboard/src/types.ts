@@ -28,15 +28,19 @@ import {
   TypeString,
   UX
 } from '@hcengineering/model'
-import contact from '@hcengineering/model-contact'
+import contact, { TPerson } from '@hcengineering/model-contact'
 import core, { TDoc } from '@hcengineering/model-core'
 import tracker, { TProject } from '@hcengineering/model-tracker'
 import {
   type BusinessUnit,
+  type BuDashboardSettings,
+  type Cargo,
+  type DashboardSettings,
   type ProjectDashboardConfig,
   type ProjectWithBU,
   type Team,
-  type TeamMember
+  type TeamMember,
+  type WithCargo
 } from '@hcengineering/operational-dashboard'
 import { type IssueStatus } from '@hcengineering/tracker'
 
@@ -62,6 +66,18 @@ export class TBusinessUnit extends TDoc implements BusinessUnit {
 
   @Prop(TypeBoolean(), operationalDashboard.string.Archived)
     archived!: boolean
+
+  @Prop(TypeNumber(), operationalDashboard.string.OnTimeTarget)
+    onTimeTarget?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.BaselineHoursPerDay)
+    baselineHoursPerDay?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.CapacityLowPct)
+    capacityLowPct?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.CapacityHighPct)
+    capacityHighPct?: number
 }
 
 @Model(operationalDashboard.class.Team, core.class.Doc, DOMAIN_OPERATIONAL_DASHBOARD)
@@ -86,8 +102,65 @@ export class TTeam extends TDoc implements Team {
 
 @Mixin(operationalDashboard.mixin.ProjectWithBU, tracker.class.Project)
 export class TProjectWithBU extends TProject implements ProjectWithBU {
+  // @deprecated — vínculo local antigo; mantido só como dica de migração.
   @Prop(TypeRef(operationalDashboard.class.BusinessUnit), operationalDashboard.string.BusinessUnit)
     businessUnit?: Ref<BusinessUnit>
+
+  // Id da BU no 3F Core (read-through). É o vínculo projeto→BU atual.
+  @Prop(TypeNumber(), operationalDashboard.string.BusinessUnit)
+  @Index(IndexKind.Indexed)
+    coreBuId?: number
+}
+
+@Mixin(operationalDashboard.mixin.Cargo, contact.class.Person)
+export class TWithCargo extends TPerson implements WithCargo {
+  @Prop(TypeString(), operationalDashboard.string.Cargo)
+    cargo?: Cargo
+}
+
+// Singleton de configuração global (uma instância em core.space.Workspace, id
+// fixo operationalDashboard.ids.DashboardSettings). Meta de eficiência única
+// para todos os cargos. Criado on-demand pela UI; ausência → default no código.
+@Model(operationalDashboard.class.DashboardSettings, core.class.Doc, DOMAIN_OPERATIONAL_DASHBOARD)
+@UX(operationalDashboard.string.GeneralSettings)
+export class TDashboardSettings extends TDoc implements DashboardSettings {
+  @Prop(TypeNumber(), operationalDashboard.string.EfficiencyTarget)
+    efficiencyTarget?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.RetentionAlertDays)
+    retentionAlertDays?: number
+
+  // Override position(id 3F Core) → Cargo; vence o seed por nome.
+  @Prop(TypeRecord(), operationalDashboard.string.Cargos)
+    positionCargoMap?: Record<number, Cargo>
+}
+
+// Config de dashboard por BU (metas/capacity), indexada pelo id da BU do 3F
+// Core. Substitui os campos que viviam no antigo BusinessUnit local.
+@Model(operationalDashboard.class.BuDashboardSettings, core.class.Doc, DOMAIN_OPERATIONAL_DASHBOARD)
+@UX(operationalDashboard.string.TargetsSection)
+export class TBuDashboardSettings extends TDoc implements BuDashboardSettings {
+  @Prop(TypeNumber(), operationalDashboard.string.BusinessUnit)
+  @Index(IndexKind.Indexed)
+    coreBuId!: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.OnTimeTarget)
+    onTimeTarget?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.BaselineHoursPerDay)
+    baselineHoursPerDay?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.CapacityLowPct)
+    capacityLowPct?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.CapacityHighPct)
+    capacityHighPct?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.WipLow)
+    wipLow?: number
+
+  @Prop(TypeNumber(), operationalDashboard.string.WipHigh)
+    wipHigh?: number
 }
 
 @Mixin(operationalDashboard.mixin.ProjectDashboardConfig, tracker.class.Project)
@@ -103,4 +176,7 @@ export class TProjectDashboardConfig extends TProject implements ProjectDashboar
 
   @Prop(TypeRef(tracker.class.IssueStatus), operationalDashboard.string.CycleStartStatus)
     cycleStartStatus?: Ref<IssueStatus>
+
+  @Prop(TypeBoolean(), operationalDashboard.string.SubtaskDueDates)
+    subtaskDueDates?: boolean
 }

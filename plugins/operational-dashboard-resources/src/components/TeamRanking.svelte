@@ -163,6 +163,11 @@
         color: var(--theme-content-color);
         border: 1px solid var(--theme-divider-color);
         border-radius: 0.375rem;
+
+        option {
+          background: var(--theme-popup-color);
+          color: var(--theme-content-color);
+        }
       }
     }
   }

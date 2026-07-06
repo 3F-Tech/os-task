@@ -18,12 +18,15 @@
   import { type IntlString } from '@hcengineering/platform'
   import { createQuery } from '@hcengineering/presentation'
   import tracker, { type Issue, type IssueStatus, type Project } from '@hcengineering/tracker'
-  import { Label } from '@hcengineering/ui'
+  import { Label, showPanel } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
   import { type IssueRow } from '../metrics'
   import operationalDashboard from '../plugin'
 
-  export let title: IntlString
+  // title (IntlString, traduzido) OU titleText (texto puro, ex.: nome de pessoa).
+  // titleText tem precedência quando informado.
+  export let title: IntlString | undefined = undefined
+  export let titleText: string | undefined = undefined
   export let rows: IssueRow[] = []
   // Quando false, esconde colunas Vencimento e Atraso (vão juntas).
   export let showDueDate: boolean = true
@@ -52,6 +55,8 @@
   $: hasCompletedAt = rows.some((r) => r.completedAt != null)
   $: hasLate = showDueDate && rows.some((r) => (lateDays(r) ?? 0) > 0)
   $: hasRework = rows.some((r) => r.reworkCount != null)
+  // Colunas de Eficiência (estimativa/gasto/%): só quando as linhas as trazem.
+  $: hasEfficiency = rows.some((r) => r.estimationHours != null)
   $: statusIds = Array.from(new Set(rows.map((r) => r.issue.status)))
   $: personIds = Array.from(
     new Set(
@@ -93,6 +98,10 @@
     return new Date(ts).toLocaleDateString('pt-BR')
   }
 
+  function formatHours (h: number | null | undefined): string {
+    return h == null ? '—' : `${h.toFixed(1)}h`
+  }
+
   function identifierOf (issue: Issue): string {
     const p = projectMap.get(issue.space as Ref<Project>)
     const prefix = p?.identifier ?? ''
@@ -102,6 +111,19 @@
   function isOverdue (issue: Issue): boolean {
     if (issue.dueDate == null) return false
     return startOfDay(issue.dueDate) < startOfDay(Date.now())
+  }
+
+  // Clique na linha → fecha o modal e abre a issue no painel (mesma navegação
+  // do tracker via showPanel + EditIssue).
+  function openIssue (issue: Issue): void {
+    dispatch('close')
+    showPanel(tracker.component.EditIssue, issue._id, issue._class, 'content')
+  }
+  function onRowKey (e: KeyboardEvent, issue: Issue): void {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      openIssue(issue)
+    }
   }
 
   // Paginação clássica — 10 linhas por página.
@@ -130,7 +152,13 @@
 
 <div class="modal">
   <header>
-    <h3><Label label={title} /></h3>
+    <h3>
+      {#if titleText != null}
+        {titleText}
+      {:else if title != null}
+        <Label label={title} />
+      {/if}
+    </h3>
     <button class="close" on:click={() => dispatch('close')} aria-label="Fechar">×</button>
   </header>
 
@@ -162,11 +190,22 @@
             {#if hasRework}
               <th><Label label={operationalDashboard.string.ReworkCount} /></th>
             {/if}
+            {#if hasEfficiency}
+              <th class="num"><Label label={operationalDashboard.string.Estimation} /></th>
+              <th class="num"><Label label={operationalDashboard.string.SpentTime} /></th>
+              <th class="num"><Label label={operationalDashboard.string.EfficiencyShort} /></th>
+            {/if}
           </tr>
         </thead>
         <tbody>
           {#each pagedRows as row (row.issue._id)}
-            <tr>
+            <tr
+              class="row-link"
+              role="button"
+              tabindex="0"
+              on:click={() => openIssue(row.issue)}
+              on:keydown={(e) => onRowKey(e, row.issue)}
+            >
               <td class="mono">{identifierOf(row.issue)}</td>
               <td class="title-col">{row.issue.title}</td>
               <td>{statusMap.get(row.issue.status)?.name ?? '…'}</td>
@@ -209,6 +248,11 @@
                     <span class="muted">0</span>
                   {/if}
                 </td>
+              {/if}
+              {#if hasEfficiency}
+                <td class="num">{formatHours(row.estimationHours)}</td>
+                <td class="num">{formatHours(row.spentHours)}</td>
+                <td class="num">{row.efficiencyPct != null ? `${row.efficiencyPct}%` : '—'}</td>
               {/if}
             </tr>
           {/each}
@@ -324,6 +368,10 @@
           border-bottom: none;
         }
 
+        &.row-link {
+          cursor: pointer;
+        }
+
         &:hover {
           background: var(--theme-button-hovered);
         }
@@ -351,6 +399,12 @@
       td.overdue {
         color: #e74c3c;
         font-weight: 500;
+      }
+
+      th.num,
+      td.num {
+        text-align: right;
+        white-space: nowrap;
       }
 
       .late {

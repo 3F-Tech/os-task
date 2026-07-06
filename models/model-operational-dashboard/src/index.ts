@@ -19,14 +19,30 @@ import core from '@hcengineering/model-core'
 import workbench from '@hcengineering/model-workbench'
 
 import operationalDashboard from './plugin'
-import { TBusinessUnit, TProjectDashboardConfig, TProjectWithBU, TTeam } from './types'
+import {
+  TBuDashboardSettings,
+  TBusinessUnit,
+  TDashboardSettings,
+  TProjectDashboardConfig,
+  TProjectWithBU,
+  TTeam,
+  TWithCargo
+} from './types'
 
 export { operationalDashboardId } from '@hcengineering/operational-dashboard'
 export * from './migration'
 export * from './types'
 
 export function createModel (builder: Builder): void {
-  builder.createModel(TBusinessUnit, TTeam, TProjectWithBU, TProjectDashboardConfig)
+  builder.createModel(
+    TBusinessUnit,
+    TTeam,
+    TProjectWithBU,
+    TProjectDashboardConfig,
+    TWithCargo,
+    TDashboardSettings,
+    TBuDashboardSettings
+  )
 
   builder.createDoc(
     workbench.class.Application,
@@ -37,7 +53,10 @@ export function createModel (builder: Builder): void {
       alias: 'operational-dashboard',
       hidden: false,
       position: 'mid',
-      accessLevel: AccountRole.Maintainer,
+      // Liberado para User: o gating fino (quem vê quais abas / dados de quem)
+      // é feito no front por AccountRole + Cargo. User normal vê só a Individual
+      // travada nele mesmo.
+      accessLevel: AccountRole.User,
       component: operationalDashboard.component.Dashboard
     },
     operationalDashboard.app.Dashboard

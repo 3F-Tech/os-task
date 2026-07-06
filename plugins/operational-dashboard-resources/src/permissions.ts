@@ -13,8 +13,23 @@
 // limitations under the License.
 //
 
-import { AccountRole, getCurrentAccount, hasAccountRole } from '@hcengineering/core'
+import { AccountRole, getCurrentAccount, hasAccountRole, type Ref } from '@hcengineering/core'
+import { getCurrentEmployee, type Person } from '@hcengineering/contact'
 
 export function canEditDashboard (): boolean {
   return hasAccountRole(getCurrentAccount(), AccountRole.Maintainer)
+}
+
+/**
+ * Admin do dashboard (Maintainer+): vê todas as visões e as abas de gestão.
+ * Abaixo disso, a visibilidade é por Cargo (Coordenador / Líder QG) e o user
+ * normal só enxerga a própria visão Individual.
+ */
+export function isDashboardAdmin (): boolean {
+  return hasAccountRole(getCurrentAccount(), AccountRole.Maintainer)
+}
+
+/** Ref da Person do usuário logado (Employee e Person compartilham o _id). */
+export function getMyPersonRef (): Ref<Person> {
+  return getCurrentEmployee() as unknown as Ref<Person>
 }

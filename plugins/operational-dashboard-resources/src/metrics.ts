@@ -24,12 +24,19 @@ import operationalDashboard, {
 import task from '@hcengineering/task'
 import tracker, { type Issue, type IssueStatus, type Project } from '@hcengineering/tracker'
 import { type DashboardFilters } from './stores'
+import { type OrgIndexes, squadsAsTeams } from './orgStructure'
 
 export interface IssueRow {
   issue: Issue
   startedAt?: Timestamp
   completedAt?: Timestamp
   reworkCount?: number
+  // Drill-down de Eficiência (Designer/Editor): estimativa e tempo gasto em
+  // horas + razão (%). Presentes só nas linhas do card de Eficiência; o
+  // IssueListModal renderiza as colunas quando estiverem definidas.
+  estimationHours?: number
+  spentHours?: number
+  efficiencyPct?: number
 }
 
 export interface MetricResult {
@@ -89,6 +96,18 @@ interface IssueAnalysis {
 
 const DAY_MS = 1000 * 60 * 60 * 24
 
+// Tom do indicador conforme a meta da BU (spec: verde ≥ meta, amarelo entre
+// 80%–99% da meta, vermelho < 80% da meta). Sem meta configurada, mantém o
+// comportamento legado (≥80 positivo, <50 negativo) — fallback não-destrutivo.
+export function toneForTarget (value: number, target: number | undefined): 'positive' | 'negative' | 'neutral' {
+  if (target != null && target > 0) {
+    if (value >= target) return 'positive'
+    if (value >= target * 0.8) return 'neutral'
+    return 'negative'
+  }
+  return value >= 80 ? 'positive' : value < 50 ? 'negative' : 'neutral'
+}
+
 function emptyResult (): MetricsResult {
   return {
     onTime: NO_DATA(),
@@ -104,18 +123,27 @@ function emptyResult (): MetricsResult {
 export async function computeDashboard (
   client: Client,
   filters: DashboardFilters,
-  teams: Team[]
+  idx: OrgIndexes
 ): Promise<DashboardResult> {
   // BU é obrigatória — sem BU selecionada, não há dados a apresentar.
   if (filters.buId === '') return { metrics: emptyResult(), ranking: [] }
 
+  // "Equipes" agora vêm dos squads do 3F Core (read-through).
+  const teams: Team[] = squadsAsTeams(idx)
   const hierarchy = client.getHierarchy()
+
+  // Config da BU selecionada (metas/limiares) — agora por id da BU do 3F Core,
+  // num doc local BuDashboardSettings. Ausente → comportamento padrão.
+  const buSettings = await client.findOne(operationalDashboard.class.BuDashboardSettings, {
+    coreBuId: Number(filters.buId)
+  })
+  const onTimeTarget = buSettings?.onTimeTarget
 
   // 1. Load projects + apply BU/Project filters
   const allProjects = await client.findAll(tracker.class.Project, { archived: false })
   let filteredProjects: Project[] = allProjects.filter((p) => {
     const m = hierarchy.as(p, operationalDashboard.mixin.ProjectWithBU) as ProjectWithBU
-    return m.businessUnit === filters.buId
+    return m.coreBuId === Number(filters.buId)
   })
   if (filters.projectId !== '') {
     filteredProjects = filteredProjects.filter((p) => p._id === (filters.projectId as Ref<Project>))
@@ -350,7 +378,7 @@ export async function computeDashboard (
     onTime = {
       value: `${pct}%`,
       subtitle: `${onTimeAnalyses.length}/${withDueDate.length} no prazo`,
-      tone: pct >= 80 ? 'positive' : pct < 50 ? 'negative' : 'neutral',
+      tone: toneForTarget(pct, onTimeTarget),
       issues: withDueDate.map((a) => ({ issue: a.issue, completedAt: a.firstApproval }))
     }
   }

@@ -13,11 +13,11 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { type Team } from '@hcengineering/operational-dashboard'
   import { type IntlString } from '@hcengineering/platform'
-  import { createQuery, getClient } from '@hcengineering/presentation'
+  import { getClient } from '@hcengineering/presentation'
   import { Label, showPopup } from '@hcengineering/ui'
   import { computeDashboard, type IssueRow, type MetricsResult, type TeamRankingRow } from '../metrics'
+  import { orgStore } from '../orgStructure'
   import operationalDashboard from '../plugin'
   import {
     dashboardFilters,
@@ -36,11 +36,8 @@
 
   const client = getClient()
 
-  const teamsQuery = createQuery()
-  let teams: Team[] = []
-  $: teamsQuery.query(operationalDashboard.class.Team, { archived: false }, (res) => {
-    teams = res
-  })
+  // Org structure do 3F Core (squads viram "equipes" no ranking).
+  $: idx = $orgStore.indexes
 
   const loading: MetricsResult = {
     onTime: { value: '…', subtitle: '', tone: 'neutral', issues: [] },
@@ -57,10 +54,15 @@
   let isLoading = false
   let pendingToken = 0
 
-  $: $refreshTrigger, teams, void load($dashboardFilters)
+  $: $refreshTrigger, idx, void load($dashboardFilters)
 
   async function load (filters: Filters): Promise<void> {
     const token = ++pendingToken
+    // Org structure ainda carregando → recomputa quando idx chegar.
+    if (idx == null) {
+      isLoading = false
+      return
+    }
     // Sem BU selecionada: zera estado, não consulta backend, mantém botão liberado para idle.
     if (filters.buId === '') {
       metrics = loading
@@ -73,7 +75,7 @@
     // Garante 'loading' mesmo se chamado por mudança de filtro (e não por triggerRefresh).
     refreshState.set('loading')
     try {
-      const result = await computeDashboard(client, filters, teams)
+      const result = await computeDashboard(client, filters, idx)
       if (token === pendingToken) {
         metrics = result.metrics
         ranking = result.ranking

@@ -83,6 +83,7 @@
   let reworkSet: Set<Ref<IssueStatus>> = new Set()
   let waitingSet: Set<Ref<IssueStatus>> = new Set()
   let cycleStart: Ref<IssueStatus> | undefined
+  let subtaskDueDates = false
 
   $: {
     const config = hierarchy.as(project, operationalDashboard.mixin.ProjectDashboardConfig) as ProjectDashboardConfig
@@ -90,6 +91,7 @@
     reworkSet = new Set(config.reworkStatuses ?? [])
     waitingSet = new Set(config.waitingApprovalStatuses ?? [])
     cycleStart = config.cycleStartStatus
+    subtaskDueDates = config.subtaskDueDates === true
   }
 
   function toggleApproved (id: Ref<IssueStatus>): void {
@@ -128,7 +130,8 @@
         approvedStatuses: Array.from(approvedSet),
         reworkStatuses: Array.from(reworkSet),
         waitingApprovalStatuses: Array.from(waitingSet),
-        cycleStartStatus: cycleStart
+        cycleStartStatus: cycleStart,
+        subtaskDueDates
       }
     )
     dispatch('close')
@@ -212,6 +215,14 @@
           </div>
         </div>
       </div>
+
+      <label class="toggle-row">
+        <input type="checkbox" bind:checked={subtaskDueDates} disabled={!canEdit} />
+        <span class="toggle-text">
+          <span class="toggle-title"><Label label={operationalDashboard.string.SubtaskDueDates} /></span>
+          <span class="toggle-hint"><Label label={operationalDashboard.string.SubtaskDueDatesHint} /></span>
+        </span>
+      </label>
 
       <div class="hints">
         <p><Label label={operationalDashboard.string.ApprovedStatusesHint} /></p>
@@ -321,6 +332,38 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      margin-top: 0.875rem;
+      padding: 0.625rem 0.75rem;
+      background: var(--theme-button-bg);
+      border: 1px solid var(--theme-divider-color);
+      border-radius: 0.375rem;
+      cursor: pointer;
+
+      input {
+        margin-top: 0.15rem;
+      }
+
+      .toggle-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .toggle-title {
+        color: var(--theme-caption-color);
+        font-size: 0.9375rem;
+      }
+
+      .toggle-hint {
+        color: var(--theme-dark-color);
+        font-size: 0.8125rem;
+      }
     }
 
     .hints {

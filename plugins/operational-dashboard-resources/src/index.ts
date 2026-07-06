@@ -14,24 +14,18 @@
 //
 
 import { type Resources } from '@hcengineering/platform'
-import BUManagement from './components/BUManagement.svelte'
 import Dashboard from './components/Dashboard.svelte'
-import EditBusinessUnit from './components/EditBusinessUnit.svelte'
 import EditProjectMetricsConfig from './components/EditProjectMetricsConfig.svelte'
-import EditTeam from './components/EditTeam.svelte'
 import MetricsConfig from './components/MetricsConfig.svelte'
-import TeamManagement from './components/TeamManagement.svelte'
+import ProjectBUAssignment from './components/ProjectBUAssignment.svelte'
 import TeamRanking from './components/TeamRanking.svelte'
 
 export default async (): Promise<Resources> => ({
   component: {
     Dashboard,
-    BUManagement,
-    EditBusinessUnit,
+    ProjectBUAssignment,
     MetricsConfig,
     EditProjectMetricsConfig,
-    TeamManagement,
-    EditTeam,
     TeamRanking
   }
 })
