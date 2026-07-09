@@ -1,7 +1,7 @@
 # CLAUDE.md — 3F Tasks
 
 Ponto de entrada obrigatório. **Leia antes de qualquer tarefa.** Este arquivo é
-enxuto de propósito (entra no contexto de toda sessão); o detalhe longo mora nos
+enxuto de propósito; o detalhe longo mora nos
 documentos e skills indexados no fim.
 
 ---
@@ -16,9 +16,9 @@ em **produção com dados reais**. Monorepo **Rush + pnpm** (~481 pacotes).
 | Front | Svelte 4.2.20 + TypeScript |
 | Back | Node.js 20+ + TypeScript |
 | Dados | CockroachDB · Elasticsearch · MinIO · Redpanda (Kafka) |
-| Infra local | Docker Compose · URL local `http://localhost:8087` |
+| Infra local de testes | Docker Compose · URL local `http://localhost:8087` |
 | Branch principal | `develop` |
-| Deploy | `3f-build.sh` + `dev/docker-compose.vps.yaml` (imagens `hardcoreeng/<pod>:3f-local`) |
+| Deploy em produção | `3f-build.sh` + `dev/docker-compose.vps.yaml` (imagens `hardcoreeng/<pod>:3f-local`) |
 
 Cada domínio segue o **Plugin Triple**: `plugins/X` (tipos + IDs) · `plugins/X-resources`
 (componentes Svelte) · `models/X` (schema). Opcional: `server-plugins/X` (triggers).
@@ -118,6 +118,7 @@ Os docs em `3f-docs/features/` às vezes ficam para trás — esta tabela é a f
 | **`archive-context.md`** | Mapa completo do monorepo + **padrões de criação de código** (decorators, schema, mixin, migration, trigger, Svelte, service, templates de tsconfig/package, cabeçalho de licença) |
 | **`3f-docs/AGENT_RULES.md`** | Convenções de branch/commit · build/deploy (`3f-build.sh`) · logs de debug · sync com upstream |
 | **`3f-docs/BUILD_AND_DEPLOY.md`** | Build e deploy na VPS |
+| **`3f-docs/INFRA.md`** | Mapa dos containers da VPS: serviço ↔ imagem ↔ buildado por nós ↔ stateful · guard-rails da esteira (o que a CI/CD pode redeployar e o que NUNCA tocar) |
 | **`3f-docs/desenvolvimento.md`** | Desenvolvimento local |
 | **`3f-docs/features/`** | Specs e casos de teste por feature (F01, F02, F04, F09…) |
 | **`.claude/skills/`** | Skills por feature (`f02-tag-sharing`, `f04-pdca-cycle`) — o Claude Code seleciona pela `description`. Molde novo: `.claude/skills/_template/` |
