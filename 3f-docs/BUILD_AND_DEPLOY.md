@@ -41,7 +41,7 @@ O 3F Tasks usa **dois números de versão distintos e independentes**:
 | `VERSION` | Versão do release do software | `common/scripts/tag.txt` | `process.env.VERSION` nos bundles Node.js |
 
 **Valores atuais:**
-- `common/scripts/version.txt` → `"0.7.344"` (aspas fazem parte do valor — é uma string JS literal)
+- `common/scripts/version.txt` → `"0.7.359"` (aspas fazem parte do valor — é uma string JS literal)
 - `common/scripts/tag.txt` → `"0.7.413"` (aspas fazem parte do valor)
 
 ### Como os valores são injetados nos bundles
@@ -51,12 +51,12 @@ O `esbuild` **bake** os valores em tempo de build — eles não são lidos do am
 ```
 rushx bundle
   → chama common/scripts/esbuild.js
-    → chama show_version.js  → lê version.txt  → MODEL_VERSION="0.7.344"
+    → chama show_version.js  → lê version.txt  → MODEL_VERSION="0.7.359"
     → chama show_tag.js      → lê tag.txt       → VERSION="0.7.413"
     → esbuild substitui process.env.MODEL_VERSION e process.env.VERSION no bundle.js
 ```
 
-O `bundle.js` gerado contém literalmente `"0.7.344"` hardcoded. Mudar variáveis de ambiente no Docker não afeta esses valores — é preciso **rebuildar**.
+O `bundle.js` gerado contém literalmente `"0.7.359"` hardcoded. Mudar variáveis de ambiente no Docker não afeta esses valores — é preciso **rebuildar**.
 
 ### Por que version.txt/tag.txt em vez de git tags
 
@@ -113,7 +113,7 @@ Serviços que continuam usando imagens oficiais (sem código modificado):
 | Flag | Efeito |
 |---|---|
 | `--vps` | Usa `dev/docker-compose.vps.yaml` em vez de `dev/docker-compose.yaml` |
-| `--pod <nome>` | Limita o build ao(s) pod(s) indicado(s) (padrão: todos) |
+| `--pod <nome>` | Limita o build ao(s) pod(s) indicado(s). **Default (sem `--pod`):** `server front account collaborator workspace fulltext worker` — `fulltext` e `worker` embutem o model e entram no conjunto padrão (rebuild junto em version bump) |
 | `--skip-rush` | Pula `rush build` (só bundle + docker build + restart) |
 | `--skip-webpack` | Pula webpack (só necessário quando front mudou) |
 | `--clean` | Usa `rush rebuild` em vez de `rush build` incremental |
@@ -144,7 +144,7 @@ O número `MODEL_VERSION` também é armazenado **no banco de dados** (`workspac
 ### Como funciona o upgrade
 
 Quando o `workspace_cockroach` inicia:
-1. Lê seu próprio `MODEL_VERSION` compilado (ex: `0.7.344`)
+1. Lê seu próprio `MODEL_VERSION` compilado (ex: `0.7.359`)
 2. Consulta o banco: qual é a versão atual do workspace?
 3. Se `db_version < compiled_version` → executa migrations (`tryMigrate`, `mode: 'upgrade'`)
 4. Ao terminar: registra `---UPGRADE-DONE---` no log
@@ -153,7 +153,7 @@ Quando o `workspace_cockroach` inicia:
 
 Se `version.txt` tem o mesmo valor que a versão já gravada no banco, nenhum upgrade roda.
 Para forçar um upgrade (ex: adicionar novas migrations):
-1. Incremente `version.txt` (ex: `"0.7.343"` → `"0.7.344"`)
+1. Incremente `version.txt` (ex: `"0.7.358"` → `"0.7.359"`)
 2. Rebuilde workspace: `./3f-build.sh --vps --pod workspace --skip-rush --skip-webpack`
 3. Reinicie o container e aguarde `---UPGRADE-DONE---` nos logs
 
@@ -209,13 +209,13 @@ ls common/scripts/version.txt
 ls common/scripts/tag.txt
 
 # O que contém?
-cat common/scripts/version.txt   # deve ser "0.7.344" (com aspas)
+cat common/scripts/version.txt   # deve ser "0.7.359" (com aspas)
 cat common/scripts/tag.txt       # deve ser "0.7.413" (com aspas)
 ```
 
 **Solução:** Criar/corrigir os arquivos (com aspas como parte do conteúdo):
 ```bash
-echo '"0.7.344"' > common/scripts/version.txt
+echo '"0.7.359"' > common/scripts/version.txt
 echo '"0.7.413"' > common/scripts/tag.txt
 ```
 Depois rebuildar os pods afetados.
@@ -354,7 +354,7 @@ Usar quando a VPS estiver desatualizada ou apresentar erros persistentes:
 git pull
 
 # 2. Verificar arquivos de versão
-cat common/scripts/version.txt  # "0.7.344"
+cat common/scripts/version.txt  # "0.7.359"
 cat common/scripts/tag.txt      # "0.7.413"
 
 # 3. Build completo de todos os pods customizados
@@ -383,7 +383,7 @@ huly-3f/
 │   ├── esbuild.js          ← orchestrador do bundle (lê show_version.js e show_tag.js)
 │   ├── show_version.js     ← retorna MODEL_VERSION (lê version.txt primeiro)
 │   ├── show_tag.js         ← retorna VERSION (lê tag.txt primeiro)
-│   ├── version.txt         ← "0.7.344" — versão do modelo de dados (com aspas)
+│   ├── version.txt         ← "0.7.359" — versão do modelo de dados (com aspas)
 │   └── tag.txt             ← "0.7.413" — versão do release (com aspas)
 ├── dev/
 │   ├── docker-compose.vps.yaml   ← compose da VPS (imagens :3f-local)
@@ -405,9 +405,9 @@ huly-3f/
 
 ### Upgrade de workspace bem-sucedido
 ```
-workspace_cockroach | Starting workspace service ... for version: 0.7.344
-workspace_cockroach | upgrading job='xxxx' force=false currentVersion='0.7.343' toVersion='0.7.344'
-workspace_cockroach | ---UPGRADE-DONE--- job='xxxx' oldWorkspaceVersion={...343} requestedVersion={...344} time=619
+workspace_cockroach | Starting workspace service ... for version: 0.7.359
+workspace_cockroach | upgrading job='xxxx' force=false currentVersion='0.7.358' toVersion='0.7.359'
+workspace_cockroach | ---UPGRADE-DONE--- job='xxxx' oldWorkspaceVersion={...358} requestedVersion={...359} time=619
 ```
 
 ### Transactor pronto para conexões

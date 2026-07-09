@@ -1,7 +1,7 @@
 # F09 — Campos de Cliente (Nome do Cliente + Etapa)
 
 ## Status
-🔲 A desenvolver
+✅ Implementada
 
 **Branch:** `feature/client-fields`  
 **Prioridade:** Alta
@@ -47,37 +47,35 @@ SEPF-2  [EM ANDAMENTO]  Setup de Contas  Seed  [Expansão]  [Ana]
 
 ---
 
-## Arquitetura planejada
+## Arquitetura (implementada)
 
-### Abordagem recomendada: Custom Fields nativos do Huly
+### Campos reais no modelo `Issue`
 
-Usar o sistema de custom fields já existente no Huly, configurado via **Settings → Space Types → Task Types → Propriedades**.
-
-**Não** adicionar campos diretamente no modelo `Issue` — isso requer migration de schema e polui o modelo com campos de negócio da 3F.
-
-**Configuração manual inicial (sem código):**
-1. Settings → Space Types → [qualquer Space Type] → Task Types → Padrão
-2. Adicionar propriedade: `Nome do Cliente` (tipo: Texto)
-3. Adicionar propriedade: `Etapa` (tipo: Dropdown com valores: Onboarding, Expansão, Retenção, Churned)
-4. Repetir para todos os Space Types
-
-**Para exibição na list view:** depende de F07 estar implementado.
-
-### Alternativa: campos no modelo Issue (não recomendado para MVP)
-
-Se precisar de queries server-side (ex: dashboard, relatórios), pode-se adicionar ao modelo:
+Os campos foram adicionados **diretamente no modelo `Issue`** (não são custom fields via Settings). Isso viabiliza queries server-side (dashboard, relatórios) e list view.
 
 ```typescript
 // plugins/tracker/src/index.ts
-clientName?: string
-clientStage?: 'onboarding' | 'expansion' | 'retention' | 'churned'
+export enum ClientStage {
+  Onboarding = 'onboarding',
+  Expansion = 'expansion',
+  Retention = 'retention',
+  Churned = 'churned'
+}
+
+// interface Issue
+clientName: string
+clientStage: ClientStage
 ```
 
-Isso exige migration transaction:
 ```typescript
-// models/tracker/src/migration.ts
-await tx.createDoc(core.class.TxMixin, ...) // adicionar campos
+// models/tracker/src/types.ts (~321, ~325) — classe TIssue
+@Prop(...) clientName: string
+@Prop(...) clientStage: ClientStage
 ```
+
+Além disso, o projeto ganhou a flag `Project.useClientName?: boolean` (`plugins/tracker/src/index.ts` ~89) para controlar se o campo Nome do Cliente é usado naquele projeto.
+
+**Para exibição na list view:** depende de F07 estar implementado.
 
 ---
 
@@ -108,10 +106,10 @@ A etapa do cliente é global (todas as BUs usam o mesmo ciclo de vida):
 
 | Decisão | Escolha | Motivo |
 |---|---|---|
-| Custom field vs campo no modelo | Custom field (MVP) | Sem migration, configurável via UI |
-| Etapa como dropdown vs tag | Dropdown fixo | Etapas são fixas e têm semântica de negócio clara |
-| Obrigatoriedade | Ambos obrigatórios | Toda tarefa da 3F está associada a um cliente |
-| Valores do dropdown | 4 fixos (sem configuração) | Etapas do ciclo de vida do cliente são definição de negócio |
+| Custom field vs campo no modelo | **Campo no modelo `Issue`** | Habilita queries server-side (dashboard/relatórios) e list view |
+| Etapa como dropdown vs tag | Dropdown fixo (`enum ClientStage`) | Etapas são fixas e têm semântica de negócio clara |
+| Obrigatoriedade | `clientStage` não-opcional no modelo | Toda tarefa da 3F está associada a um cliente |
+| Valores do dropdown | 4 fixos (`enum`) | Etapas do ciclo de vida do cliente são definição de negócio |
 
 ---
 
@@ -119,22 +117,13 @@ A etapa do cliente é global (todas as BUs usam o mesmo ciclo de vida):
 
 | Arquivo | Ação | Observação |
 |---|---|---|
-| Nenhum (MVP) | — | MVP usa custom fields nativos via Settings UI |
-| `plugins/tracker/src/index.ts` | Modificar (se migrar para modelo) | Adicionar string IDs `clientName`, `clientStage` |
-| `models/tracker/src/types.ts` | Modificar (se migrar para modelo) | Adicionar campos no interface `Issue` |
-| `models/tracker/src/migration.ts` | Modificar (se migrar para modelo) | Migration para adicionar campos |
-| `plugins/tracker-resources/src/` | Modificar (para list view) | Depende de F07 |
+| `plugins/tracker/src/index.ts` | Modificado | `enum ClientStage` + `clientName`/`clientStage` na interface `Issue` + `Project.useClientName` |
+| `models/tracker/src/types.ts` | Modificado | `@Prop` de `clientName`/`clientStage` na classe `TIssue` (~321, ~325) |
+| `models/tracker/src/migration.ts` | Modificado | Migration para popular os campos em issues existentes |
+| `plugins/tracker-resources/src/` | Modificado (list view) | Depende de F07 |
 
 ---
 
-## MVP sem código (configuração manual)
+## Estado atual
 
-Para começar a usar imediatamente sem desenvolvimento:
-
-1. Acesse **Settings → Space Types → Performance → Task Types → Padrão → Propriedades**
-2. Clique em "+ Add property"
-3. Adicione `Nome do Cliente` (tipo: String, obrigatório)
-4. Adicione `Etapa` (tipo: Dropdown, valores: Onboarding, Expansão, Retenção, Churned, obrigatório)
-5. Repita para todos os Space Types: Planejamento & Design, Audiovisual, Branding, Site LP, Tecnologia - Chamados, Tecnologia - Automações
-
-Os campos estarão disponíveis dentro da issue imediatamente, mas **não** na list view até F07 ser implementado.
+Os campos `clientName` e `clientStage` já são campos reais do modelo `Issue` em todos os projetos — não há configuração manual via Settings. A exibição inline na list view depende de F07.

@@ -124,6 +124,3 @@ ws-tests/docker-compose.override.yml
 
 # VPS data directories (Docker bind mounts — never commit runtime data)
 data/
-
-#3f-docs
-3f-docs/*

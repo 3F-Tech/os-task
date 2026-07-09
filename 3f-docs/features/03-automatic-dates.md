@@ -2,7 +2,7 @@
 
 **Branch:** `feature/automatic-dates`  
 **Prioridade:** Alta  
-**Status:** Planejado
+**Status:** Implementado
 
 ---
 

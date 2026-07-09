@@ -1,6 +1,6 @@
 # Testes das Features Desenvolvidas — 3F Tasks
 
-> **Ambiente:** http://localhost:7000  
+> **Ambiente:** http://localhost:8087  
 > **Usuário de teste:** pedrobartelle@3fventure.com.br (Owner)  
 > **Pré-requisito:** Docker rodando (`docker compose -f dev/docker-compose.yaml up -d`)
 

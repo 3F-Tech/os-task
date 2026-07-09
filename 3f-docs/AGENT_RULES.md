@@ -69,6 +69,10 @@ feature/custom-fields-list-view       ← F07 (a desenvolver)
 feature/home-dashboard                ← F08 (a desenvolver)
 ```
 
+> **Nota (estado atual):** o roster acima é histórico. F04 (PDCA), F09 (Client Fields),
+> F10 (Operational Dashboard) e F11 (Login Universal 3F Core) **já estão implementadas** —
+> F11 inclusive **em produção**. Ver a tabela "Features 3F" no `CLAUDE.md` para o estado vigente.
+
 ---
 
 ## 4. Convenção de commits
@@ -79,7 +83,7 @@ feature/home-dashboard                ← F08 (a desenvolver)
 
 [corpo opcional — explique o POR QUÊ, não o O QUÊ]
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 ```
 
 ### Tipos

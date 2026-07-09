@@ -2,7 +2,7 @@
 
 ## Pré-requisitos
 
-- Docker Desktop rodando com os containers do 3F Tasks ativos em `localhost:7000`
+- Docker Desktop rodando com os containers do 3F Tasks ativos em `localhost:8087`
 - Rush instalado globalmente (`npm install -g @microsoft/rush`)
 - Node.js 20+
 
@@ -18,13 +18,13 @@ rushx dev-server
 
 O servidor sobe em `http://localhost:8080` com **hot reload** — qualquer arquivo `.svelte` ou `.ts` salvo recompila automaticamente em segundos.
 
-O webpack já está configurado para proxiar todas as chamadas de API e WebSocket para o Docker em `localhost:7000`.
+O webpack já está configurado para proxiar todas as chamadas de API e WebSocket para o Docker em `localhost:8087`.
 
 ```
 Seu browser (localhost:8080)
        ↓  frontend servido pelo webpack
        ↓  chamadas de API/WebSocket proxiadas para
-Docker backend (localhost:7000)
+Docker backend (localhost:8087)
 ```
 
 ### Checklist antes de rodar
@@ -48,8 +48,12 @@ rushx dev-server
 
 ## Dois mundos: frontend vs backend
 
-O Docker roda **imagens pré-compiladas** do Docker Hub (`hardcoreeng/transactor`, `hardcoreeng/account`, etc.).
+O Docker roda imagens dos pods (`hardcoreeng/transactor`, `hardcoreeng/account`, etc.).
 Mudanças no código-fonte **não refletem automaticamente** no Docker — dependendo do que você alterar, o fluxo é diferente.
+
+> **Nota:** o fork **não** usa mais as imagens prontas do Docker Hub para os pods customizados.
+> O `./3f-build.sh` builda imagens locais `hardcoreeng/<pod>:3f-local` a partir do próprio
+> código-fonte do monorepo — é essa a imagem que sobe nos containers. Ver `3f-docs/BUILD_AND_DEPLOY.md`.
 
 ```
 Seu código-fonte (platform/)

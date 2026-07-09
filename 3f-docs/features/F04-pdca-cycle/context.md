@@ -1,7 +1,7 @@
 # F04 — Ciclo PDCA
 
 ## Status
-🔲 A desenvolver
+✅ Implementada (pod `worker`)
 
 **Branch:** `feature/pdca-cycle`  
 **Prioridade:** Alta
@@ -10,122 +10,103 @@
 
 ## Objetivo
 
-Permitir que uma issue seja marcada como recorrente no ciclo PDCA. Quando ativado, o sistema cria automaticamente uma nova issue baseada no template da issue original ao início de cada ciclo, com frequência configurável.
+Permitir que uma issue seja marcada como recorrente no ciclo PDCA. Quando ativado, o sistema **reinicia automaticamente a tarefa** (modo padrão) ou **cria uma nova tarefa** (modo opcional) ao vencimento de cada ciclo, com frequência configurável.
 
 ---
 
 ## Campos novos na Issue
 
-| Campo | Tipo | Obrigatório | Valores |
-|---|---|---|---|
-| `Ciclo PDCA Ativo` | Boolean | Não | true / false |
-| `Frequência do Ciclo` | Dropdown | Não (obrigatório se PDCA ativo) | Semanal / Quinzenal / Mensal |
+Estes são **campos reais do modelo** (`@Prop`) na interface `Issue` (`plugins/tracker/src/index.ts` ~274-281) — **não** são custom fields configurados via Settings.
 
-Estes campos são custom fields configurados via **Settings → Space Types → [Space Type] → Task Types → Padrão → Propriedades**.
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `pdcaCycleActive` | `boolean` | Liga/desliga a recorrência PDCA na issue |
+| `pdcaCycleFrequency` | `PdcaFrequency` | Frequência do ciclo (ver enum abaixo) |
+| `pdcaCycleResetStatus` | `Ref<IssueStatus>` | Status para o qual a tarefa é resetada no início de cada ciclo |
+| `pdcaNextCycleDate` | `Timestamp` | Watermark do próximo disparo (usado para idempotência) |
+| `pdcaCycleDueDays` | `number[]` | Dias usados para calcular o `dueDate` do ciclo |
+| `pdcaCycleCustomWeekdays` | `number[]` | Dias da semana (0-6) quando a frequência é `Custom` |
+| `pdcaCycleDuplicate` | `boolean` | Se `true`, duplica em vez de resetar in-place (ver modos abaixo) |
+| `pdcaCycleResetSubIssues` | `boolean` | Se `true`, também reseta/recria as sub-issues diretas |
+
+### Enum `PdcaFrequency` (6 valores)
+
+`plugins/tracker/src/index.ts` ~56-63:
+
+| Valor | Comportamento de virada |
+|---|---|
+| `Daily` | Todo dia à meia-noite |
+| `Weekly` | **Segunda-feira** à meia-noite |
+| `Biweekly` | A cada 14 dias |
+| `Monthly` | 1º dia do mês |
+| `Quarterly` | A cada 3 meses, no 1º dia |
+| `Custom` | Dias da semana definidos em `pdcaCycleCustomWeekdays` |
 
 ---
 
 ## Comportamento esperado
 
-1. Usuário marca `Ciclo PDCA Ativo = true` na issue
-2. Usuário define `Frequência do Ciclo` (ex: Semanal)
-3. No início de cada novo ciclo (Domingo à meia-noite para Semanal, ou 1º dia do mês para Mensal):
-   - O sistema cria uma nova issue no mesmo projeto
-   - A issue herdada traz: título, responsável, componente, prioridade, estimativa, descrição
-   - `Ciclo PDCA Ativo` e `Frequência do Ciclo` são mantidos na nova issue
-   - Spent time e subtarefas NÃO são herdados (começam zerados)
-   - O responsável recebe notificação de nova tarefa criada
+O agendamento e a execução rodam no **pod `worker`** (`services/worker/src/pdca.ts`). Ao vencer o ciclo, o worker aplica **um de dois modos** conforme o campo `pdcaCycleDuplicate`:
 
-### Nomenclatura da issue gerada
+### Modo 1 — Reset in-place (PADRÃO, `pdcaCycleDuplicate = false`)
 
-```
-[CLIENTE] Ciclo PDCA de Comunicação — Semana 18
-[CLIENTE] Ciclo PDCA de Mídia Paga — Quinzena 2 de Abril
-[CLIENTE] Relatório Mensal — Maio 2026
-```
+A **mesma tarefa** é reiniciada — nenhuma issue nova é criada:
 
-Formato:
-- **Semanal:** `{título original} — Semana {nº da semana ISO}`
-- **Quinzenal:** `{título original} — Quinzena {1|2} de {mês}`
-- **Mensal:** `{título original} — {mês} {ano}`
+- `status` volta para `pdcaCycleResetStatus`
+- `reportedTime` (tempo gasto) zera
+- `startDate` é atualizada para o momento do reset
+- `completedDate` é limpa (`null`)
+- `dueDate` é recalculada a partir da frequência/`pdcaCycleDueDays`
+- Título, responsável, componente, prioridade e demais campos são **preservados** (é a mesma tarefa)
+- Se `pdcaCycleResetSubIssues = true`, as sub-issues diretas são resetadas in-place da mesma forma (status, tempo, datas); o `dueDate` próprio da sub-issue não é recalculado
+- Um comentário de snapshot é adicionado registrando o estado do ciclo anterior
+
+### Modo 2 — Duplicar (OPCIONAL, `pdcaCycleDuplicate = true`)
+
+Uma **nova tarefa** é criada e a original é **mantida intacta** como registro histórico:
+
+- A original é marcada como **concluída** (status categoria Won) e tem `pdcaCycleActive = false`, encerrando seu ciclo
+- Uma nova issue é criada no mesmo projeto/parent, **reutilizando o MESMO título** da original (não há sufixo "Semana N")
+- A nova issue recebe número/identifier próprios (bump de `sequence` do projeto), spent time zerado, `startDate` = agora, `dueDate` do ciclo, e herda responsável, prioridade, componente, milestone, estimativa, `clientName`/`clientStage` e a configuração PDCA
+- Se `pdcaCycleResetSubIssues = true`, as sub-issues diretas da original são **recriadas** sob a nova issue (resetadas ao status de reset); as sub-issues originais permanecem anexadas à issue já concluída
+
+> **Importante:** o modo padrão é reset-in-place. A duplicação só acontece quando `pdcaCycleDuplicate` está ligado. Não existe geração automática de sufixo de título ("Semana 18", "Quinzena 2", etc.) em nenhum dos modos.
 
 ---
 
-## Arquitetura planejada
-
-### Abordagem recomendada: scheduler server-side
-
-Não usar cron externo. Usar o sistema de **triggers + scheduled jobs** já existente no Huly.
+## Arquitetura
 
 ```
 plugins/tracker/src/index.ts
-  └─ Adicionar string IDs: cicloPdcaAtivo, frequenciaCiclo, pdcaCycleScheduled
+  └─ enum PdcaFrequency (6 valores)
+  └─ campos pdcaCycle* na interface Issue (campos reais @Prop)
 
 models/tracker/src/types.ts
-  └─ Adicionar campos na interface Issue (ou como custom fields via TxCreateDoc)
+  └─ @Prop dos campos pdcaCycle* na classe TIssue
 
-server-plugins/tracker-resources/src/
-  └─ Criar trigger OnPdcaCycleIssueCreate
-  └─ Criar scheduler que verifica issues com PDCA ativo a cada ciclo
+services/worker/src/pdca.ts
+  └─ agendamento por watermark (pdcaNextCycleDate) + execução da virada
+  └─ calculateNextCycleDate (weekly = segunda-feira)
+  └─ modo reset-in-place (padrão) e modo duplicate (opcional)
+  └─ idempotência via pdcaNextCycleDate + claim (proteção contra redelivery Kafka)
 ```
 
-### Alternativa mais simples (recomendada para MVP)
-
-Usar o sistema de **custom fields** existente do Huly (não modificar o modelo `Issue` diretamente):
-
-1. Admin cria os campos `Ciclo PDCA Ativo` (Boolean) e `Frequência do Ciclo` (Dropdown) via Settings UI
-2. Criar um server plugin que roda periodicamente, busca issues com `Ciclo PDCA Ativo = true`, e executa `TxCreateDoc` para criar a issue clonada
-
-Benefício: não precisa de migration de schema se usar custom fields nativos.
+O worker consome eventos e usa `pdcaNextCycleDate` como watermark de idempotência: a data é avançada **antes** da mutação, de modo que uma reentrega concorrente da mesma mensagem Kafka lê a data já avançada e é ignorada pelo guard de dedup.
 
 ---
 
 ## Regras de negócio
 
-- Se a issue-pai for removida (status Done/Cancelled), o ciclo PDCA dela **não** cria novas issues
-- O ciclo conta a partir da data de criação da issue original, não da última criação automática
-- Cada issue gerada automaticamente tem `attachedTo = null` (não é sub-issue, é issue independente)
-- Se `Frequência do Ciclo` não estiver preenchido e `Ciclo PDCA Ativo = true`, o sistema deve alertar (validação)
-
----
-
-## Issues de template no onboarding (F05)
-
-As seguintes issues são criadas no onboarding com PDCA ativo por padrão:
-
-```
-[CLIENTE] Ciclo PDCA de Comunicação   → Frequência: Semanal
-[CLIENTE] Ciclo PDCA de Mídia Paga    → Frequência: Semanal
-[CLIENTE] Ciclo PDCA de Gestão do Cliente → Frequência: Semanal
-[CLIENTE] Relatório Mensal            → Frequência: Mensal
-```
-
----
-
-## Decisões de design
-
-| Decisão | Escolha | Motivo |
-|---|---|---|
-| Custom fields vs campos no modelo | Custom fields (MVP) | Evita migration, permite configurar via UI sem código |
-| Scheduler | Server plugin periódico | Integra com arquitetura existente do Huly |
-| Clone profundo ou raso | Raso (sem subtarefas/spent time) | Cada ciclo começa do zero |
-| Notificação | Nativa (sistema de notifications do Huly) | Sem dependência externa |
-
----
-
-## Arquivos a criar/modificar
-
-| Arquivo | Ação | Observação |
-|---|---|---|
-| `plugins/tracker/src/index.ts` | Modificar | Adicionar string IDs para campos PDCA |
-| `server-plugins/tracker-resources/src/pdcaCycle.ts` | Criar | Lógica do scheduler e clonagem de issue |
-| `server-plugins/tracker-resources/src/index.ts` | Modificar | Registrar o scheduler PDCA |
-| `models/tracker/src/` | Modificar (opcional) | Se preferir adicionar campos no modelo em vez de custom fields |
+- Uma issue só entra no ciclo se `pdcaCycleActive = true`, `pdcaCycleFrequency` e `pdcaCycleResetStatus` estiverem definidos
+- Frequência `Custom` exige `pdcaCycleCustomWeekdays` não vazio
+- No modo duplicate, a original é fechada (Won) e desativada — ela não dispara novos ciclos
+- Redelivery de mensagem Kafka é neutralizado pelo watermark `pdcaNextCycleDate` (evita a criação de N cópias em storm)
 
 ---
 
 ## Referência
 
-- CLAUDE.md → seção "Ciclo PDCA (A DESENVOLVER)"
-- Exemplo de trigger existente: `server-plugins/tracker-resources/src/` (triggers de completion validation)
-- Exemplo de custom field: Settings → Space Types → Task Types → Propriedades
+- Skill: `.claude/skills/f04-pdca-cycle/`
+- Código do worker: `services/worker/src/pdca.ts`
+- Campos e enum: `plugins/tracker/src/index.ts` (~56-63, ~274-281)
+- Memória: `pdca` (idempotência Kafka, digest redelivery)
