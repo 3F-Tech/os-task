@@ -7,7 +7,7 @@ services:
     environment:
       - STREAM_ENDPOINT_URL=datalake://datalake:4030
       - STREAM_INSECURE=true
-      - STREAM_SERVER_SECRET=secret
+      - STREAM_SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - STREAM_MAX_PARALLEL_SCALING_COUNT=6
       - STREAM_LOG_LEVEL=debug
       - AWS_ACCESS_KEY_ID=minioadmin
@@ -26,7 +26,7 @@ services:
       datalake:
         condition: service_started
     environment:
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - CACHE_PATH=/data/cache
     ports:
@@ -158,7 +158,7 @@ services:
     environment:
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=redpanda:9092
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - ADMIN_EMAILS=admin,${PLATFORM_ADMIN_EMAILS}
       - STATS_URL=http://stats:4900
       - WORKSPACE_LIMIT_PER_USER=10000
@@ -205,7 +205,7 @@ services:
       - 4900:4900
     environment:
       - PORT=4900
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
     restart: unless-stopped
   # payment: disabled — hardcoreeng/payment not yet published to Docker Hub
   workspace_cockroach:
@@ -224,7 +224,7 @@ services:
     environment:
       - WS_OPERATION=all+backup
       - REGION=cockroach
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - QUEUE_CONFIG=redpanda:9092
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
       - STATS_URL=http://stats:4900
@@ -248,7 +248,7 @@ services:
       - 13078:3078
     environment:
       - COLLABORATOR_PORT=3078
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - ACCOUNTS_URL=http://account:3000
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - STATS_URL=http://stats:4900
@@ -265,7 +265,7 @@ services:
       - 8088:8080
     environment:
       - SERVER_PORT=8080
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - ACCOUNTS_URL=https://3ftasks.3fventure.tech:3000
       - STATS_URL=http://stats:4900
       - FILES_URL=https://3ftasks.3fventure.tech/files/blob/:workspace/:blobId/:filename
@@ -320,7 +320,7 @@ services:
       - QUEUE_CONFIG=redpanda:9092
       - SERVER_PORT=3332
       - REGION=cockroach
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - ENABLE_COMPRESSION=true
       - FULLTEXT_URL=http://fulltext_cockroach:4702
       - STATS_URL=http://stats:4900
@@ -355,7 +355,7 @@ services:
       - 13500:3500
     environment:
       - PORT=3500
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - BOT_NAME=os-tasks[bot]
       - ACCOUNTS_URL=http://account:3000
       - COLLABORATOR_URL=ws://collaborator:3078
@@ -391,7 +391,7 @@ services:
     environment:
       - PORT=4702
       - REGION=cockroach
-      - SERVER_SECRET=secret
+      - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - QUEUE_CONFIG=redpanda:9092
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
       - FULLTEXT_DB_URL=http://elastic:9200
@@ -410,7 +410,7 @@ services:
     ports:
       - 4005:4005
     environment:
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - REGION=cockroach
       - QUEUE_CONFIG=redpanda:9092
       - STORAGE_CONFIG=datalake|http://datalake:4030
@@ -428,7 +428,7 @@ services:
       - ../services/sign/pod-sign/debug/certificate.p12:/var/cfg/certificate.p12
       - ../services/sign/pod-sign/debug/branding.json:/var/cfg/branding.json
     environment:
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - MINIO_ENDPOINT=minio
       - REGION=cockroach
       - QUEUE_CONFIG=redpanda:9092
@@ -446,7 +446,7 @@ services:
     ports:
       - 4017:4017
     environment:
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - PORT=4017
       - SERVICE_ID=analytics-collector-service
       - ACCOUNTS_URL=http://account:3000
@@ -462,7 +462,7 @@ services:
       - 4009:4009
     environment:
       - PORT=4009
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - SERVICE_ID=export-service
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
       - STATS_URL=http://stats:4900
@@ -486,7 +486,7 @@ services:
       - 4031:4030
     environment:
       - PORT=4030
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - ACCOUNTS_URL=http://account:3000
       - STATS_URL=http://stats:4900
       - DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
@@ -529,7 +529,7 @@ services:
       - QUEUE_REGION=cockroach
       - ACCOUNTS_URL=http://account:3000
       - TRANSACTOR_INTERNAL_URL=ws://transactor_cockroach:3332
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - MAIL_URL=http://mail:8092
       - FRONT_URL=https://3ftasks.3fventure.tech
       - DIGEST_HOUR=8
@@ -550,7 +550,7 @@ services:
       account:
         condition: service_started
     environment:
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - ACCOUNTS_URL=http://account:3000
       - ACCOUNTS_DB_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
       - STATS_URL=http://stats:4900
@@ -597,7 +597,7 @@ services:
     environment:
       - PORT=8095
       - ACCOUNTS_URL=http://account:3000
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - KVS_URL=http://hulykvs:8094
       - WATCH_URL=https://3ftasks.3fventure.tech/_calendar
       - SERVICE_ID=calendar-service
@@ -654,7 +654,7 @@ services:
       - 8097:8097
     environment:
       - PORT=8097
-      - SECRET=secret
+      - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - SERVICE_ID=love-service
       - ACCOUNTS_URL=http://account:3000
       - LIVEKIT_HOST=http://livekit:7880
