@@ -15,7 +15,7 @@ services:
       - STREAM_REGION=cockroach
       - STREAM_QUEUE_CONFIG=redpanda:9092
     ports:
-      - 1080:1080
+      - 127.0.0.1:1080:1080
     restart: unless-stopped
   preview:
     image: hardcoreeng/preview:3f-local
@@ -30,7 +30,7 @@ services:
       - STORAGE_CONFIG=datalake|http://datalake:4030
       - CACHE_PATH=/data/cache
     ports:
-      - 14040:4040
+      - 127.0.0.1:14040:4040
     restart: unless-stopped
   # link-preview: disabled — hardcoreeng/link-preview not yet published to Docker Hub
   cockroach:
@@ -38,8 +38,8 @@ services:
     extra_hosts:
       - 'huly.local:host-gateway'
     ports:
-      - '26257:26257'
-      - '8089:8080'
+      - '127.0.0.1:26257:26257'
+      - '127.0.0.1:8089:8080'
     command: start-single-node --insecure
     volumes:
       - /opt/apps/os-tasks/data/cockroach:/cockroach/cockroach-data
@@ -76,10 +76,10 @@ services:
     volumes:
       - /opt/apps/os-tasks/data/redpanda:/var/lib/redpanda/data
     ports:
-      - 18081:18081
-      - 18082:18082
-      - 19092:19092
-      - 19644:9644
+      - 127.0.0.1:18081:18081
+      - 127.0.0.1:18082:18082
+      - 127.0.0.1:19092:19092
+      - 127.0.0.1:19644:9644
     restart: unless-stopped
   minio:
     image: 'minio/minio'
@@ -90,8 +90,8 @@ services:
       - 9000
       - 9001
     ports:
-      - 9002:9000
-      - 9003:9001
+      - 127.0.0.1:9002:9000
+      - 127.0.0.1:9003:9001
     volumes:
       - /opt/apps/os-tasks/data/minio:/data
     healthcheck:
@@ -108,7 +108,7 @@ services:
     volumes:
       - /opt/apps/os-tasks/data/elastic:/usr/share/elasticsearch/data
     ports:
-      - 9200:9200
+      - 127.0.0.1:9200:9200
     environment:
       - ELASTICSEARCH_PORT_NUMBER=9200
       - BITNAMI_DEBUG=true
@@ -126,7 +126,7 @@ services:
   redis:
     image: redis:8.0.2-alpine3.21
     ports:
-      - 6379:6379
+      - 127.0.0.1:6379:6379
     restart: unless-stopped
 
   mail:
@@ -149,7 +149,7 @@ services:
     links:
       - stats
     ports:
-      - 13000:3000
+      - 127.0.0.1:13000:3000
     volumes:
       - ./branding.json:/var/cfg/branding.json
     env_file:
@@ -202,7 +202,7 @@ services:
     extra_hosts:
       - 'huly.local:host-gateway'
     ports:
-      - 4900:4900
+      - 127.0.0.1:4900:4900
     environment:
       - PORT=4900
       - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
@@ -245,7 +245,7 @@ services:
       - transactor_cockroach
       - stats
     ports:
-      - 13078:3078
+      - 127.0.0.1:13078:3078
     environment:
       - COLLABORATOR_PORT=3078
       - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
@@ -261,8 +261,8 @@ services:
     links:
       - stats
     ports:
-      - 8087:8080
-      - 8088:8080
+      - 127.0.0.1:8087:8080
+      - 127.0.0.1:8088:8080
     environment:
       - SERVER_PORT=8080
       - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
@@ -312,7 +312,7 @@ services:
       redpanda:
         condition: service_started
     ports:
-      - 13332:3332
+      - 127.0.0.1:13332:3332
     volumes:
       - ./branding.json:/var/cfg/branding.json
     environment:
@@ -352,7 +352,7 @@ services:
       account:
         condition: service_started
     ports:
-      - 13500:3500
+      - 127.0.0.1:13500:3500
     environment:
       - PORT=3500
       - SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
@@ -371,7 +371,7 @@ services:
       - 'huly.local:host-gateway'
     restart: unless-stopped
     ports:
-      - 4004:4004
+      - 127.0.0.1:4004:4004
     environment:
       - STATS_URL=http://stats:4900
   fulltext_cockroach:
@@ -387,7 +387,7 @@ services:
       - cockroach
       - rekoni
     ports:
-      - 4702:4702
+      - 127.0.0.1:4702:4702
     environment:
       - PORT=4702
       - REGION=cockroach
@@ -408,7 +408,7 @@ services:
       - 'huly.local:host-gateway'
     restart: unless-stopped
     ports:
-      - 4005:4005
+      - 127.0.0.1:4005:4005
     environment:
       - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - REGION=cockroach
@@ -423,7 +423,7 @@ services:
       - 'huly.local:host-gateway'
     restart: unless-stopped
     ports:
-      - 4006:4006
+      - 127.0.0.1:4006:4006
     volumes:
       - ../services/sign/pod-sign/debug/certificate.p12:/var/cfg/certificate.p12
       - ../services/sign/pod-sign/debug/branding.json:/var/cfg/branding.json
@@ -444,7 +444,7 @@ services:
       - 'huly.local:host-gateway'
     restart: unless-stopped
     ports:
-      - 4017:4017
+      - 127.0.0.1:4017:4017
     environment:
       - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
       - PORT=4017
@@ -459,7 +459,7 @@ services:
       - minio
       - stats
     ports:
-      - 4009:4009
+      - 127.0.0.1:4009:4009
     environment:
       - PORT=4009
       - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
@@ -483,7 +483,7 @@ services:
       account:
         condition: service_started
     ports:
-      - 4031:4030
+      - 127.0.0.1:4031:4030
     environment:
       - PORT=4030
       - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
@@ -505,7 +505,7 @@ services:
       redis:
         condition: service_started
     ports:
-      - 8099:8099
+      - 127.0.0.1:8099:8099
     environment:
       - HULY_REDIS_URLS=redis://redis:6379
       - HULY_BIND_PORT=8099
@@ -591,7 +591,7 @@ services:
       hulykvs:
         condition: service_started
     ports:
-      - 18095:8095
+      - 127.0.0.1:18095:8095
     env_file:
       - .env.secrets
     environment:
@@ -651,7 +651,7 @@ services:
       minio:
         condition: service_healthy
     ports:
-      - 8097:8097
+      - 127.0.0.1:8097:8097
     environment:
       - PORT=8097
       - SECRET=${SERVER_SECRET:?SERVER_SECRET_missing}
