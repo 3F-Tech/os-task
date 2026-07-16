@@ -24491,12 +24491,18 @@ importers:
       '@hcengineering/activity':
         specifier: workspace:^0.7.0
         version: link:../activity
+      '@hcengineering/calendar':
+        specifier: workspace:^0.7.0
+        version: link:../calendar
       '@hcengineering/contact':
         specifier: workspace:^0.7.0
         version: link:../contact
       '@hcengineering/core':
         specifier: workspace:^0.7.26
         version: link:../../foundations/core/packages/core
+      '@hcengineering/login':
+        specifier: workspace:^0.7.0
+        version: link:../login
       '@hcengineering/operational-dashboard':
         specifier: workspace:^0.7.0
         version: link:../operational-dashboard
@@ -24509,6 +24515,9 @@ importers:
       '@hcengineering/task':
         specifier: workspace:^0.7.0
         version: link:../task
+      '@hcengineering/time':
+        specifier: workspace:^0.7.0
+        version: link:../time
       '@hcengineering/tracker':
         specifier: workspace:^0.7.0
         version: link:../tracker
