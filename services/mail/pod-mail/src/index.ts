@@ -20,5 +20,6 @@ void main().catch((err) => {
   if (err != null) {
     Analytics.handleError(err)
     console.error(err)
+    //teste build
   }
 })
