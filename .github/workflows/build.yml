@@ -1,0 +1,365 @@
+# =============================================================================
+# build.yml — CI/CD Fase 1 (3F): builda as imagens dos pods FORA da VPS e
+# publica no GHCR (ghcr.io/3f-tech/os-task/<pod>).
+#
+# NÃO faz deploy. O deploy.yml (pull + up + health-gate na VPS) vem numa
+# próxima fase. Ver 3f-docs/features/projeto-pedro/estrategia-cicd.md e
+# 3f-docs/INFRA.md §7.
+#
+# Reaproveita o padrão de compilação do upstream (main.yml) — setup-node por
+# .nvmrc, cache do Rush/pnpm — e os scripts de imagem do fork
+# (common/scripts/docker_build.sh + docker_tag_push.sh), trocando a string de
+# imagem de hardcoreeng/<pod> para ghcr.io/3f-tech/os-task/<pod>.
+# =============================================================================
+name: 3F Build (GHCR)
+
+on:
+  push:
+    branches: [develop]
+    paths-ignore:
+      - CHANGELOG.md
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: 'Buildar a FROTA INTEIRA (os 11 pods), ignorando o git diff'
+        type: boolean
+        default: false
+      run_tests:
+        description: 'Rodar rush test (jest) antes de publicar'
+        type: boolean
+        default: false
+
+# Um push novo no mesmo branch cancela o build anterior ainda em execução.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# GHCR usa o GITHUB_TOKEN automático — nenhum secret manual necessário.
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io/3f-tech/os-task
+  DOCKER_BUILDKIT: '1'
+  DOCKER_CLI_HINTS: 'false'
+  # Tag das imagens-base upstream que TODOS os 11 Dockerfiles referenciam via
+  # `FROM hardcoreeng/*:<BASE_VERSION>`. Precisa bater com pods/*/Dockerfile e
+  # services/*/pod-*/Dockerfile. Ver step "Build base images" e o resumo do PR.
+  BASE_VERSION: v20250916
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      # fetch-depth: 0 → git diff entre o commit anterior e o atual + HEAD~1.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # Detecção do que mudou → lista de pods a buildar.
+      #
+      # FROTA INTEIRA (os 11) se:
+      #   - version.txt OU tag.txt mudou (bump de MODEL_VERSION/VERSION);
+      #   - mudou algo compartilhado: common/, foundations/, packages/,
+      #     rush.json, .nvmrc, dev/base-image/;
+      #   - build_all=true (workflow_dispatch);
+      #   - primeira execução no branch / diff não calculável (before nulo ou
+      #     ausente);
+      #   - qualquer caminho de fonte NÃO mapeado (fallback conservador).
+      #
+      # Caso contrário, só os pods afetados. Mapeamento baseado na tabela do
+      # CLAUDE.md, com uma extensão de segurança: models/ e server-plugins/
+      # rebuildam TODO o grupo que embute o model (server, workspace, fulltext,
+      # worker) — não só o server — para não repetir os incidentes de "imagem
+      # stale com model velho" (busca morta / transactor recusa conexão).
+      # -----------------------------------------------------------------------
+      - name: Detect changed pods
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          BUILD_ALL: ${{ inputs.build_all }}
+        run: |
+          set -euo pipefail
+          ALL_PODS="server front account workspace collaborator fulltext worker preview github mail calendar"
+          NULL_SHA="0000000000000000000000000000000000000000"
+
+          emit_fleet() {
+            echo "→ FROTA INTEIRA: $1"
+            {
+              echo "pods=$ALL_PODS"
+              echo "fleet=true"
+              echo "reason=fleet: $1"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          # 1) Disparo manual pedindo a frota inteira.
+          if [ "${BUILD_ALL:-}" = "true" ]; then
+            emit_fleet "workflow_dispatch build_all=true"
+          fi
+
+          # 2) Definir a base do diff.
+          AFTER="$GITHUB_SHA"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if git rev-parse -q --verify "HEAD~1" >/dev/null 2>&1; then
+              BEFORE="$(git rev-parse HEAD~1)"
+            else
+              emit_fleet "workflow_dispatch sem commit anterior (HEAD~1 inexistente)"
+            fi
+          else
+            BEFORE="${EVENT_BEFORE:-}"
+          fi
+
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "$NULL_SHA" ]; then
+            emit_fleet "primeira execução no branch / before nulo ($BEFORE)"
+          fi
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            emit_fleet "commit anterior indisponível ($BEFORE) — history rewrite/shallow"
+          fi
+
+          CHANGED="$(git diff --name-only "$BEFORE" "$AFTER")"
+          if [ -z "$CHANGED" ]; then
+            echo "Nenhum arquivo alterado entre $BEFORE e $AFTER — nada a buildar."
+            {
+              echo "pods="
+              echo "fleet=false"
+              echo "reason=no changes"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Arquivos alterados:"; echo "$CHANGED" | sed 's/^/  /'
+
+          # 3) Gatilhos de frota inteira (compartilhados).
+          if echo "$CHANGED" | grep -qE '^common/scripts/(version|tag)\.txt$'; then
+            emit_fleet "version.txt/tag.txt (bump de MODEL_VERSION/VERSION)"
+          fi
+          if echo "$CHANGED" | grep -qE '^(common/|foundations/|packages/|rush\.json$|\.nvmrc$|dev/base-image/)'; then
+            emit_fleet "pacote/config base compartilhado (common/foundations/packages/rush/nvmrc/base-image)"
+          fi
+
+          # 4) Mapeamento caminho → pod(s).
+          PODS=""
+          UNMATCHED=""
+          add() { case " $PODS " in *" $1 "*) ;; *) PODS="$PODS $1" ;; esac; }
+          # grupo que embute o model.json / model compilado
+          add_model_group() { add server; add workspace; add fulltext; add worker; }
+
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              models/all/*)                 emit_fleet "models/all (registro master do model) — $f" ;;
+              models/*|server-plugins/*)    add_model_group ;;
+              plugins/*-resources/*)        add front ;;
+              plugins/*)                    add front; add_model_group ;;
+              server/account/*|server/account-service/*) add account ;;
+              server/*)                     add_model_group ;;
+              dev/prod/*)                   add front ;;
+              pods/server/*)                add server ;;
+              pods/front/*)                 add front ;;
+              pods/account/*)               add account ;;
+              pods/workspace/*)             add workspace ;;
+              pods/collaborator/*)          add collaborator ;;
+              pods/fulltext/*)              add fulltext ;;
+              pods/preview/*)               add preview ;;
+              services/worker/*)            add worker ;;
+              services/github/*)            add github ;;
+              services/mail/*)              add mail ;;
+              services/calendar/*)          add calendar ;;
+              # Sem efeito em imagem: docs, CI, tooling de deploy, config de repo.
+              3f-docs/*|.github/*|automation/*|dev/nginx/*|dev/*|*.md|.gitignore|.editorconfig|.prettierrc*|.eslintrc*|.vscode/*|LICENSE) ;;
+              *)                            UNMATCHED="$UNMATCHED $f" ;;
+            esac
+          done <<EOF
+          $CHANGED
+          EOF
+
+          if [ -n "$UNMATCHED" ]; then
+            emit_fleet "caminho(s) de fonte não mapeado(s):$UNMATCHED"
+          fi
+
+          PODS="$(echo "$PODS" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' | sed 's/ *$//')"
+          echo "→ Pods afetados: ${PODS:-(nenhum)}"
+          {
+            echo "pods=$PODS"
+            echo "fleet=false"
+            echo "reason=paths mapped to: ${PODS:-none}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Nothing to build
+        if: steps.detect.outputs.pods == ''
+        run: echo "Nenhum pod afetado por este push (${{ steps.detect.outputs.reason }}). Encerrando com sucesso."
+
+      # ---- Daqui em diante, tudo condicionado a haver pelo menos 1 pod --------
+
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.pods != ''
+        with:
+          node-version-file: '.nvmrc'
+
+      # Cache do Rush/pnpm. Chaves PREFIXADAS com "3f-build-" para NÃO colidir
+      # com o cache do pipeline herdado (main.yml usa "<os>-build-cache-...").
+      - name: Cache Rush/pnpm
+        if: steps.detect.outputs.pods != ''
+        uses: actions/cache@v4
+        with:
+          path: common/temp
+          key: 3f-build-${{ runner.os }}-${{ hashFiles('common/config/rush/pnpm-lock.yaml') }}
+          restore-keys: |
+            3f-build-${{ runner.os }}-
+
+      # Ação composta herdada — libera espaço no runner (o build do monorepo +
+      # imagens Docker é grande).
+      - name: Free disk space
+        if: steps.detect.outputs.pods != ''
+        uses: ./.github/actions/free-disk-space
+
+      - name: Rush install
+        if: steps.detect.outputs.pods != ''
+        run: node common/scripts/install-run-rush.js install
+
+      - name: Rush rebuild (build limpo)
+        if: steps.detect.outputs.pods != ''
+        run: node common/scripts/install-run-rush.js rebuild
+
+      # OPCIONAL, desligado por padrão. Se falhar, o job para e nada é publicado.
+      - name: Rush test (jest)
+        if: ${{ steps.detect.outputs.pods != '' && inputs.run_tests }}
+        run: node common/scripts/install-run-rush.js test --verbose
+
+      # Webpack (bundle do front) — só se "front" estiver na lista. Reproduz o
+      # 3f-build.sh passo 2 (memória um pouco maior pelo runner ter mais RAM).
+      - name: Webpack (front bundle)
+        if: ${{ steps.detect.outputs.pods != '' && contains(steps.detect.outputs.pods, 'front') }}
+        working-directory: dev/prod
+        run: |
+          set -euo pipefail
+          node -e "try{require('fs').rmSync('./dist',{recursive:true,force:true})}catch(e){}"
+          WEBPACK_MINIMIZE="${WEBPACK_MINIMIZE:-false}" NODE_OPTIONS="--max-old-space-size=6144" \
+            ./node_modules/.bin/cross-env NODE_ENV=production \
+            ./node_modules/.bin/webpack --stats-error-details
+
+      # -----------------------------------------------------------------------
+      # Imagens-base. TODOS os 11 pods fazem `FROM hardcoreeng/<base>:<tag>`.
+      # Hoje essas bases vêm do Docker Hub upstream (buildadas pelo antigo
+      # baseimage.yaml, que empurra p/ hardcoreeng/* com um token que o fork NÃO
+      # tem). Para o CI ser auto-suficiente e imune a rate-limit de pull anônimo
+      # do Docker Hub, buildamos localmente no runner APENAS as bases que os
+      # pods selecionados precisam, com a MESMA tag que o `FROM` espera — assim
+      # o docker build dos pods resolve a base local (não faz pull).
+      # -----------------------------------------------------------------------
+      - name: Build base images
+        if: steps.detect.outputs.pods != ''
+        env:
+          PODS: ${{ steps.detect.outputs.pods }}
+        working-directory: dev/base-image
+        run: |
+          set -euo pipefail
+          need_base=false; need_slim=false; need_front=false; need_preview=false
+          for pod in $PODS; do
+            case "$pod" in
+              server)                                          need_base=true ;;
+              front)                                           need_front=true ;;
+              preview)                                         need_preview=true ;;
+              account|workspace|collaborator|fulltext|worker|github|mail|calendar) need_slim=true ;;
+            esac
+          done
+          V="$BASE_VERSION"
+          if $need_base;    then echo "== base";       docker build -t "hardcoreeng/base:$V"        -f base.Dockerfile    . ; fi
+          if $need_slim;    then echo "== base-slim";  docker build -t "hardcoreeng/base-slim:$V"   -f slim.Dockerfile    . ; fi
+          if $need_front;   then echo "== front-base"; docker build -t "hardcoreeng/front-base:$V"  -f front.Dockerfile   . ; fi
+          if $need_preview; then echo "== preview";    docker build -t "hardcoreeng/preview-base:$V" -f preview.Dockerfile . ; fi
+
+      - name: Login to GHCR
+        if: steps.detect.outputs.pods != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # Bundle + docker build + push, por pod. Duas tags por imagem:
+      #   :<sha-curto>  imutável (alvo de rollback)
+      #   :develop      móvel (ponteiro do último build do branch)
+      # Reusa common/scripts/docker_build.sh (gera <img> + <img>:<sha>) e
+      # docker_tag_push.sh (tag + push com retry). Trata o worker igual aos
+      # demais — publica ghcr.io/3f-tech/os-task/worker:<sha> (corrige a
+      # inconsistência do 3f-build.sh, onde o worker saía sem tag → :latest).
+      # -----------------------------------------------------------------------
+      - name: Bundle, build and push images
+        if: steps.detect.outputs.pods != ''
+        env:
+          PODS: ${{ steps.detect.outputs.pods }}
+        run: |
+          set -euo pipefail
+          ROOT="$(pwd)"
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          echo "SHORT_SHA=$SHORT_SHA"
+
+          pod_dir() {
+            case "$1" in
+              server)       echo "pods/server" ;;
+              front)        echo "pods/front" ;;
+              account)      echo "pods/account" ;;
+              workspace)    echo "pods/workspace" ;;
+              collaborator) echo "pods/collaborator" ;;
+              fulltext)     echo "pods/fulltext" ;;
+              preview)      echo "pods/preview" ;;
+              worker)       echo "services/worker" ;;
+              github)       echo "services/github/pod-github" ;;
+              mail)         echo "services/mail/pod-mail" ;;
+              calendar)     echo "services/calendar/pod-calendar" ;;
+            esac
+          }
+
+          for pod in $PODS; do
+            dir="$(pod_dir "$pod")"
+            image="$REGISTRY/$pod"
+
+            echo "::group::bundle $pod ($dir)"
+            ( cd "$ROOT/$dir" && node "$ROOT/common/scripts/install-run-rushx.js" bundle )
+            if [ "$pod" = "front" ]; then
+              # Reproduz o 3f-build.sh passo 3 (front): injeta o dist do webpack.
+              ( cd "$ROOT/pods/front"
+                node -e "try{require('fs').rmSync('./dist',{recursive:true,force:true})}catch(e){}"
+                cp -r "$ROOT/dev/prod/dist" .
+                cp -r "$ROOT/dev/prod/public/"* ./dist/
+                rm -f ./dist/config.json )
+            fi
+            echo "::endgroup::"
+
+            echo "::group::docker build + push $image"
+            ( cd "$ROOT/$dir"
+              DOCKER_VERSION="$SHORT_SHA" bash "$ROOT/common/scripts/docker_build.sh" "$image"
+              bash "$ROOT/common/scripts/docker_tag_push.sh" "$image" "$SHORT_SHA"
+              bash "$ROOT/common/scripts/docker_tag_push.sh" "$image" "develop" )
+            echo "::endgroup::"
+
+            echo "✓ publicado: $image:$SHORT_SHA  e  $image:develop"
+          done
+
+      - name: Summary
+        if: ${{ steps.detect.outputs.pods != '' }}
+        env:
+          PODS: ${{ steps.detect.outputs.pods }}
+          REASON: ${{ steps.detect.outputs.reason }}
+          FLEET: ${{ steps.detect.outputs.fleet }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          {
+            echo "## 3F Build (GHCR)"
+            echo ""
+            echo "- **Frota inteira:** \`$FLEET\`"
+            echo "- **Motivo:** $REASON"
+            echo "- **Commit:** \`$SHORT_SHA\`"
+            echo ""
+            echo "| Pod | Imagem publicada |"
+            echo "|---|---|"
+            for pod in $PODS; do
+              echo "| $pod | \`$REGISTRY/$pod:$SHORT_SHA\` + \`:develop\` |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
