@@ -181,7 +181,13 @@ jobs:
             emit_fleet "caminho(s) de fonte não mapeado(s):$UNMATCHED"
           fi
 
-          PODS="$(echo "$PODS" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' | sed 's/ *$//')"
+          # Normaliza a lista final: ordena, remove duplicados e enxuga espaços.
+          # Precisa ser TOLERANTE A LISTA VAZIA (0 pods mapeados) — não pode
+          # estourar no `set -euo pipefail`. Por isso NÃO usar `grep -v '^$'`:
+          # quando filtra todas as linhas, o grep retorna exit 1 e o pipefail
+          # derruba o step. `sort` e `xargs` retornam 0 mesmo com entrada vazia,
+          # e o `xargs` já colapsa espaços e apara as pontas (vazio → "").
+          PODS="$(echo "$PODS" | tr ' ' '\n' | sort -u | xargs)"
           echo "→ Pods afetados: ${PODS:-(nenhum)}"
           {
             echo "pods=$PODS"
