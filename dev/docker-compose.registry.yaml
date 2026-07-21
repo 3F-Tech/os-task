@@ -1,0 +1,51 @@
+# =============================================================================
+# docker-compose.registry.yaml — OVERRIDE de registry (GHCR)
+#
+# Troca as imagens `hardcoreeng/<pod>:3f-local` (buildadas in-place na VPS pelo
+# 3f-build.sh) pelas imagens publicadas no GHCR pela esteira de CI/CD
+# (.github/workflows/build.yml → ghcr.io/3f-tech/os-task/<pod>).
+#
+# Uso (docker-compose v1, hífen) — a partir da RAIZ do repositório, para que o
+# project dir seja `dev/` (primeiro -f) e o `dev/.env` seja carregado:
+#
+#     docker-compose -f dev/docker-compose.vps.yaml \
+#                    -f dev/docker-compose.registry.yaml <comando> [serviço]
+#
+# IMAGE_TAG seleciona a tag do GHCR:
+#   - default `develop` (tag MÓVEL: ponteiro do último build do branch);
+#   - fixe uma tag IMUTÁVEL para rollback determinístico, ex.:
+#       export IMAGE_TAG=<sha-de-12-chars>   # build.yml publica ${GITHUB_SHA:0:12}
+#
+# ESCOPO: só os 11 pods que NÓS buildamos. NENHUM serviço de dado/infra
+# (cockroach, redpanda, minio, elastic, redis, hulykvs, livekit*) nem upstream
+# pinado (datalake, stats, rekoni, print, sign, analytics, export, love,
+# hulypulse, backup) entra aqui — ver 3f-docs/INFRA.md §7 (lista "não tocar").
+#
+# Mapeamento serviço(compose) → pod(GHCR) confirmado em dev/docker-compose.vps.yaml:
+#   transactor_cockroach → server     workspace_cockroach → workspace
+#   fulltext_cockroach   → fulltext    time-machine        → worker
+#   (os demais têm o mesmo nome do pod)
+# =============================================================================
+services:
+  transactor_cockroach:
+    image: ghcr.io/3f-tech/os-task/server:${IMAGE_TAG:-develop}
+  front:
+    image: ghcr.io/3f-tech/os-task/front:${IMAGE_TAG:-develop}
+  account:
+    image: ghcr.io/3f-tech/os-task/account:${IMAGE_TAG:-develop}
+  workspace_cockroach:
+    image: ghcr.io/3f-tech/os-task/workspace:${IMAGE_TAG:-develop}
+  collaborator:
+    image: ghcr.io/3f-tech/os-task/collaborator:${IMAGE_TAG:-develop}
+  fulltext_cockroach:
+    image: ghcr.io/3f-tech/os-task/fulltext:${IMAGE_TAG:-develop}
+  time-machine:
+    image: ghcr.io/3f-tech/os-task/worker:${IMAGE_TAG:-develop}
+  preview:
+    image: ghcr.io/3f-tech/os-task/preview:${IMAGE_TAG:-develop}
+  github:
+    image: ghcr.io/3f-tech/os-task/github:${IMAGE_TAG:-develop}
+  mail:
+    image: ghcr.io/3f-tech/os-task/mail:${IMAGE_TAG:-develop}
+  calendar:
+    image: ghcr.io/3f-tech/os-task/calendar:${IMAGE_TAG:-develop}
