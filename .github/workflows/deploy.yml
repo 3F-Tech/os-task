@@ -1,0 +1,434 @@
+# =============================================================================
+# deploy.yml — CI/CD Fase 2 (3F): DEPLOY manual dos pods na VPS puxando a
+# imagem JÁ publicada no GHCR pela esteira build.yml.
+#
+# Automatiza, por botão (workflow_dispatch), exatamente o roteiro manual de
+# 3f-docs/features/projeto-pedro/teste-esteira-noturno.md, com verificação
+# "a-light" (verifica e ALERTA; SEM rollback automático — job fica VERMELHO e o
+# comando de rollback manual é impresso no log).
+#
+# ⚠️ A VPS usa `docker compose` (v2, com espaço), NÃO `docker-compose` (v1). Todos
+# os comandos remotos aqui usam v2 — não copie o hífen do roteiro/3f-build.sh.
+#
+# Guard-rails (ver 3f-docs/INFRA.md §7): só os 11 pods que NÓS buildamos entram.
+# Nenhum serviço de dado/infra nem upstream pinado é tocado. Bump de model
+# (version.txt) bloqueia deploy parcial do model-group (upgrade coordenado).
+# =============================================================================
+name: 3F Deploy (GHCR → VPS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit a deployar (short 7 ou 12 chars). Expandido p/ 12 (tag real do GHCR) e validado com docker manifest inspect.'
+        type: string
+        required: true
+      pods:
+        description: 'Pods separados por espaço, ou "all" para os 11. Ex.: "mail calendar". Vazio = falha (obriga a escolher).'
+        type: string
+        required: true
+        default: ''
+
+# Um deploy por vez. Não cancela o anterior no meio (in-flight na VPS é
+# perigoso) — enfileira.
+concurrency:
+  group: 3f-deploy-vps
+  cancel-in-progress: false
+
+# contents: write → append no CHANGELOG.md e push em develop ([skip ci]).
+# packages: read  → docker manifest inspect nas imagens privadas do GHCR.
+permissions:
+  contents: write
+  packages: read
+
+env:
+  REGISTRY: ghcr.io/3f-tech/os-task
+  PROJECT_DIR: /opt/apps/os-tasks
+  # Grupo de pods que EMBUTE o model.json (build.yml add_model_group). Bump de
+  # version.txt exige upgrade coordenado destes — nunca deploy parcial.
+  MODEL_GROUP: 'server workspace fulltext worker'
+  # Os 11 pods permitidos (idêntico ao ALL_PODS do build.yml). Qualquer nome fora
+  # desta lista FALHA antes de conectar na VPS.
+  ALLOWED_PODS: 'server front account workspace collaborator fulltext worker preview github mail calendar'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # fetch-depth: 0 → `git show <sha>:version.txt` e expansão do short-SHA.
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # 1) Validação de inputs + guard-rail de nomes (ANTES de tocar na VPS).
+      #    - expande sha 7→12 e confirma que é um commit válido;
+      #    - "all" → os 11 pods; senão valida cada nome contra ALLOWED_PODS;
+      #    - reordena para a ordem de MENOR blast radius (roteiro §6 / INFRA);
+      #    - mapeia pod (GHCR) → serviço (compose).
+      # -----------------------------------------------------------------------
+      - name: Validate inputs & build pod/service lists
+        id: plan
+        env:
+          IN_SHA: ${{ inputs.sha }}
+          IN_PODS: ${{ inputs.pods }}
+        run: |
+          set -euo pipefail
+
+          # -- sha: expande p/ 12 chars e confirma que é commit real ----------
+          if ! SHA12="$(git rev-parse --verify "${IN_SHA}^{commit}" 2>/dev/null | cut -c1-12)"; then
+            echo "::error::sha inválido: '${IN_SHA}' não resolve para um commit no histórico de develop."
+            exit 1
+          fi
+          echo "→ sha (12 chars, tag GHCR) = $SHA12"
+
+          # -- ordem canônica de deploy (menor → maior blast radius) ----------
+          # Roteiro §6 / INFRA: mail primeiro, workspace (migrations) por último.
+          ORDER="mail calendar github preview collaborator fulltext worker front account server workspace"
+
+          # -- normaliza a lista pedida ---------------------------------------
+          REQ="$IN_PODS"
+          # trim
+          REQ="$(echo "$REQ" | xargs || true)"
+          if [ -z "$REQ" ]; then
+            echo "::error::input 'pods' vazio. Informe pods separados por espaço (ex.: 'mail calendar') ou 'all'."
+            exit 1
+          fi
+          if [ "$REQ" = "all" ]; then
+            REQ="$ALLOWED_PODS"
+          fi
+
+          # -- guard-rail: todo nome pedido tem que estar em ALLOWED_PODS -----
+          for p in $REQ; do
+            case " $ALLOWED_PODS " in
+              *" $p "*) ;;
+              *)
+                echo "::error::pod não permitido: '$p'. Permitidos (11): $ALLOWED_PODS."
+                echo "::error::Serviços de dado/infra e upstream pinado (cockroach, minio, redpanda, elastic, redis, hulykvs, livekit*, datalake, stats, rekoni, print, sign, analytics, export, love, hulypulse, backup-cockroach) NUNCA são deployados pela esteira — ver INFRA.md §7."
+                exit 1
+                ;;
+            esac
+          done
+
+          # -- reordena pela ordem canônica, removendo duplicados ------------
+          PODS_ORDERED=""
+          for c in $ORDER; do
+            for p in $REQ; do
+              if [ "$c" = "$p" ]; then
+                case " $PODS_ORDERED " in *" $c "*) ;; *) PODS_ORDERED="$PODS_ORDERED $c" ;; esac
+              fi
+            done
+          done
+          PODS_ORDERED="$(echo "$PODS_ORDERED" | xargs)"
+
+          # -- mapeia pod → serviço (compose) + flags de health --------------
+          svc_of() {
+            case "$1" in
+              server)    echo transactor_cockroach ;;
+              workspace) echo workspace_cockroach ;;
+              fulltext)  echo fulltext_cockroach ;;
+              worker)    echo time-machine ;;
+              *)         echo "$1" ;;
+            esac
+          }
+          SVCS_ORDERED=""
+          MODEL_IN_LIST=""
+          NEED_SERVER=0; NEED_FRONT=0
+          for p in $PODS_ORDERED; do
+            SVCS_ORDERED="$SVCS_ORDERED $(svc_of "$p")"
+            [ "$p" = "server" ] && NEED_SERVER=1
+            [ "$p" = "front" ]  && NEED_FRONT=1
+            case " $MODEL_GROUP " in *" $p "*) MODEL_IN_LIST="$MODEL_IN_LIST $p" ;; esac
+          done
+          SVCS_ORDERED="$(echo "$SVCS_ORDERED" | xargs)"
+          MODEL_IN_LIST="$(echo "$MODEL_IN_LIST" | xargs)"
+
+          echo "→ pods (ordem de deploy): $PODS_ORDERED"
+          echo "→ serviços (compose):     $SVCS_ORDERED"
+          echo "→ model-group na lista:   ${MODEL_IN_LIST:-(nenhum)}"
+
+          {
+            echo "sha12=$SHA12"
+            echo "pods=$PODS_ORDERED"
+            echo "services=$SVCS_ORDERED"
+            echo "model_in_list=$MODEL_IN_LIST"
+            echo "need_server=$NEED_SERVER"
+            echo "need_front=$NEED_FRONT"
+          } >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # 2) Login no GHCR + confirma que TODAS as imagens pedidas existem no
+      #    registry ANTES de conectar na VPS (falha segura). manifest inspect
+      #    não baixa layers.
+      # -----------------------------------------------------------------------
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify GHCR images exist
+        env:
+          SHA12: ${{ steps.plan.outputs.sha12 }}
+          PODS: ${{ steps.plan.outputs.pods }}
+        run: |
+          set -euo pipefail
+          fail=0
+          for p in $PODS; do
+            ref="$REGISTRY/$p:$SHA12"
+            if docker manifest inspect "$ref" >/dev/null 2>&1; then
+              echo "✓ existe: $ref"
+            else
+              echo "::error::imagem NÃO existe no GHCR: $ref (o build.yml chegou a publicar este pod neste sha?)"
+              fail=1
+            fi
+          done
+          [ "$fail" = "0" ] || { echo "::error::Aborte: uma ou mais imagens não estão no GHCR. Nada foi tocado na VPS."; exit 1; }
+
+      # -----------------------------------------------------------------------
+      # 3) Config SSH para a VPS.
+      # -----------------------------------------------------------------------
+      - name: Setup SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      # -----------------------------------------------------------------------
+      # 4) Guard de MIGRATION (bump de model). Compara version.txt do sha alvo
+      #    com o do que está rodando na VPS (tag da imagem do transactor):
+      #      - tag GHCR de 12-hex → git show <tag>:version.txt;
+      #      - :3f-local / :develop / outra → versão indeterminável por git.
+      #    Se a lista inclui pod do model-group E (versões diferentes OU running
+      #    indeterminável) → PARA (upgrade coordenado, NÃO deploy parcial).
+      #    Sem model-group na lista → pula o guard. Ver roteiro §6.
+      # -----------------------------------------------------------------------
+      - name: Migration guard (model version)
+        env:
+          SHA12: ${{ steps.plan.outputs.sha12 }}
+          MODEL_IN_LIST: ${{ steps.plan.outputs.model_in_list }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$MODEL_IN_LIST" ]; then
+            echo "→ Nenhum pod do model-group (server/workspace/fulltext/worker) na lista — guard de migration não se aplica."
+            exit 0
+          fi
+
+          TARGET_VER="$(git show "${SHA12}:common/scripts/version.txt" 2>/dev/null | tr -d '[:space:]')"
+          echo "→ version.txt do alvo ($SHA12): ${TARGET_VER:-(vazio)}"
+
+          SSH="ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${VPS_USER}@${VPS_HOST}"
+          RUNNING_IMG="$($SSH "cd '$PROJECT_DIR' && docker inspect \$(docker compose -f dev/docker-compose.vps.yaml ps -q transactor_cockroach) --format '{{.Config.Image}}' 2>/dev/null" || true)"
+          RUNNING_IMG="$(echo "$RUNNING_IMG" | tr -d '[:space:]')"
+          echo "→ imagem do transactor rodando na VPS: ${RUNNING_IMG:-(indeterminada)}"
+
+          RUNNING_TAG="${RUNNING_IMG##*:}"
+          RUNNING_VER=""
+          if echo "$RUNNING_TAG" | grep -qiE '^[0-9a-f]{12}$'; then
+            RUNNING_VER="$(git show "${RUNNING_TAG}:common/scripts/version.txt" 2>/dev/null | tr -d '[:space:]' || true)"
+          fi
+
+          if [ -z "$RUNNING_VER" ]; then
+            echo "::error::Não foi possível determinar o version.txt do que está rodando (imagem '${RUNNING_IMG:-?}' não é uma tag GHCR de 12-hex — provável :3f-local/:develop pré-cutover)."
+            echo "::error::Como a lista inclui pod(s) do model-group ($MODEL_IN_LIST), não dá para PROVAR que o model é o mesmo → parando por segurança."
+            echo "::error::Faça o primeiro cutover do model-group como UPGRADE COORDENADO manual (workspace primeiro, esperar ---UPGRADE-DONE--- nos logs) — ver roteiro §6. Depois disso o transactor roda uma tag GHCR e este guard passa a ser automático."
+            exit 1
+          fi
+          echo "→ version.txt do que roda hoje ($RUNNING_TAG): $RUNNING_VER"
+
+          if [ "$TARGET_VER" != "$RUNNING_VER" ]; then
+            echo "::error::BUMP DE MODEL detectado: rodando=$RUNNING_VER, alvo=$TARGET_VER."
+            echo "::error::A lista inclui pod(s) do model-group ($MODEL_IN_LIST). Isto é um UPGRADE COORDENADO, não um deploy per-pod:"
+            echo "::error::  1) subir o workspace PRIMEIRO e esperar '---UPGRADE-DONE---' nos logs (docker compose ... logs -f workspace_cockroach);"
+            echo "::error::  2) só então trocar server, fulltext e worker — TODOS na mesma versão."
+            echo "::error::Deploy parcial faz o transactor recusar conexões ('Preparing workspace for new version'). Parando — rode o upgrade coordenado manual (roteiro §6)."
+            exit 1
+          fi
+          echo "✓ version.txt igual (rodando == alvo). Deploy per-pod liberado."
+
+      # -----------------------------------------------------------------------
+      # 5) DEPLOY na VPS (um script remoto único). Pré-checks → pull → por pod:
+      #    rm -sf + up -d --no-deps → verificação a-light. Falha em qualquer pod
+      #    = exit != 0 (job VERMELHO) com o comando de rollback manual no log.
+      #    SEM rollback automático.
+      # -----------------------------------------------------------------------
+      - name: Deploy to VPS
+        id: deploy
+        env:
+          SHA12: ${{ steps.plan.outputs.sha12 }}
+          PODS: ${{ steps.plan.outputs.pods }}
+          SERVICES: ${{ steps.plan.outputs.services }}
+          NEED_SERVER: ${{ steps.plan.outputs.need_server }}
+          NEED_FRONT: ${{ steps.plan.outputs.need_front }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/deploy_remote.sh <<'REMOTE'
+          set -euo pipefail
+
+          PROJECT_DIR="$1"
+          REGISTRY="$2"
+          SHA12="$3"
+          PODS_STR="$4"
+          SERVICES_STR="$5"
+          NEED_SERVER="$6"
+          NEED_FRONT="$7"
+
+          read -ra PODS <<< "$PODS_STR"
+          read -ra SVCS <<< "$SERVICES_STR"
+
+          cd "$PROJECT_DIR"
+          # project dir = dev/ (1º -f) → carrega dev/.env (SERVER_SECRET etc.).
+          DC="docker compose -f dev/docker-compose.vps.yaml -f dev/docker-compose.registry.yaml"
+          DC_BASE="docker compose -f dev/docker-compose.vps.yaml"
+          export IMAGE_TAG="$SHA12"
+
+          echo "==================================================================="
+          echo "DEPLOY — sha=$SHA12  pods=${PODS[*]}"
+          echo "==================================================================="
+
+          # ---- PRÉ-CHECK 1: compose files presentes na VPS ------------------
+          for f in dev/docker-compose.vps.yaml dev/docker-compose.registry.yaml; do
+            if [ ! -f "$f" ]; then
+              echo "ERRO: $f não existe na VPS. Rode 'git pull' em $PROJECT_DIR antes de deployar."
+              exit 1
+            fi
+          done
+
+          # ---- PRÉ-CHECK 2: dev/.env com SERVER_SECRET setado --------------
+          # O compose usa ${SERVER_SECRET:?} e derruba TUDO se faltar.
+          if [ ! -f dev/.env ]; then
+            echo "ERRO: dev/.env não existe na VPS — o compose exige SERVER_SECRET. Abortando antes de tocar em qualquer container."
+            exit 1
+          fi
+          if ! grep -qE '^SERVER_SECRET=.+' dev/.env; then
+            echo "ERRO: SERVER_SECRET ausente/vazio em dev/.env. Abortando (o compose derrubaria tudo com \${SERVER_SECRET:?})."
+            exit 1
+          fi
+          echo "✓ dev/.env com SERVER_SECRET presente."
+
+          # ---- PRÉ-CHECK 3: rede de rollback (imagem base local existe) -----
+          # Deriva a imagem do compose BASE (sem override) — cobre transactor
+          # (:3f-local) e worker (:latest, sem :3f-local) sem hardcode.
+          for svc in "${SVCS[@]}"; do
+            base_img="$($DC_BASE config --images "$svc" 2>/dev/null | head -1 || true)"
+            if [ -z "$base_img" ]; then
+              echo "ERRO: não consegui resolver a imagem base do serviço '$svc' no compose. Abortando."
+              exit 1
+            fi
+            if ! docker image inspect "$base_img" >/dev/null 2>&1; then
+              echo "ERRO: imagem de rollback '$base_img' ($svc) NÃO existe localmente. Sem rede de rollback → abortando antes de deployar."
+              exit 1
+            fi
+            echo "✓ rollback disponível para $svc: $base_img"
+          done
+
+          # ---- PULL (zero downtime — só baixa) -----------------------------
+          echo "--- pull das imagens do GHCR (IMAGE_TAG=$SHA12) ---"
+          $DC pull "${SVCS[@]}"
+
+          # ---- DEPLOY + VERIFY por pod -------------------------------------
+          n="${#PODS[@]}"
+          for i in $(seq 0 $((n-1))); do
+            pod="${PODS[$i]}"
+            svc="${SVCS[$i]}"
+            want="$REGISTRY/$pod:$SHA12"
+            echo ""
+            echo ">>> [$((i+1))/$n] deploy $pod (serviço $svc) → $want"
+
+            $DC rm -sf "$svc"
+            $DC up -d --no-deps "$svc"
+
+            # deixa o container estabilizar e pega crash-loop imediato
+            sleep 8
+
+            cid="$($DC ps -q "$svc" || true)"
+            if [ -z "$cid" ]; then
+              echo "❌ FALHA: nenhum container para '$svc' após up."
+              echo "   ROLLBACK MANUAL: cd $PROJECT_DIR && $DC_BASE rm -sf $svc && $DC_BASE up -d --no-deps $svc"
+              exit 1
+            fi
+
+            read -r img status restarts < <(docker inspect "$cid" --format '{{.Config.Image}} {{.State.Status}} {{.RestartCount}}')
+            echo "   IMG=$img  STATUS=$status  RESTARTS=$restarts"
+
+            ok=1
+            [ "$img" = "$want" ]      || { echo "   ❌ imagem errada (esperado $want)"; ok=0; }
+            [ "$status" = "running" ] || { echo "   ❌ status != running"; ok=0; }
+            [ "${restarts:-0}" -le 2 ] || { echo "   ❌ RestartCount alto ($restarts) — provável crash-loop"; ok=0; }
+
+            # health a-light específico
+            if [ "$ok" = "1" ] && [ "$pod" = "server" ] && [ "$NEED_SERVER" = "1" ]; then
+              hok=0
+              for t in 1 2 3 4 5 6; do
+                code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:13332/api/v1/health || echo 000)"
+                if [ "$code" = "200" ]; then hok=1; echo "   ✓ /api/v1/health = 200"; break; fi
+                echo "   … health tentativa $t: HTTP $code (aguardando reconnect storm assentar)"; sleep 10
+              done
+              [ "$hok" = "1" ] || { echo "   ❌ /api/v1/health não retornou 200"; ok=0; }
+            fi
+            if [ "$ok" = "1" ] && [ "$pod" = "front" ] && [ "$NEED_FRONT" = "1" ]; then
+              code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:8087/config.json || echo 000)"
+              if [ "$code" = "200" ]; then echo "   ✓ /config.json = 200"; else echo "   ❌ /config.json = $code"; ok=0; fi
+            fi
+
+            if [ "$ok" != "1" ]; then
+              echo "❌ FALHA na verificação de '$pod'. Últimos logs:"
+              $DC logs --tail=40 "$svc" 2>&1 | sed 's/^/     /' || true
+              echo "   ROLLBACK MANUAL (volta a imagem local, SEM o override):"
+              echo "     cd $PROJECT_DIR && $DC_BASE rm -sf $svc && $DC_BASE up -d --no-deps $svc"
+              echo "   (pods já trocados antes deste continuam na imagem do GHCR — nenhum rollback automático foi feito.)"
+              exit 1
+            fi
+            echo "   ✅ $pod OK"
+          done
+
+          echo ""
+          echo "==================================================================="
+          echo "DEPLOY OK — todos os pods verificados: ${PODS[*]}"
+          echo "==================================================================="
+          REMOTE
+
+          SSH="ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${VPS_USER}@${VPS_HOST}"
+          $SSH 'bash -s' -- \
+            "$PROJECT_DIR" "$REGISTRY" "$SHA12" "$PODS" "$SERVICES" "$NEED_SERVER" "$NEED_FRONT" \
+            < /tmp/deploy_remote.sh
+
+      # -----------------------------------------------------------------------
+      # 6) Só no sucesso: registra no CHANGELOG.md e commita com [skip ci]
+      #    (build.yml ignora CHANGELOG.md em paths-ignore; deploy.yml é manual).
+      # -----------------------------------------------------------------------
+      - name: Record deploy in CHANGELOG
+        if: success()
+        env:
+          SHA12: ${{ steps.plan.outputs.sha12 }}
+          PODS: ${{ steps.plan.outputs.pods }}
+        run: |
+          set -euo pipefail
+          TS="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          touch CHANGELOG.md
+          {
+            echo "- **$TS** — deploy \`$SHA12\` → [$PODS] — ✅ sucesso (por ${{ github.actor }}, run ${{ github.run_id }})"
+          } >> CHANGELOG.md
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore(deploy): $SHA12 → [$PODS] [skip ci]"
+          # rebase defensivo contra corrida com um push em develop
+          git pull --rebase origin develop
+          git push origin HEAD:develop
