@@ -63,8 +63,15 @@
     if (attribute.collectionAttr) return
     if (attribute.isLookup) return
     if (attribute?.attribute?.readonly === true) return
+    // For mixin (task-type custom) attributes the model key is the fully
+    // qualified "<mixin>.<attr>" path. updateMixin scopes by attr.attributeOf
+    // and writes the key verbatim INTO the mixin, so it must receive the bare
+    // attribute name — otherwise the value lands at doc[mixin][mixin].attr and
+    // never reaches the canonical doc[mixin].attr that the read/detail use.
+    // Mirrors Table.svelte:getOnChange (castRequest strip).
+    const key = attribute.castRequest ? attribute.key.substring(attribute.castRequest.length + 1) : attribute.key
     return (value: any) => {
-      onChange(value, docObject, attribute.key, attr)
+      onChange(value, docObject, key, attr)
     }
   }
 
