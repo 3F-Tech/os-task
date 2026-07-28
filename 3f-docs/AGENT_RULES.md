@@ -121,6 +121,20 @@ chore(deps): update rush lockfile after adding tag-sharing packages
 docs(3f-docs): add F02 context and test cases
 ```
 
+### Higiene de commit — o que quebra a esteira (e por quê)
+
+A CI/CD publica no GHCR a cada push na `develop` (`build.yml`) e faz deploy por botão
+(`deploy.yml`). Commit "sujo" quebra esse fluxo de forma silenciosa. Regras (cada uma
+com o motivo — regra sem motivo alguém contorna):
+
+- **Nunca `git add .` nem `git add -A`; adicione os arquivos da mudança nominalmente.** Add em massa arrasta config de ambiente local pro commit sem você perceber.
+- **Nunca commite estes arquivos** (são ambiente local, não código da mudança):
+  - `common/scripts/version.txt` — se for junto, transforma um deploy simples num **upgrade de modelo coordenado** (com migrations) e o `deploy.yml` **bloqueia** o deploy.
+  - `.claude/settings.local.json` — config pessoal do Claude Code, não do projeto.
+  - `dev/.env`, qualquer `*.secrets` e chaves (`deploy_key*`) — credenciais; já ignorados no `.gitignore`, e por isso nunca force com `git add -f`.
+- **Antes do push, rode `git status`** e garanta que só a mudança pretendida está staged — é a última chance de pegar arquivo indevido antes de ele virar imagem no GHCR.
+- **Sinal de alerta:** se o `build.yml` reportar rebuild da **frota inteira (11 pods)** para uma mudança pequena, quase certamente entrou arquivo indevido no commit — **investigue antes de apertar o deploy**, não depois.
+
 ---
 
 ## 5. Como subir mudanças no Docker para teste

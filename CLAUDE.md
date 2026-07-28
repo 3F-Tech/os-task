@@ -52,6 +52,7 @@ Mapa detalhado do monorepo + padrões de criação de código: **`archive-contex
 - **NUNCA crie `SubIssue` como classe** → sub-issue é uma `Issue` com `attachedTo` preenchido.
 - **NUNCA edite `description` de Issue via Tx direta** → use o collaborator service (Yjs).
 - **NUNCA `git push --force` na `develop`.**
+- **NUNCA `git add .` / `git add -A`** → adicione os arquivos da mudança nominalmente e confira `git status` antes do push; um arquivo de ambiente local no commit quebra a esteira de deploy. Lista do que nunca entra + porquês: **`3f-docs/AGENT_RULES.md` §4**.
 - **NUNCA commite `.env`, chaves ou credenciais.** Segredos reais vão em `dev/.env.secrets` (injetado via `env_file`, **não versionado**); só `*.example` entram no git.
 - **Schema mudou → migration obrigatória** (`tryMigrate`/`tryUpgrade`).
 - **NUNCA edite `common/config/rush/pnpm-lock.yaml` manualmente.**
