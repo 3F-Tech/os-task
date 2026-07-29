@@ -4,6 +4,7 @@
 
 import account, {
   type AccountMethods,
+  type AccountDB,
   type Meta,
   type ClientNetworkPosition,
   EndpointKind,
@@ -12,13 +13,22 @@ import account, {
   getAllTransactors,
   getMethods,
   cleanExpiredOtp,
-  fetchOrgStructure
+  fetchOrgStructure,
+  getCoreUserByEmail,
+  setCoreUserBirthDate
 } from '@hcengineering/account'
 import accountEn from '@hcengineering/account/lang/en.json'
 import accountRu from '@hcengineering/account/lang/ru.json'
 import { Analytics } from '@hcengineering/analytics'
 import { registerProviders } from '@hcengineering/auth-providers'
-import { metricsAggregate, type Branding, type BrandingMap, type MeasureContext } from '@hcengineering/core'
+import {
+  type AccountUuid,
+  metricsAggregate,
+  SocialIdType,
+  type Branding,
+  type BrandingMap,
+  type MeasureContext
+} from '@hcengineering/core'
 import platform, { Severity, Status, addStringsLoader, setMetadata, unknownStatus } from '@hcengineering/platform'
 import serverToken, { decodeToken, decodeTokenVerbose, generateToken } from '@hcengineering/server-token'
 import cors from '@koa/cors'
@@ -39,6 +49,30 @@ const KEEP_ALIVE_HEADERS = {
   'Content-Type': 'application/json',
   Connection: 'keep-alive',
   'Keep-Alive': 'timeout=5, max=1000'
+}
+
+const BIRTHDATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Valida uma data de nascimento `YYYY-MM-DD`: formato, existência real (rejeita
+ * rollover tipo `2026-02-31`), ano ≥ 1900 e não-futura. A 3F Core revalida de
+ * qualquer forma (Zod), mas isto dá um 400 amigável antes da ida à rede.
+ */
+function isValidBirthDate (v: unknown): v is string {
+  if (typeof v !== 'string' || !BIRTHDATE_RE.test(v)) return false
+  const [y, m, d] = v.split('-').map((s) => parseInt(s, 10))
+  const date = new Date(Date.UTC(y, m - 1, d))
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return false
+  if (y < 1900) return false
+  if (date.getTime() > Date.now()) return false
+  return true
+}
+
+/** Resolve o email verificado (social id EMAIL) do dono do token — server-side. */
+async function resolveAccountEmail (db: AccountDB, accountUuid: AccountUuid): Promise<string | undefined> {
+  const socialIds = await db.socialId.find({ personUuid: accountUuid, verifiedOn: { $gt: 0 } })
+  const emailId = socialIds.find((si) => si.type === SocialIdType.EMAIL && si.isDeleted !== true)
+  return emailId?.value
 }
 
 /**
@@ -425,6 +459,83 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
       ctx.res.end(JSON.stringify({ data }))
     } catch (err: any) {
       measureCtx.error('org-structure proxy failed', { error: err?.message })
+      ctx.res.writeHead(502, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.InternalServerError, {}) }))
+    }
+  })
+
+  // 3F Core — completude de perfil (data de nascimento).
+  // GET devolve o estado do aniversário do usuário logado (para o popup pós-login
+  // decidir se aparece). A identidade vem do token (email resolvido server-side),
+  // nunca do browser. Fail-safe: se não achar o usuário na Core → found:false.
+  router.get('/api/v1/me/birthday', async (ctx) => {
+    const token = extractToken(ctx.request.headers)
+    let accountUuid: AccountUuid | undefined
+    try {
+      if (token !== undefined) accountUuid = decodeToken(token).account
+    } catch {
+      accountUuid = undefined
+    }
+    if (accountUuid === undefined) {
+      ctx.res.writeHead(401, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.Unauthorized, {}) }))
+      return
+    }
+
+    try {
+      const [db] = await accountsDb
+      const email = await resolveAccountEmail(db, accountUuid)
+      const coreUser = email !== undefined ? await getCoreUserByEmail(measureCtx, email) : undefined
+      const data =
+        coreUser === undefined
+          ? { found: false, hasBirthday: false, birthDate: null }
+          : { found: true, hasBirthday: coreUser.birthDate != null, birthDate: coreUser.birthDate }
+      ctx.res.writeHead(200, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ data }))
+    } catch (err: any) {
+      measureCtx.error('me/birthday GET failed', { error: err?.message })
+      ctx.res.writeHead(502, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.InternalServerError, {}) }))
+    }
+  })
+
+  // POST grava o aniversário do usuário logado na Core (PATCH /users/:id).
+  // Exige que a API Key do account tenha scope users:write (chave adm).
+  router.post('/api/v1/me/birthday', async (ctx) => {
+    const token = extractToken(ctx.request.headers)
+    let accountUuid: AccountUuid | undefined
+    try {
+      if (token !== undefined) accountUuid = decodeToken(token).account
+    } catch {
+      accountUuid = undefined
+    }
+    if (accountUuid === undefined) {
+      ctx.res.writeHead(401, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.Unauthorized, {}) }))
+      return
+    }
+
+    const birthDate = (ctx.request.body as any)?.birthDate
+    if (!isValidBirthDate(birthDate)) {
+      ctx.res.writeHead(400, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: { code: 'INVALID_BIRTHDATE' } }))
+      return
+    }
+
+    try {
+      const [db] = await accountsDb
+      const email = await resolveAccountEmail(db, accountUuid)
+      const coreUser = email !== undefined ? await getCoreUserByEmail(measureCtx, email) : undefined
+      if (coreUser === undefined) {
+        ctx.res.writeHead(404, KEEP_ALIVE_HEADERS)
+        ctx.res.end(JSON.stringify({ error: { code: 'CORE_USER_NOT_FOUND' } }))
+        return
+      }
+      await setCoreUserBirthDate(measureCtx, coreUser.id, birthDate)
+      ctx.res.writeHead(200, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ data: { ok: true, birthDate } }))
+    } catch (err: any) {
+      measureCtx.error('me/birthday POST failed', { error: err?.message })
       ctx.res.writeHead(502, KEEP_ALIVE_HEADERS)
       ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.InternalServerError, {}) }))
     }

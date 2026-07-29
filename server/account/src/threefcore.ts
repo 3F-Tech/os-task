@@ -327,3 +327,103 @@ export async function fetchOrgStructure (ctx: MeasureContext, force = false): Pr
   orgCache = data
   return data
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Profile completion (birth date) — usado pelo popup pós-login que pede o
+// aniversário quando ele está vazio na 3F Core.
+//
+// Leitura: GET /users?q=<email> (scope users:read). Escrita: PATCH /users/:id
+// { birth_date } (scope users:write — exige chave adm). A identidade é sempre
+// resolvida server-side pelo email do token Huly, nunca vinda do browser.
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Usuário da 3F Core reduzido ao necessário para o fluxo de aniversário. @public */
+export interface CoreUserBirthday {
+  id: number
+  email: string
+  /** `YYYY-MM-DD` ou `null` se ainda não preenchido. */
+  birthDate: string | null
+}
+
+function normalizeCoreEmail (email: string): string {
+  return email.trim().toLowerCase()
+}
+
+// Timeout próprio (maior que o 5s do /auth/validate): o /users do Core faz busca
+// por `q` e pode chegar a ~3.5s por página — 5s estoura sob concorrência (mesmo
+// motivo do ORG_REQUEST_TIMEOUT_MS acima). Vale para leitura e escrita do perfil.
+const CORE_USERS_TIMEOUT_MS = 20_000
+
+/**
+ * Busca o usuário da 3F Core pelo email exato (case-insensitive). Usa o filtro
+ * `q` do `/users` (que casa nome OU email) e confere a igualdade exata depois.
+ * Retorna `undefined` se nenhum usuário casar. Lança em erro de rede/config/HTTP.
+ * @public
+ */
+export async function getCoreUserByEmail (ctx: MeasureContext, email: string): Promise<CoreUserBirthday | undefined> {
+  const baseUrl = getMetadata(accountPlugin.metadata.ThreeFCoreUrl)
+  const apiKey = getMetadata(accountPlugin.metadata.ThreeFCoreApiKey)
+  if (baseUrl == null || baseUrl === '' || apiKey == null || apiKey === '') {
+    ctx.error('birthday lookup requested but 3F Core URL/API key not configured')
+    throw new Error('3F Core URL/API key not configured')
+  }
+
+  const wanted = normalizeCoreEmail(email)
+  const controller = new AbortController()
+  const timer = setTimeout(() => {
+    controller.abort()
+  }, CORE_USERS_TIMEOUT_MS)
+  try {
+    const res = await fetch(concatLink(baseUrl, `/users?q=${encodeURIComponent(wanted)}&perPage=100`), {
+      method: 'GET',
+      headers: { 'X-API-Key': apiKey },
+      signal: controller.signal
+    })
+    if (res.status !== 200) {
+      throw new Error(`3F Core GET /users → status ${res.status}`)
+    }
+    const body: any = await res.json()
+    const data: any[] = Array.isArray(body?.data) ? body.data : []
+    const match = data.find((u) => typeof u?.email === 'string' && normalizeCoreEmail(u.email) === wanted)
+    if (match === undefined) return undefined
+    const birthDate =
+      typeof match.birth_date === 'string' && match.birth_date !== '' ? match.birth_date.slice(0, 10) : null
+    return { id: match.id, email: match.email, birthDate }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Grava o `birth_date` (`YYYY-MM-DD`) do usuário na 3F Core via `PATCH /users/:id`.
+ * Exige que a API Key configurada tenha o scope `users:write` (chave `adm`).
+ * Lança em erro de rede/config/HTTP.
+ * @public
+ */
+export async function setCoreUserBirthDate (ctx: MeasureContext, coreUserId: number, birthDate: string): Promise<void> {
+  const baseUrl = getMetadata(accountPlugin.metadata.ThreeFCoreUrl)
+  const apiKey = getMetadata(accountPlugin.metadata.ThreeFCoreApiKey)
+  if (baseUrl == null || baseUrl === '' || apiKey == null || apiKey === '') {
+    ctx.error('birthday write requested but 3F Core URL/API key not configured')
+    throw new Error('3F Core URL/API key not configured')
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => {
+    controller.abort()
+  }, CORE_USERS_TIMEOUT_MS)
+  try {
+    const res = await fetch(concatLink(baseUrl, `/users/${coreUserId}`), {
+      method: 'PATCH',
+      headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ birth_date: birthDate }),
+      signal: controller.signal
+    })
+    if (res.status !== 200) {
+      const detail = await res.text().catch(() => '')
+      throw new Error(`3F Core PATCH /users/${coreUserId} → status ${res.status} ${detail}`)
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}

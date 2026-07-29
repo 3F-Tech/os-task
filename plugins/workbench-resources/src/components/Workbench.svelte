@@ -105,6 +105,7 @@
   import workbench from '../plugin'
   import { buildNavModel, isAllowedToRole, logOut, workspacesStore } from '../utils'
   import { showSupportNoticeOnce } from '../supportNotice'
+  import { showBirthdayPromptOnce } from '../birthdayPrompt'
   import AccountPopup from './AccountPopup.svelte'
   import AppItem from './AppItem.svelte'
   import AppSwitcher from './AppSwitcher.svelte'
@@ -270,6 +271,8 @@
     syncWorkbenchTab()
     // Aviso de suporte: mostra uma vez por usuário após a atualização (controlado por localStorage + versão)
     showSupportNoticeOnce(account.uuid)
+    // Completude de perfil: se o aniversário estiver vazio na 3F Core, pede pra preencher (bloqueante).
+    void showBirthdayPromptOnce()
   })
 
   const workspaceId = $location.path[1]
