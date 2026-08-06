@@ -171,7 +171,10 @@ interface WorkspaceConnection {
 }
 
 async function createWorkspaceConnection (workspaceUuid: WorkspaceUuid): Promise<WorkspaceConnection> {
-  const token = generateToken(systemAccountUuid, workspaceUuid, { service: SERVICE_NAME })
+  // Assina com config.Secret explicitamente — ver nota em pdca.ts:createWorkspaceClient.
+  // Sem isso, generateToken usa o default 'secret' e o account rejeita (Unauthorized)
+  // desde a rotação do SERVER_SECRET (2026-07-09).
+  const token = generateToken(systemAccountUuid, workspaceUuid, { service: SERVICE_NAME }, config.Secret)
   const accountClient = getAccountClient(config.AccountsUrl, token)
   const wsInfo = await accountClient.getLoginInfoByToken()
   if (wsInfo == null || !('endpoint' in wsInfo)) {

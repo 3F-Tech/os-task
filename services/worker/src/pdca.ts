@@ -208,7 +208,12 @@ async function addCycleComment (
 }
 
 async function createWorkspaceClient (workspaceUuid: WorkspaceUuid): Promise<TxOperations> {
-  const token = generateToken(systemAccountUuid, workspaceUuid, { service: SERVICE_NAME })
+  // Assina com config.Secret explicitamente. Sem o 4º arg, generateToken cai em
+  // getMetadata(serverToken.metadata.Secret) — que o worker nunca seta — e usa o
+  // default 'secret'. Batia por acaso em prod até o SERVER_SECRET ser rotacionado
+  // (2026-07-09); depois o account passou a rejeitar todo token (Unauthorized) e
+  // nenhum ciclo PDCA reiniciava.
+  const token = generateToken(systemAccountUuid, workspaceUuid, { service: SERVICE_NAME }, config.Secret)
   const accountClient = getAccountClient(config.AccountsUrl, token)
   const wsInfo = await accountClient.getLoginInfoByToken()
   if (wsInfo == null || !('endpoint' in wsInfo)) {
