@@ -21,6 +21,7 @@ import { TimeMachineDB } from './db'
 import { SendTimeEvent } from './activities'
 import { startPdcaConsumer, bootstrapPdcaSchedules } from './pdca'
 import { startDailyDigestConsumer, bootstrapDailyDigestSchedule } from './dailyDigest'
+import { startClientRefreshSchedule } from './clientRefresh'
 import config from './config'
 
 export async function runWorker (): Promise<void> {
@@ -72,6 +73,10 @@ export async function runWorker (): Promise<void> {
   startDailyDigestConsumer(ctx, db)
 
   void bootstrapDailyDigestSchedule(ctx, db)
+
+  // F12 — refresh do nome do cliente (common_name da Core) 2×/dia. Agendador
+  // in-process; ver services/worker/src/clientRefresh.ts.
+  startClientRefreshSchedule(ctx, db)
 
   // Delay first poll so Kafka consumers finish joining (~23s) before
   // any expired events are fired via SendTimeEvent

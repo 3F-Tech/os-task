@@ -14,7 +14,9 @@
 
 ## Estado atual (resumo para quem pega agora)
 
-- **Branch:** `feat/clientname-via-core` (nada commitado ainda; ver "Regras" abaixo).
+- **Branch/commit:** landado direto em **`develop`** (2026-08-07): `4b8442f23`
+  (feat, 34 arquivos) + `27fb010c2` (bump `version.txt` → 0.7.360, upgrade de model).
+  Push dispara o `build.yml` (imagens → GHCR). Deploy na VPS = `deploy.yml` manual.
 - **Implementação:** Fases 0–5 completas + **paginação/busca** na tela de acompanhamento.
 - **Validação:**
   - `rush validate` → **exit 0** (todos os pacotes).
@@ -25,9 +27,15 @@
     do webpack; use-o manualmente como checagem extra dos `.svelte`.
   - webpack front → compilou com sucesso (`WEBPACK_EXIT=0`).
 - **Falta (nesta ordem):**
-  1. Build: `./3f-build.sh --pod "front server account"` (`--vps` para produção).
-  2. Smoke test no browser (criar/editar issue, tela de Configurações → Clientes).
-  3. Rodar reconciliação em prod: `automation/reconcile-clients.ts` (dry-run → `--apply`).
+  1. ✅ Commit+push em `develop` (2026-08-07) → `build.yml` builda as imagens no GHCR.
+  2. **Deploy na VPS (Fase 2, manual):** rodar `deploy.yml` (workflow_dispatch) com
+     `sha=27fb010c2ca2` e `pods="front server account worker"` (ou `all`) **depois**
+     do build ficar verde. Como `version.txt` foi bumpado, o deploy força o upgrade
+     coordenado do model-group (restart do `workspace_cockroach` → roda a migration).
+  3. **Pré-req a confirmar:** API key da Core em prod com scope `clients:read`
+     (o feature de aniversário `2343086cd`, que exige key `adm`, indica que sim).
+  4. Smoke test no browser (criar/editar issue, tela de Configurações → Clientes).
+  5. Rodar reconciliação em prod: `automation/reconcile-clients.ts` (dry-run → `--apply`).
 - **Deploy é do dono do repo.** NÃO bumpar `common/scripts/version.txt`, NÃO commitar
   segredos, NÃO `git add .`/`-A`. A key real da Core mora em `dev/.env.secrets` (fora do git).
 
@@ -103,6 +111,30 @@
 ---
 
 ## Log
+
+### 2026-08-07 — Refresh agendado do nome do cliente (pod `worker`)
+- **Pedido:** o `common_name` do cliente pode mudar no cadastro da Core; como o
+  `clientName` na issue é um snapshot denormalizado, o nome exibido ficava velho.
+  Sincronizar automaticamente, **2×/dia (12:00 e 20:00 BRT)**.
+- **Novo módulo `services/worker/src/clientRefresh.ts`** (aditivo — NÃO toca em
+  `pdca.ts`/`dailyDigest.ts`): agendador **in-process** (`setTimeout` que calcula
+  o próximo horário configurado, roda e reagenda — `computeNextRunMs`, testado
+  p/ 9h→12h, 15h→20h, 22h→12h+1, meio-dia→20h e virada de mês). Não usa a
+  máquina TimeMachine/Kafka do digest (scan idempotente e stateless; run perdido
+  se recupera no próximo slot).
+- **Lista da Core:** via o proxy `GET /api/v1/clients` do **account** (token de
+  sistema assinado com `config.Secret`) → **não** precisa da API Key da Core no
+  pod worker. Um fetch por run (lista é global).
+- **O que faz:** por workspace ativo (`db.getActiveWorkspaces()`), varre as issues
+  com `clientCoreId` e atualiza `clientName` onde divergiu de `common_name ?? name`.
+  Atualiza root **e** sub direto (independe do trigger). Pausa de 80ms entre
+  gravações; só grava onde há divergência (normalmente ~0).
+- **Config nova** (`config.ts`, defaults funcionam sem mexer no compose):
+  `CLIENT_REFRESH_ENABLED` (true), `CLIENT_REFRESH_TIMES` (`12:00,20:00`),
+  `CLIENT_REFRESH_TIMEZONE` (`America/Sao_Paulo`). O worker já recebe `SECRET` e
+  `ACCOUNTS_URL` (o digest usa) → nenhum segredo novo.
+- **Deploy:** pod **`worker`** (`./3f-build.sh --skip-webpack --pod worker [--vps]`).
+  Vale no boot do worker; nenhum upgrade de model. `tsc --noEmit` do worker = exit 0.
 
 ### 2026-08-06 — "Tarefas por cliente" 15/página (era 50)
 - **Pedido:** paginar melhor a tabela "Tarefas por cliente" da tela de controle

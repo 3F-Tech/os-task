@@ -33,6 +33,11 @@ export interface Config {
   DigestTimezone: string
   DigestUpcomingDays: number
   DigestSkipWeekend: boolean
+  // F12 — refresh do nome do cliente a partir da 3F Core (common_name pode mudar
+  // no cadastro; o clientName gravado na issue é um snapshot). Roda N vezes/dia.
+  ClientRefreshEnabled: boolean
+  ClientRefreshTimes: string
+  ClientRefreshTimezone: string
 }
 
 const config: Config = {
@@ -51,7 +56,11 @@ const config: Config = {
   DigestMinute: process.env.DIGEST_MINUTE != null ? Number(process.env.DIGEST_MINUTE) : 30,
   DigestTimezone: process.env.DIGEST_TIMEZONE ?? 'America/Sao_Paulo',
   DigestUpcomingDays: process.env.DIGEST_UPCOMING_DAYS != null ? Number(process.env.DIGEST_UPCOMING_DAYS) : 3,
-  DigestSkipWeekend: (process.env.DIGEST_SKIP_WEEKEND ?? 'true').toLowerCase() !== 'false'
+  DigestSkipWeekend: (process.env.DIGEST_SKIP_WEEKEND ?? 'true').toLowerCase() !== 'false',
+  ClientRefreshEnabled: (process.env.CLIENT_REFRESH_ENABLED ?? 'true').toLowerCase() !== 'false',
+  // Horários (HH:MM, na timezone abaixo) separados por vírgula. Default: meio-dia e 20h.
+  ClientRefreshTimes: process.env.CLIENT_REFRESH_TIMES ?? '12:00,20:00',
+  ClientRefreshTimezone: process.env.CLIENT_REFRESH_TIMEZONE ?? 'America/Sao_Paulo'
 }
 
 export default config
