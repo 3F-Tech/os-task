@@ -30,6 +30,7 @@
   import PriorityEditor from '../issues/PriorityEditor.svelte'
   import MilestoneSelector from '../milestones/MilestoneSelector.svelte'
   import ClientStageSelector from '../issues/ClientStageSelector.svelte'
+  import ClientNameSelector from '../issues/ClientNameSelector.svelte'
   import PdcaCycleSection from '../issues/PdcaCycleSection.svelte'
   import ProjectPresenter from '../projects/ProjectPresenter.svelte'
   import EstimationEditor from './EstimationEditor.svelte'
@@ -242,7 +243,8 @@
       <span class="labelOnPanel">
         <Label label={tracker.string.ClientName} />
       </span>
-      <EditBox bind:value={object.clientName} placeholder={tracker.string.ClientName} size="large" />
+      <!-- F12: seletor da Core (só o nome; template não guarda clientCoreId). -->
+      <ClientNameSelector bind:clientName={object.clientName} showPending={false} size={'large'} />
     </div>
 
     <div class="flex-row-center gap-4">

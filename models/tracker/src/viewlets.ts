@@ -121,15 +121,10 @@ export function issueConfig (
       key: '',
       label: tracker.string.ClientName,
       presenter: tracker.component.ClientNamePresenter,
-      props: { width: '8rem' },
+      // Nome do cliente + badge da Etapa colados numa única célula (F12).
+      // maxWidth trunca nomes longos com "…" (razão social gigante estourava a linha).
+      props: { maxWidth: '12rem', showStage: true },
       displayProps: { key: key + 'clientName', compression: true, fixed: 'left', dividerBefore: true }
-    },
-    {
-      key: '',
-      label: tracker.string.ClientStage,
-      presenter: tracker.component.ClientStagePresenter,
-      props: { width: '8rem' },
-      displayProps: { key: key + 'clientStage', compression: true, fixed: 'left', dividerBefore: true }
     },
     {
       key: 'labels',

@@ -25,6 +25,7 @@
   import ComponentEditor from '../components/ComponentEditor.svelte'
   import AssigneeEditor from '../issues/AssigneeEditor.svelte'
   import ClientStageSelector from '../issues/ClientStageSelector.svelte'
+  import ClientNameSelector from '../issues/ClientNameSelector.svelte'
   import PdcaCycleSection from '../issues/PdcaCycleSection.svelte'
   import PriorityEditor from '../issues/PriorityEditor.svelte'
   import MilestoneEditor from '../milestones/MilestoneEditor.svelte'
@@ -122,12 +123,18 @@
 
   <div class="divider" />
 
-  <AttributeBarEditor
-    key={'clientName'}
-    _class={issue._class}
-    object={issue}
-    showHeader={true}
+  <span class="labelOnPanel">
+    <Label label={tracker.string.ClientName} />
+  </span>
+  <!-- F12: seletor da Core (só o nome; template não guarda clientCoreId). -->
+  <ClientNameSelector
+    clientName={issue.clientName ?? ''}
+    showPending={false}
+    kind={'regular'}
     size={'medium'}
+    on:change={({ detail }) => {
+      void client.update(issue, { clientName: detail.clientName })
+    }}
   />
 
   <span class="labelOnPanel">

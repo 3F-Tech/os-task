@@ -34,6 +34,7 @@
   import MilestoneEditor from '../../milestones/MilestoneEditor.svelte'
   import AssigneeEditor from '../AssigneeEditor.svelte'
   import ClientStageSelector from '../ClientStageSelector.svelte'
+  import ClientNameSelector from '../ClientNameSelector.svelte'
   import CompletedDateEditor from '../CompletedDateEditor.svelte'
   import DueDateEditor from '../DueDateEditor.svelte'
   import PdcaCycleSection from '../PdcaCycleSection.svelte'
@@ -220,14 +221,23 @@
 
   <div class="divider" />
 
-  <AttributeBarEditor
-    readonly={clientFieldsReadonly}
-    key={'clientName'}
-    identifier={issue.identifier}
-    _class={issue._class}
-    object={issue}
-    showHeader={true}
-    size={'medium'}
+  <span class="labelOnPanel">
+    <Label label={tracker.string.ClientName} />
+  </span>
+  <ClientNameSelector
+    clientName={issue.clientName}
+    clientCoreId={issue.clientCoreId}
+    kind={'regular'}
+    size={'small'}
+    disabled={clientFieldsReadonly}
+    on:change={({ detail }) => {
+      void client.update(
+        issue,
+        detail.clientCoreId !== undefined
+          ? { clientName: detail.clientName, clientCoreId: detail.clientCoreId }
+          : { clientName: detail.clientName }
+      )
+    }}
   />
 
   <span class="labelOnPanel">

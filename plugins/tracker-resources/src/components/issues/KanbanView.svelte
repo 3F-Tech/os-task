@@ -630,11 +630,17 @@
     /* Global styles in components.scss */
     .card-labels {
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
+      align-items: center;
+      row-gap: 0.25rem;
       margin: 0 0.75rem 0 1rem;
       min-width: 0;
 
+      // A linha de tags (labels) segue em linha única, com compressão própria;
+      // só a linha de chips (cliente/etapa/prazo) pode quebrar para não cortar
+      // os campos quando o card fica estreito.
       &.labels {
+        flex-wrap: nowrap;
         overflow: hidden;
         flex-shrink: 1;
         margin: 0 1rem;
@@ -660,7 +666,7 @@
       display: flex;
       align-items: center;
       min-width: 0;
-      max-width: 8rem;
+      max-width: 100%;
       overflow: hidden;
       margin-left: 0.25rem;
     }

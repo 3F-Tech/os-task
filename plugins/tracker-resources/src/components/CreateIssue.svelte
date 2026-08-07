@@ -102,6 +102,7 @@
   import MilestoneSelector from './milestones/MilestoneSelector.svelte'
   import ProjectPresenter from './projects/ProjectPresenter.svelte'
   import ClientStageSelector from './issues/ClientStageSelector.svelte'
+  import ClientNameSelector from './issues/ClientNameSelector.svelte'
 
   export let space: Ref<Project> | undefined
   export let status: Ref<IssueStatus> | undefined = undefined
@@ -204,7 +205,8 @@
       parentIssue: parentIssue?._id,
       subIssues: [],
       clientName: (originalIssue as any)?.clientName ?? '',
-      clientStage: (originalIssue as any)?.clientStage ?? ClientStage.Onboarding
+      clientStage: (originalIssue as any)?.clientStage ?? ClientStage.Onboarding,
+      clientCoreId: (originalIssue as any)?.clientCoreId
     } as any
     if (originalIssue !== undefined && !ignoreOriginal) {
       const res: IssueDraft = {
@@ -245,6 +247,7 @@
   $: showClientFields = projectUsesClientName && !isSubIssue
   $: effectiveClientName = (object as any).clientName ?? ''
   $: effectiveClientStage = ((object as any).clientStage ?? ClientStage.Onboarding) as ClientStage
+  $: effectiveClientCoreId = (object as any).clientCoreId as number | undefined
   $: syncClientFromParent(parentIssue)
   $: updateIssueStatusId(object, currentProject)
   $: updateAssigneeId(object, currentProject)
@@ -260,8 +263,13 @@
     if (parent === undefined) return
     const parentName = (parent as any).clientName ?? ''
     const parentStage = (parent as any).clientStage ?? ClientStage.Onboarding
-    if ((object as any).clientName !== parentName || (object as any).clientStage !== parentStage) {
-      object = { ...object, clientName: parentName, clientStage: parentStage } as any
+    const parentCoreId = (parent as any).clientCoreId
+    if (
+      (object as any).clientName !== parentName ||
+      (object as any).clientStage !== parentStage ||
+      (object as any).clientCoreId !== parentCoreId
+    ) {
+      object = { ...object, clientName: parentName, clientStage: parentStage, clientCoreId: parentCoreId } as any
     }
   }
 
@@ -535,7 +543,7 @@
     'subIssues', 'relations', 'blockedBy', 'parents', 'childInfo', 'reportedTime',
     'remainingTime', 'reports', 'number', 'rank', 'modifiedOn', 'modifiedBy',
     'createdOn', 'createdBy', 'space', '_id', '_class', 'template',
-    'clientName', 'clientStage', 'startDate', 'completedDate'
+    'clientName', 'clientStage', 'clientCoreId', 'startDate', 'completedDate'
   ]
 
   let customAttributes: KeyedAttribute[] = []
@@ -704,6 +712,7 @@
         identifier,
         clientName: getTitle((object as any).clientName),
         clientStage: (object as any).clientStage,
+        clientCoreId: (object as any).clientCoreId,
         pdcaCycleActive: object.pdcaCycleActive,
         pdcaCycleFrequency: object.pdcaCycleFrequency,
         pdcaCycleResetStatus: object.pdcaCycleResetStatus,
@@ -1116,6 +1125,7 @@
       component={object.component}
       clientName={effectiveClientName}
       clientStage={effectiveClientStage}
+      clientCoreId={effectiveClientCoreId}
       bind:subIssues={object.subIssues}
     />
   {/if}
@@ -1125,10 +1135,10 @@
   <svelte:fragment slot="pool">
     {#if showClientFields && !isGuest}
       <div id="client-name-editor" class="pool-item">
-        <EditBox
+        <ClientNameSelector
           focusIndex={2.5}
-          bind:value={object.clientName}
-          placeholder={tracker.string.ClientName}
+          bind:clientName={object.clientName}
+          bind:clientCoreId={object.clientCoreId}
           kind={'regular'}
           size={'large'}
         />

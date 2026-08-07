@@ -515,6 +515,48 @@ export const trackerOperation: MigrateOperation = {
         }
       },
       {
+        // clientCoreId (F09 clientName via Core): sub-issues mirror the root's Core
+        // client link, same as clientName/clientStage. No-op until clientCoreId starts
+        // being populated (reconciliation script / ClientNameSelector); kept for parity
+        // and to heal drift on upgrade. Uses attachedTo walk (postgres adapter can't
+        // traverse 'parents.0'). Only propagates when the root actually has a link.
+        state: 'subIssueInheritClientCoreId',
+        mode: 'upgrade',
+        func: async (client) => {
+          const allIssues = await client.find<Issue>(DOMAIN_TASK, {
+            _class: tracker.class.Issue
+          })
+          if (allIssues.length === 0) return
+
+          const byId = new Map<string, Issue>()
+          for (const issue of allIssues) byId.set(issue._id as string, issue)
+
+          const noParent = tracker.ids.NoParent as unknown as string
+          function findRoot (start: Issue): Issue | undefined {
+            let current: Issue | undefined = start
+            for (let depth = 0; depth < 100 && current !== undefined; depth++) {
+              const at = (current as any).attachedTo as string | undefined
+              if (at === undefined || at === noParent) return current
+              const next = byId.get(at)
+              if (next === undefined || next._id === current._id) return current
+              current = next
+            }
+            return current
+          }
+
+          for (const issue of allIssues) {
+            const attachedTo = (issue as any).attachedTo as string | undefined
+            if (attachedTo === undefined || attachedTo === noParent) continue
+            const root = findRoot(issue)
+            if (root === undefined || root._id === issue._id) continue
+            const rootCoreId = (root as any).clientCoreId
+            if (rootCoreId === undefined) continue
+            if ((issue as any).clientCoreId === rootCoreId) continue
+            await client.update(DOMAIN_TASK, { _id: issue._id }, { clientCoreId: rootCoreId })
+          }
+        }
+      },
+      {
         state: 'templateAssigneeToArray',
         mode: 'upgrade',
         func: async (client) => {

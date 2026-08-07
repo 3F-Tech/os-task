@@ -323,6 +323,11 @@ export class TIssue extends TTask implements Issue {
   @Prop(TypeString(), tracker.string.ClientStage)
   @Index(IndexKind.Indexed)
     clientStage!: ClientStage
+
+  @Prop(TypeNumber(), tracker.string.ClientCoreId)
+  @Index(IndexKind.Indexed)
+  @Hidden()
+    clientCoreId?: number
 }
 /**
  * @public

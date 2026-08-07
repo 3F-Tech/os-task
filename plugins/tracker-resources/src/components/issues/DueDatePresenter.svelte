@@ -23,6 +23,11 @@
   export let kind: ButtonKind = 'link'
   export let size: ButtonSize = 'medium'
   export let isEditable = true
+  // Mostra um placeholder clicável ("Data limite") mesmo quando a tarefa não tem
+  // data, permitindo definir/alterar a due date direto na lista. Por padrão fica
+  // ligado no contexto de lista (kind 'list') e desligado nos cards do kanban
+  // (kind 'link-bordered'), que continuam ocultos quando vazios. `undefined` = auto.
+  export let showUnset: boolean | undefined = undefined
 
   const client = getClient()
 
@@ -40,7 +45,8 @@
     )
   }
 
-  $: shouldRenderPresenter = dueDateMs != null
+  $: showEmptyPlaceholder = showUnset ?? kind === 'list'
+  $: shouldRenderPresenter = dueDateMs != null || (isEditable && showEmptyPlaceholder)
 
   $: ignoreOverDue =
     value.$lookup?.status?.category === task.statusCategory.Won ||

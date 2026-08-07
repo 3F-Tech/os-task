@@ -20,10 +20,11 @@
     Project,
     ScriptExecutionTask
   } from '@hcengineering/tracker'
-  import { Button, EditBox, Label, tooltip } from '@hcengineering/ui'
+  import { Button, Label, tooltip } from '@hcengineering/ui'
   import { createEventDispatcher, onMount } from 'svelte'
 
   import tracker from '../../plugin'
+  import ClientNameSelector from '../issues/ClientNameSelector.svelte'
 
   export let scriptId: Ref<AutomationScript>
   export let onComplete: (entry: { scriptName: string, clientName: string, count: number }) => void = () => {}
@@ -39,6 +40,9 @@
   let loaded = false
 
   let clientName = ''
+  // Vínculo com o cadastro da 3F Core (F12). Ausente = tarefa nasce "pendente"
+  // (texto livre); presente = vinculada. O seletor cai p/ texto livre se a Core cair.
+  let clientCoreId: number | undefined = undefined
   // Escolha selecionada em cada grupo de variantes (índice do grupo → valor)
   let groupChoices: Record<number, string> = {}
   // Máximo de responsáveis por etiqueta (e por tarefa) — alinhado ao limite do tracker
@@ -283,6 +287,7 @@
 
     const kindCache = new Map<string, string>()
     const cliente = clientName.trim()
+    const coreId = clientCoreId
     let sucessos = 0
     // Snapshot das tarefas-raiz criadas — persistido no ScriptExecution para o histórico.
     const createdTasks: ScriptExecutionTask[] = []
@@ -406,6 +411,7 @@
           startDate: Date.now(),
           completedDate: null,
           clientName: cliente,
+          clientCoreId: coreId,
           clientStage,
           pdcaCycleActive: pdcaActive,
           pdcaCycleFrequency: pdcaFrequency,
@@ -490,6 +496,7 @@
             startDate: Date.now(),
             completedDate: null,
             clientName: cliente,
+            clientCoreId: coreId,
             clientStage,
             dueDate: childDueDate
           } as any,
@@ -570,7 +577,7 @@
       {#if !concluido}
         <section class="form-section">
           <h4 class="section-title"><Label label={tracker.string.ClientName} /></h4>
-          <EditBox bind:value={clientName} placeholder={tracker.string.ClientNamePlaceholder} kind="default" />
+          <ClientNameSelector bind:clientName bind:clientCoreId />
         </section>
 
         {#if variantGroups.length > 0}

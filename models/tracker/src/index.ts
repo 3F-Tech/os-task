@@ -188,8 +188,21 @@ function defineFilters (builder: Builder): void {
       'space',
       'createdBy',
       'assignee',
-      'clientName',
-      'clientStage',
+      // Cliente: filtro próprio com BUSCA (ClientNameFilter). O ValueFilter padrão
+      // só mostra caixa de busca p/ TypeNumber/EnumOf; clientName é TypeString e
+      // ficava uma checklist sem busca (inviável com ~300 clientes).
+      {
+        _class: tracker.class.Issue,
+        key: 'clientName',
+        component: tracker.component.ClientNameFilter
+      },
+      // Etapa: ValueFilter basta (só 4 valores, renderizados como badge via
+      // ClientStageValuePresenter; busca desnecessária).
+      {
+        _class: tracker.class.Issue,
+        key: 'clientStage',
+        component: view.component.ValueFilter
+      },
       {
         _class: tracker.class.Issue,
         key: 'component',
@@ -673,6 +686,16 @@ export function createModel (builder: Builder): void {
     group: 'settings-editor',
     role: AccountRole.Maintainer,
     order: 6000
+  })
+
+  builder.createDoc(setting.class.WorkspaceSettingCategory, core.space.Model, {
+    name: 'clientsMigration',
+    label: tracker.string.ClientsMigration,
+    icon: tracker.icon.Issues,
+    component: tracker.component.ClientsMigrationSettings,
+    group: 'settings-editor',
+    role: AccountRole.Maintainer,
+    order: 6100
   })
 
   builder.createDoc(

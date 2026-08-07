@@ -329,6 +329,67 @@ export async function fetchOrgStructure (ctx: MeasureContext, force = false): Pr
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Clients (read-through) — usado pela feature F09 "Nome do cliente via Core".
+//
+// O seletor de cliente na Issue e a tela de acompanhamento em Configurações
+// leem a lista de clientes direto da 3F Core (identidade canônica). Mesmo
+// padrão da org-structure: proxy no account (a API Key fica server-side) e
+// resposta enxuta SEM PII (nada de documento/cpf/cnpj/endereço/contato).
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Cliente da 3F Core (enxuto, sem PII). @public */
+export interface CoreClient {
+  id: number
+  /** Razão social / nome formal. */
+  name: string
+  /** Nome comum/apelido usado no dia a dia (pode faltar → null). */
+  common_name: string | null
+  /** Ciclo de vida comercial: active | aguardando_renovacao | em_cancelamento | churn | cancelado. */
+  status: string
+  is_active: boolean
+}
+
+const CLIENTS_CACHE_TTL_MS = 60_000
+let clientsCache: CoreClient[] | undefined
+let clientsCacheAt = 0
+
+/**
+ * Busca a lista de clientes da 3F Core (id, razão social, nome comum, status).
+ * Pagina internamente (reusa coreGetAll) e cacheia ~60s in-memory. Exclui
+ * registros soft-deleted (is_active=false); mantém todos os status comerciais
+ * (inclusive churn/cancelado — o filtro por status é decisão do consumidor).
+ * Lança em falha de rede/config — o proxy traduz pra 5xx.
+ * @public
+ */
+export async function fetchCoreClients (ctx: MeasureContext, force = false): Promise<CoreClient[]> {
+  if (!force && clientsCache !== undefined && Date.now() - clientsCacheAt < CLIENTS_CACHE_TTL_MS) {
+    return clientsCache
+  }
+
+  const baseUrl = getMetadata(accountPlugin.metadata.ThreeFCoreUrl)
+  const apiKey = getMetadata(accountPlugin.metadata.ThreeFCoreApiKey)
+  if (baseUrl == null || baseUrl === '' || apiKey == null || apiKey === '') {
+    ctx.error('clients requested but 3F Core URL/API key not configured')
+    throw new Error('3F Core URL/API key not configured')
+  }
+
+  const raw = await coreGetAll(baseUrl, apiKey, '/clients')
+  const data: CoreClient[] = raw
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      common_name: c.common_name ?? null,
+      status: typeof c.status === 'string' ? c.status : 'active',
+      is_active: c.is_active ?? true
+    }))
+    .filter((c) => c.is_active && typeof c.id === 'number')
+
+  clientsCache = data
+  clientsCacheAt = Date.now()
+  return data
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Profile completion (birth date) — usado pelo popup pós-login que pede o
 // aniversário quando ele está vazio na 3F Core.
 //

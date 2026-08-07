@@ -14,6 +14,7 @@ import account, {
   getMethods,
   cleanExpiredOtp,
   fetchOrgStructure,
+  fetchCoreClients,
   getCoreUserByEmail,
   setCoreUserBirthDate
 } from '@hcengineering/account'
@@ -459,6 +460,37 @@ export function serveAccount (measureCtx: MeasureContext, brandings: BrandingMap
       ctx.res.end(JSON.stringify({ data }))
     } catch (err: any) {
       measureCtx.error('org-structure proxy failed', { error: err?.message })
+      ctx.res.writeHead(502, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.InternalServerError, {}) }))
+    }
+  })
+
+  // 3F Core clients proxy (F09 "Nome do cliente via Core"). Devolve a lista de
+  // clientes enxuta (id, razão social, nome comum, status) — sem PII. Alimenta o
+  // seletor de cliente na Issue e a tela de acompanhamento. Exige token Huly válido.
+  router.get('/api/v1/clients', async (ctx) => {
+    const token = extractToken(ctx.request.headers)
+    let valid = false
+    if (token !== undefined) {
+      try {
+        decodeToken(token)
+        valid = true
+      } catch {
+        valid = false
+      }
+    }
+    if (!valid) {
+      ctx.res.writeHead(401, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.Unauthorized, {}) }))
+      return
+    }
+
+    try {
+      const data = await fetchCoreClients(measureCtx)
+      ctx.res.writeHead(200, KEEP_ALIVE_HEADERS)
+      ctx.res.end(JSON.stringify({ data }))
+    } catch (err: any) {
+      measureCtx.error('clients proxy failed', { error: err?.message })
       ctx.res.writeHead(502, KEEP_ALIVE_HEADERS)
       ctx.res.end(JSON.stringify({ error: new Status(Severity.ERROR, platform.status.InternalServerError, {}) }))
     }

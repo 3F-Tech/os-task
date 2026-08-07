@@ -822,10 +822,12 @@ async function doIssueClientPropagate (
   const ops = updateTx.operations as Record<string, unknown>
   const hasClientName = Object.prototype.hasOwnProperty.call(ops, 'clientName')
   const hasClientStage = Object.prototype.hasOwnProperty.call(ops, 'clientStage')
-  if (!hasClientName && !hasClientStage) return []
+  const hasClientCoreId = Object.prototype.hasOwnProperty.call(ops, 'clientCoreId')
+  if (!hasClientName && !hasClientStage && !hasClientCoreId) return []
 
   const newClientName = hasClientName ? (ops.clientName as string) : undefined
   const newClientStage = hasClientStage ? (ops.clientStage as Issue['clientStage']) : undefined
+  const newClientCoreId = hasClientCoreId ? (ops.clientCoreId as number | undefined) : undefined
 
   const descendants: Issue[] = []
   let frontier: Ref<Issue>[] = [updateTx.objectId]
@@ -846,6 +848,9 @@ async function doIssueClientPropagate (
     }
     if (hasClientStage && (issue as any).clientStage !== newClientStage) {
       ;(update as any).clientStage = newClientStage
+    }
+    if (hasClientCoreId && newClientCoreId !== undefined && (issue as any).clientCoreId !== newClientCoreId) {
+      ;(update as any).clientCoreId = newClientCoreId
     }
     if (Object.keys(update).length === 0) continue
     res.push(control.txFactory.createTxUpdateDoc(issue._class, issue.space, issue._id, update))
@@ -869,9 +874,13 @@ async function doIssueReparentSync (
 
   const parentName = (newParent as any).clientName ?? ''
   const parentStage = (newParent as any).clientStage ?? 'onboarding'
+  const parentCoreId = (newParent as any).clientCoreId as number | undefined
   const update: DocumentUpdate<Issue> = {}
   if ((issue as any).clientName !== parentName) (update as any).clientName = parentName
   if ((issue as any).clientStage !== parentStage) (update as any).clientStage = parentStage
+  if (parentCoreId !== undefined && (issue as any).clientCoreId !== parentCoreId) {
+    ;(update as any).clientCoreId = parentCoreId
+  }
   if (Object.keys(update).length === 0) return []
 
   return [control.txFactory.createTxUpdateDoc(updateTx.objectClass, updateTx.objectSpace, updateTx.objectId, update)]
@@ -890,12 +899,17 @@ async function doIssueCreateInherit (
 
   const parentName = (parent as any).clientName ?? ''
   const parentStage = (parent as any).clientStage ?? 'onboarding'
+  const parentCoreId = (parent as any).clientCoreId as number | undefined
   const childName = attrs.clientName ?? ''
   const childStage = attrs.clientStage ?? 'onboarding'
+  const childCoreId = attrs.clientCoreId as number | undefined
 
   const update: DocumentUpdate<Issue> = {}
   if (childName !== parentName) (update as any).clientName = parentName
   if (childStage !== parentStage) (update as any).clientStage = parentStage
+  if (parentCoreId !== undefined && childCoreId !== parentCoreId) {
+    ;(update as any).clientCoreId = parentCoreId
+  }
   if (Object.keys(update).length === 0) return []
 
   return [control.txFactory.createTxUpdateDoc(createTx.objectClass, createTx.objectSpace, createTx.objectId, update)]
@@ -903,7 +917,7 @@ async function doIssueCreateInherit (
 
 /**
  * @public
- * Keeps sub-issues' clientName/clientStage mirrored to their parent. Covers three paths:
+ * Keeps sub-issues' clientName/clientStage/clientCoreId mirrored to their parent. Covers three paths:
  *   1) Parent updates clientName/clientStage → propagate to all descendants (BFS via attachedTo).
  *   2) Issue's attachedTo changes (re-parented) → pull values from the new parent.
  *   3) Issue is created with attachedTo pointing to another issue → pull values from the parent

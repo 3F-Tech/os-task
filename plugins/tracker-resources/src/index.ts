@@ -65,6 +65,8 @@ import IssueStatusPresenter from './components/issues/IssueStatusPresenter.svelt
 import ClientStagePresenter from './components/issues/ClientStagePresenter.svelte'
 import ClientStageValuePresenter from './components/issues/ClientStageValuePresenter.svelte'
 import ClientNamePresenter from './components/issues/ClientNamePresenter.svelte'
+import ClientNameFilter from './components/issues/ClientNameFilter.svelte'
+import ClientsMigrationSettings from './components/settings/ClientsMigration.svelte'
 import IssueColumnHeader from './components/issues/IssueColumnHeader.svelte'
 import IssuesView from './components/issues/IssuesView.svelte'
 import KanbanView from './components/issues/KanbanView.svelte'
@@ -505,6 +507,8 @@ export default async (): Promise<Resources> => ({
     ClientStagePresenter,
     ClientStageValuePresenter,
     ClientNamePresenter,
+    ClientNameFilter,
+    ClientsMigrationSettings,
     IssueColumnHeader
   },
   completion: {

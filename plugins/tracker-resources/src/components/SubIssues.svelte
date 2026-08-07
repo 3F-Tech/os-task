@@ -36,6 +36,7 @@
   export let subIssues: IssueDraft[] = []
   export let clientName: string = ''
   export let clientStage: ClientStage = ClientStage.Onboarding
+  export let clientCoreId: number | undefined = undefined
   let lastProject = project
   let isCollapsed = false
   async function handleIssueSwap (ev: CustomEvent<{ fromIndex: number, toIndex: number }>) {
@@ -99,7 +100,8 @@
         kind: subIssue.kind,
         identifier: `${project.identifier}-${number}`,
         clientName,
-        clientStage
+        clientStage,
+        clientCoreId
       } as AttachedData<Issue>
 
       if (!isEmptyMarkup(subIssue.description)) {

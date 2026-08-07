@@ -470,7 +470,9 @@ export default mergeIds(trackerId, tracker, {
     MilestoneStatusIcon: '' as AnyComponent,
     ClientStagePresenter: '' as AnyComponent,
     ClientStageValuePresenter: '' as AnyComponent,
-    ClientNamePresenter: '' as AnyComponent
+    ClientNamePresenter: '' as AnyComponent,
+    ClientNameFilter: '' as AnyComponent,
+    ClientsMigrationSettings: '' as AnyComponent
   },
   metadata: {
     CreateIssueDraft: '' as Metadata<IssueDraft>

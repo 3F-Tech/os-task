@@ -400,6 +400,9 @@ export async function processPdcaCycleEvent (
         pdcaCycleResetSubIssues: resetSubIssues,
         pdcaNextCycleDate: nextDate,
         clientName: (issue as any).clientName,
+        // F12: leva o vínculo com a Core junto, senão a tarefa recriada nasce
+        // "pendente" (com nome, sem id) a cada ciclo.
+        clientCoreId: (issue as any).clientCoreId,
         clientStage: (issue as any).clientStage
       }
 
@@ -465,6 +468,8 @@ export async function processPdcaCycleEvent (
                 dueDate: null,
                 completedDate: null,
                 clientName: (child as any).clientName,
+                // F12: preserva o vínculo com a Core na sub-issue recriada também.
+                clientCoreId: (child as any).clientCoreId,
                 clientStage: (child as any).clientStage
               } as any
             )

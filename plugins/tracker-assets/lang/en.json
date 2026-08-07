@@ -46,6 +46,8 @@
     "PdcaCustomWeekdays": "Weekdays",
     "ClientName": "Nome do Cliente",
     "ClientStage": "Etapa",
+    "ClientCoreId": "Cliente (3F Core)",
+    "ClientsMigration": "Clientes",
     "UseClientName": "Use Client Name",
     "PdcaDueWeekday": "Due day (weekday)",
     "PdcaDueMonthDay": "Due day (month day)",

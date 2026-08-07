@@ -21,11 +21,12 @@
 
   function openPopup (event: MouseEvent): void {
     if (disabled) return
+    // SelectPopup: `text` é string crua; `label` é IntlString (id p/ traduzir).
+    // Usar `text` evita o erro "Invalid Id: <etapa>" ao tentar traduzir o rótulo.
     const items = options.map((o) => ({
       id: o.id,
-      label: o.label,
-      isSelected: o.id === value,
-      color: o.color
+      text: o.label,
+      isSelected: o.id === value
     }))
     showPopup(SelectPopup, { value: items }, eventToHTMLElement(event), (selected: ClientStage | undefined) => {
       if (selected !== undefined && selected !== value) {

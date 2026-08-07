@@ -282,6 +282,10 @@ export interface Issue extends Task {
 
   clientName: string
   clientStage: ClientStage
+  // Ref to the client record in 3F Core (see F09 clientName via Core). When set, the
+  // issue's client is "linked" to the canonical Core registry; when absent with a
+  // non-empty clientName, the client is a legacy free-text value pending reconciliation.
+  clientCoreId?: number
 }
 
 /**
@@ -302,6 +306,7 @@ export interface IssueDraft {
 
   clientName: string
   clientStage: ClientStage
+  clientCoreId?: number
 
   // Estimation in man days
   estimation: number
@@ -705,6 +710,8 @@ const pluginState = plugin(trackerId, {
     MissingCompletedDate: '' as IntlString,
     ClientName: '' as IntlString,
     ClientStage: '' as IntlString,
+    ClientCoreId: '' as IntlString,
+    ClientsMigration: '' as IntlString,
     UseClientName: '' as IntlString,
     PdcaDueWeekday: '' as IntlString,
     PdcaDueMonthDay: '' as IntlString,
