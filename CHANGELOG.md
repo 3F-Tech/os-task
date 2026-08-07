@@ -2,3 +2,4 @@
 - **2026-07-22 17:10 UTC** — deploy `6a5df09ef914` → [front] — ✅ sucesso (por PedroBartelle3F, run 29941196680)
 - **2026-07-29 17:57 UTC** — deploy `2343086cd133` → [account] — ✅ sucesso (por mateusj1207, run 30477638244)
 - **2026-07-29 17:59 UTC** — deploy `2343086cd133` → [front] — ✅ sucesso (por mateusj1207, run 30477802456)
+- **2026-08-07 16:36 UTC** — deploy `d8de25e8de22` → [worker] — ✅ sucesso (por PedroBartelle3F, run 31198288393)
