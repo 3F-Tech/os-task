@@ -4,3 +4,4 @@
 - **2026-07-29 17:59 UTC** — deploy `2343086cd133` → [front] — ✅ sucesso (por mateusj1207, run 30477802456)
 - **2026-08-07 16:36 UTC** — deploy `d8de25e8de22` → [worker] — ✅ sucesso (por PedroBartelle3F, run 31198288393)
 - **2026-08-10 17:28 UTC** — deploy `29515ceef0ce` → [worker] — ✅ sucesso (por PedroBartelle3F, run 31414096845)
+- **2026-08-10 20:19 UTC** — deploy `2bb60cd8a2e2` → [front] — ✅ sucesso (por PedroBartelle3F, run 31428370539)
