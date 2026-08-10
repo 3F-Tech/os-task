@@ -1,429 +1,422 @@
-# 3F Tasks — Build, Deploy e Troubleshooting
+---
+title: Build e Deploy — 3F Tasks
+audience: desenvolvedores da 3F Tasks
+summary: >
+  Como rodar o projeto localmente e como publicar mudanças em produção pela
+  esteira de CI/CD (build no GitHub Actions → imagens no GHCR → deploy por botão).
+  Este é o método atual. O build-in-place antigo na VPS foi aposentado.
+when_to_use: >
+  Consulte este documento sempre que precisar (a) montar/atualizar o projeto na
+  sua máquina, (b) publicar uma correção ou feature em produção, (c) reverter um
+  deploy, ou (d) aplicar uma mudança que altera o modelo de dados (migration).
+---
 
-Guia técnico completo para build, deploy na VPS e resolução de problemas.
-Escrito para agentes IA ou desenvolvedores que precisam diagnosticar falhas.
+# Build e Deploy — 3F Tasks
+
+> **Como funciona, em uma frase:** todo push na `develop` builda as imagens dos
+> pods afetados no **GitHub Actions** e publica no **GHCR**
+> (`ghcr.io/3f-tech/os-task/<pod>`); o deploy em produção é feito por **um botão**
+> no GitHub (workflow *3F Deploy (GHCR → VPS)*), que puxa a imagem já pronta,
+> troca o pod na VPS, verifica e registra no `CHANGELOG.md`.
+>
+> O build **não** roda mais na VPS. A VPS só baixa a imagem pronta e reinicia o
+> container. Isso vale para os **11 pods que nós buildamos** (lista na
+> [Referência rápida](#referência-rápida)); serviços de dado e de infraestrutura
+> **nunca** são tocados pela esteira.
+
+Índice:
+- [1. Rodar o projeto localmente](#1-rodar-o-projeto-localmente)
+- [2. Publicar uma mudança em produção (o fluxo normal)](#2-publicar-uma-mudança-em-produção-o-fluxo-normal)
+- [3. Confirmar que o deploy deu certo](#3-confirmar-que-o-deploy-deu-certo)
+- [4. Rollback (se algo der errado)](#4-rollback-se-algo-der-errado)
+- [5. Caso especial: migration / bump de MODEL_VERSION](#5-caso-especial-migration--bump-de-model_version)
+- [Referência rápida](#referência-rápida)
 
 ---
 
-## 0. Infraestrutura da VPS (produção)
+## 1. Rodar o projeto localmente
 
-Plano **Hostinger KVM 4** — upgrade em **2026-07-02** (antes: KVM de 2 núcleos).
+O build local continua sendo o **`3f-build.sh`** (roda na sua máquina, sobe o
+`dev/docker-compose.yaml` local — **não** o de produção). Ele compila o
+monorepo, empacota os pods, builda as imagens `:3f-local` e reinicia os
+containers locais.
 
-| Recurso | Valor |
-|---|---|
-| vCPU | **4 núcleos** |
-| RAM | **16 GB** |
-| Disco | **200 GB NVMe** |
-| Banda | 16 TB/mês |
-| Snapshot | 1 |
-| Backup | semanal (provedor) + serviço `backup-cockroach` no compose |
-| Rede/acesso | IP dedicado · acesso root completo |
+### 1.1 Primeira vez (setup do zero)
 
-Dados persistentes em **bind-mounts** sob `/opt/apps/os-tasks/data/` (`cockroach`, `minio`,
-`redpanda`, `elastic`) — sobrevivem a reboot; todos os serviços de estado usam `restart: unless-stopped`.
+> Faça isto **uma vez** por máquina. Depois, o dia a dia é só a
+> [§1.2](#12-atualizar-o-local-conforme-você-mexe-no-código). Todo o build local
+> roda na sua máquina e é **isolado da produção**.
 
-> Docs de performance (`3f-docs/calendar/performance-plan.md`, `3f-docs/pod-calendar-issues.md`)
-> foram escritos para os **2 núcleos** antigos — as severidades de CPU descritas lá são
-> agora mais brandas, mas os fixes estruturais seguem válidos.
-> Nota: com 4 cores, a gravação do LiveKit (livekit-egress, mín. 3 cores) ficou
-> **desbloqueada** — ver bloco `love-service` em `dev/docker-compose.vps.yaml` (segue
-> desativada por decisão).
+**Pré-requisitos**
 
----
-
-## 1. Arquitetura de Versionamento
-
-O 3F Tasks usa **dois números de versão distintos e independentes**:
-
-| Variável | O que representa | Fonte | Onde aparece |
-|---|---|---|---|
-| `MODEL_VERSION` | Versão do modelo de dados (schema) | `common/scripts/version.txt` | `process.env.MODEL_VERSION` nos bundles Node.js |
-| `VERSION` | Versão do release do software | `common/scripts/tag.txt` | `process.env.VERSION` nos bundles Node.js |
-
-**Valores atuais:**
-- `common/scripts/version.txt` → `"0.7.359"` (aspas fazem parte do valor — é uma string JS literal)
-- `common/scripts/tag.txt` → `"0.7.413"` (aspas fazem parte do valor)
-
-### Como os valores são injetados nos bundles
-
-O `esbuild` **bake** os valores em tempo de build — eles não são lidos do ambiente em runtime:
-
-```
-rushx bundle
-  → chama common/scripts/esbuild.js
-    → chama show_version.js  → lê version.txt  → MODEL_VERSION="0.7.359"
-    → chama show_tag.js      → lê tag.txt       → VERSION="0.7.413"
-    → esbuild substitui process.env.MODEL_VERSION e process.env.VERSION no bundle.js
-```
-
-O `bundle.js` gerado contém literalmente `"0.7.359"` hardcoded. Mudar variáveis de ambiente no Docker não afeta esses valores — é preciso **rebuildar**.
-
-### Por que version.txt/tag.txt em vez de git tags
-
-O fork não tem as tags git do upstream (ex: `v0.7.413`). Os scripts originais (`show_version.js`, `show_tag.js`) usavam `git describe --tags` como fonte primária e caíam para `"0.6.0"` se falhasse. Isso causava todos os serviços reportarem `0.6.0` mesmo num fork do `0.7.413`.
-
-**Fix aplicado:** ambos os scripts agora tentam `version.txt`/`tag.txt` **antes** de chamar o git. Se o arquivo existir, usa seu valor sem depender de tags git.
-
----
-
-## 2. Serviços Custom vs Oficiais
-
-O fork mantém **imagens customizadas** (`:3f-local`) para todos os serviços que têm código modificado ou precisam de MODEL_VERSION correto:
-
-| Serviço | Imagem Docker | Por que custom |
+| Ferramenta | Versão | Como obter |
 |---|---|---|
-| `front` | `hardcoreeng/front:3f-local` | Bundle baked com MODEL_VERSION correto + código customizado |
-| `account` | `hardcoreeng/account:3f-local` | Fix do `withRetryUntilTimeout` + MODEL_VERSION |
-| `collaborator` | `hardcoreeng/collaborator:3f-local` | Código customizado do fork |
-| `workspace_cockroach` | `hardcoreeng/workspace:3f-local` | Migrations do fork (clientName, clientStage, WorkspaceMemberStatus) |
-| `transactor_cockroach` | `hardcoreeng/transactor:3f-local` | MODEL_VERSION deve bater com a workspace DB |
+| Node.js | 20+ (o repo fixa **v22** no `.nvmrc`; o Rush aceita `>=20 <25`) | `nvm install 22 && nvm use 22` |
+| Rush | 5.158.1 (fixado via *version selector* no `rush.json`; o global se auto-ajusta) | `npm install -g @microsoft/rush` |
+| pnpm | 10.15.1 — **gerenciado pelo Rush, não instale à mão** | (vem com o `rush install`) |
+| Docker + Compose v2 | — | `docker compose version` tem que responder |
+| Bash | `3f-build.sh` é um script bash | no Windows, rode via **Git Bash** ou WSL |
 
-Serviços que continuam usando imagens oficiais (sem código modificado):
-`stream`, `fulltext`, `datalake`, `stats`, `rekoni`, `elastic`, `minio`, `cockroach`, `redpanda`, `redis`
+> **Regra de ouro:** nunca `pnpm install` — sempre `rush install`. O registro de
+> pacotes é o npm público (`common/config/rush/.npmrc`), então **não** é preciso
+> logar no GitHub Packages para instalar (ignore a seção de auth do `README.md`
+> upstream — não se aplica a este fork).
+
+**1. Clonar e instalar as dependências**
+
+```bash
+git clone <url-do-repo> huly-3f && cd huly-3f
+rush install
+```
+
+**2. Criar os arquivos de ambiente locais** — todos ficam em `dev/`, todos são
+git-ignored; crie a partir dos `.example`:
+
+```bash
+cp dev/.env.example         dev/.env
+cp dev/.env.secrets.example dev/.env.secrets
+cp dev/.env.github.example  dev/.env.github
+```
+
+| Arquivo | Para que serve | Precisa existir p/ subir o stack? |
+|---|---|---|
+| `dev/.env` | valores interpolados no compose (`${DB_CR_URL}`, `${STORAGE_CONFIG}`, `${QUEUE_CONFIG}`…) | **sim** — o Compose lê o `.env` da **pasta do compose** (`dev/`), não o da raiz |
+| `dev/.env.secrets` | segredos injetados em `account` e `mail` via `env_file` | **sim** (mesmo vazio) |
+| `dev/.env.github` | segredos do GitHub App, injetados em `github` via `env_file` | sim, **se** for subir o pod `github` |
+
+No **`dev/.env`**, os defaults do exemplo já servem para local; ajuste só:
+
+```bash
+# Cockroach local sobe como --insecure single-node → use o usuário root, sem senha:
+DB_CR_URL=postgresql://root@cockroach:26257/defaultdb?sslmode=disable
+# seu e-mail com privilégio de admin da plataforma:
+PLATFORM_ADMIN_EMAILS=voce@3fventure.com.br
+```
+
+Os demais (`STORAGE_CONFIG=datalake|http://datalake:4030`,
+`QUEUE_CONFIG=redpanda:9092`, `BACKUP_*` com `minioadmin`/`minioadmin`,
+`MONGO_URL`, `DB_URL_PG`, `POLAR_*`) podem ficar como vieram — o stack Cockroach
+local não usa Mongo/PG/Polar.
+
+O **`dev/.env.secrets`** pode ficar **em branco** só para subir e navegar (o
+arquivo só precisa *existir*). Preencha depois, por feature — cada bloco do
+`.example` explica como gerar a credencial: Gmail SMTP (envio de
+e-mail/digest/notificações), `Credentials` (Google OAuth → calendar), `GITHUB_*`
+(integração GitHub), `THREEF_CORE_API_KEY` (login universal 3F Core, F11).
+
+**3. Buildar as imagens locais dos pods** — passo pesado (o webpack do front leva
+5–15 min e o terminal fica quieto):
+
+```bash
+# na raiz do repo, no Git Bash:
+./3f-build.sh --pod "server front account collaborator workspace datalake mail"
+```
+
+Isso compila o monorepo (`rush build`), roda o webpack, empacota os pods, builda
+as imagens `hardcoreeng/<pod>:3f-local` e já reinicia esses containers. Na
+**primeira vez**, liste esses 7 pods: são exatamente os que o compose local serve
+como `:3f-local` — e o `datalake` e o `mail` **não** entram na lista padrão do
+`3f-build.sh`. (Acrescente `github` se for usar a integração — exige o
+`dev/.env.github` preenchido.) Os pods `fulltext` e `time-machine`/`worker`
+rodam a imagem **upstream** do Docker Hub no ambiente local, então **não**
+precisam de build local.
+
+**4. Subir o stack inteiro** — os containers de dado e de infraestrutura
+(Cockroach, Redpanda, MinIO, Elasticsearch, Redis, `stats`, `jaeger`, `rekoni`…)
+são imagens públicas, **não** são buildados; o Compose baixa e sobe:
+
+```bash
+docker compose -f dev/docker-compose.yaml up -d
+```
+
+> **Ordem de subida:** você **não** sequencia "dado antes de app" à mão — o
+> Compose resolve pelo `depends_on` + healthchecks (Cockroach/Redpanda/MinIO/
+> Elastic primeiro, depois os pods). O `3f-build.sh` reinicia **só** os pods
+> (`--no-deps`), assumindo que a camada de dado já está de pé; por isso, no
+> primeiro boot, rode este `up -d` completo uma vez. Nos boots seguintes, o
+> `3f-build.sh` sozinho já basta.
+
+**5. Verificar o boot**
+
+```bash
+docker compose -f dev/docker-compose.yaml ps          # tudo Up / healthy?
+docker logs dev-transactor_cockroach-1 2>&1 | grep -E "ERROR|NoLocation|not found" | head
+docker logs dev-front-1                2>&1 | grep -E "ERROR|error" | head
+```
+
+**6. Acessar** → **http://localhost:8087** (o `front` publica `8087→8080`; é a URL
+que o `3f-build.sh` imprime no fim).
+
+> **Login no primeiro acesso.** O `account` local sobe com `DISABLE_SIGNUP=true`
+> e `THREEF_CORE_ENABLED=true` (login universal F11 → a senha é validada na 3F
+> Core). Para um sandbox local **sem** depender da 3F Core, edite o serviço
+> `account` em `dev/docker-compose.yaml` para `THREEF_CORE_ENABLED=false` +
+> `DISABLE_SIGNUP=false`, rode `./3f-build.sh --pod account`, e cadastre por
+> e-mail/senha. Contas em `PLATFORM_ADMIN_EMAILS`/`ADMIN_EMAILS` têm bypass de admin.
+
+> Para **iterar em UI com hot reload** (sem rebuildar Docker a cada mudança),
+> suba o dev-server do webpack: `cd dev/prod && rushx dev-server` →
+> **http://localhost:8080** (proxia API/WebSocket para o Docker em `:8087`).
+> Detalhes em **`3f-docs/desenvolvimento.md`**.
+
+### 1.2 Atualizar o local conforme você mexe no código
+
+Depois do setup inicial, para ver suas mudanças rodando localmente:
+
+```bash
+# na raiz do repo, na sua máquina:
+
+# rebuilda só o(s) pod(s) que você mexeu (mais rápido):
+./3f-build.sh --pod front              # ex.: mexeu no frontend
+./3f-build.sh --skip-webpack --pod server   # ex.: mexeu só no backend
+
+# ou o build local completo (quando na dúvida do que mudou):
+./3f-build.sh
+```
+
+Consulte o mapa **arquivo alterado → pod** no `CLAUDE.md` para saber qual `--pod`
+usar. O `3f-build.sh --help` lista todas as flags.
+
+> **Importante — seu ambiente local é isolado da produção.** O que acontece na
+> sua máquina (bump de versão local, banco local dessincronizado, testes) **não**
+> vai para produção: a esteira builda a imagem de produção a partir do **commit
+> limpo na `develop`**, numa máquina zerada do GitHub, não do seu Docker local.
+> Por isso, ao commitar, **envie só o que é a mudança de fato** (veja
+> [2.1](#21-antes-de-tudo-commite-só-a-mudança)).
 
 ---
 
-## 3. Script de Build: `3f-build.sh`
+## 2. Publicar uma mudança em produção (o fluxo normal)
 
-### Uso
+Este é o caminho de **99% dos deploys**: uma correção ou feature que **não muda o
+modelo de dados**. Para mudanças que alteram o modelo (migration), veja a
+[seção 5](#5-caso-especial-migration--bump-de-model_version).
+
+### 2.1 Antes de tudo: commite só a mudança
+
+A esteira builda a imagem de produção a partir do commit na `develop`. Então o
+commit tem que conter **exatamente** a sua mudança — nada de arquivos de ambiente
+local ou segredos.
 
 ```bash
-# Build completo (tudo)
-./3f-build.sh --vps
+# confira o que mudou:
+git status
 
-# Só um pod (mais rápido)
-./3f-build.sh --vps --pod front
-./3f-build.sh --vps --pod server       # = transactor
-./3f-build.sh --vps --pod account
-./3f-build.sh --vps --pod collaborator
-./3f-build.sh --vps --pod workspace
+# adicione SÓ os arquivos da sua mudança, por nome (NUNCA git add . / git add -A):
+git add caminho/do/seu/arquivo.ext
 
-# Multiplos pods
-./3f-build.sh --vps --pod "front account"
-
-# Pular rush build (quando só empacotamento/docker mudou)
-./3f-build.sh --vps --pod front --skip-rush
-
-# Forçar rebuild total (limpa cache do rush)
-./3f-build.sh --vps --clean --no-cache
+# confirme que NÃO entrou nada indevido:
+git status
 ```
 
-### O que cada flag faz
+**Nunca commite:**
+- `common/scripts/version.txt` — a menos que a mudança **exija** migration (seção 5). Um bump acidental transforma um deploy simples num upgrade de modelo da frota inteira.
+- `.claude/settings.local.json`, `dev/.env`, `dev/.env.secrets`, `deploy_key*` — config/segredos locais. **Nunca** use `git add .` ou `git add -A` (arrasta esses arquivos).
 
-| Flag | Efeito |
-|---|---|
-| `--vps` | Usa `dev/docker-compose.vps.yaml` em vez de `dev/docker-compose.yaml` |
-| `--pod <nome>` | Limita o build ao(s) pod(s) indicado(s). **Default (sem `--pod`):** `server front account collaborator workspace fulltext worker` — `fulltext` e `worker` embutem o model e entram no conjunto padrão (rebuild junto em version bump) |
-| `--skip-rush` | Pula `rush build` (só bundle + docker build + restart) |
-| `--skip-webpack` | Pula webpack (só necessário quando front mudou) |
-| `--clean` | Usa `rush rebuild` em vez de `rush build` incremental |
-| `--no-cache` | Passa `--no-cache` para `docker build` |
-
-### Passos executados
-
-1. `rush build` (ou `rush rebuild` com `--clean`) — compila TypeScript de todo o monorepo
-2. Webpack — bundle do frontend Svelte (só se `front` estiver nos pods)
-3. `rushx bundle` — empacota cada pod com esbuild
-4. `docker build` — cria imagem Docker do pod
-5. `docker-compose up -d` — reinicia o container
-
-### Permissão de execução
-
-No Linux/VPS, se der `Permission denied`:
 ```bash
-# Alternativa sem precisar de chmod:
-bash 3f-build.sh --vps --pod server
+git commit -m "fix(escopo): descrição curta do que foi corrigido"
+git push origin develop
 ```
 
----
+### 2.2 Deixe a esteira buildar a imagem
 
-## 4. Workspace Model Version (CockroachDB)
+O push dispara o workflow **3F Build (GHCR)** automaticamente.
 
-O número `MODEL_VERSION` também é armazenado **no banco de dados** (`workspace_status.version`).
+1. Vá em **GitHub → aba Actions → 3F Build (GHCR)** e acompanhe o run do seu commit.
+2. A esteira detecta quais pods a sua mudança afeta (pelo mapa arquivo→pod) e builda **só esses**. Aguarde ficar **verde**.
+3. Anote o **SHA do commit** (aparece no run). É o que você vai deployar.
+4. (Opcional) Confirme em **GitHub → org 3F-Tech → Packages** que a imagem `os-task/<pod>` ganhou a tag do seu commit.
 
-### Como funciona o upgrade
+> Se o build detectar **frota inteira (11 pods)** para uma mudança pequena, é um
+> sinal de alerta: provavelmente `common/scripts/version.txt` ou algo em
+> `common/` entrou no commit sem querer. Confira antes de deployar.
 
-Quando o `workspace_cockroach` inicia:
-1. Lê seu próprio `MODEL_VERSION` compilado (ex: `0.7.359`)
-2. Consulta o banco: qual é a versão atual do workspace?
-3. Se `db_version < compiled_version` → executa migrations (`tryMigrate`, `mode: 'upgrade'`)
-4. Ao terminar: registra `---UPGRADE-DONE---` no log
+### 2.3 Atualize o repositório da VPS
 
-### Quando o upgrade NÃO é disparado
-
-Se `version.txt` tem o mesmo valor que a versão já gravada no banco, nenhum upgrade roda.
-Para forçar um upgrade (ex: adicionar novas migrations):
-1. Incremente `version.txt` (ex: `"0.7.358"` → `"0.7.359"`)
-2. Rebuilde workspace: `./3f-build.sh --vps --pod workspace --skip-rush --skip-webpack`
-3. Reinicie o container e aguarde `---UPGRADE-DONE---` nos logs
-
-### Regra crítica: todos os serviços devem ter o mesmo MODEL_VERSION
-
-O transactor (servidor principal) recusa conexões se o `MODEL_VERSION` compilado nele for **menor** que a versão no banco. Resultado: tela "Preparing workspace for new version" travada.
-
-**Qualquer vez que `version.txt` for incrementado, todos os pods devem ser reconstruídos.**
-
----
-
-## 5. Problemas Frequentes e Soluções
-
-### 5.1 "Preparing workspace for new version" trava na tela
-
-**Sintoma:** Browser fica preso nessa mensagem. Hard refresh não resolve.
-
-**Causa mais provável:** O `MODEL_VERSION` compilado no transactor é **menor** que a versão gravada no banco da workspace.
-
-**Diagnóstico:**
-```bash
-# Na VPS — ver versão compilada no transactor
-docker-compose -f dev/docker-compose.vps.yaml exec transactor_cockroach \
-  node -e "const b = require('./bundle/bundle.js'); console.log('MODEL_VERSION baked')" 2>/dev/null || \
-  grep -o '"MODEL_VERSION":"[^"]*"' /proc/$(docker inspect transactor_cockroach --format '{{.State.Pid}}')/cmdline 2>/dev/null
-
-# Ver versão no banco
-docker-compose -f dev/docker-compose.vps.yaml exec cockroach \
-  ./cockroach sql --insecure -e \
-  "SELECT workspace, version FROM huly.workspace_status LIMIT 5;"
-
-# Ver config.json servido ao browser
-curl -s http://localhost:8087/config.json
-```
-
-**Solução:** Rebuildar o transactor com MODEL_VERSION correto:
-```bash
-./3f-build.sh --vps --pod server --skip-rush --skip-webpack
-```
-
----
-
-### 5.2 VERSION ou MODEL_VERSION = "0.6.0" no bundle
-
-**Sintoma:** `config.json` retorna `MODEL_VERSION: "0.6.0"` ou `VERSION: "0.6.0"`.
-
-**Causa:** `show_version.js` ou `show_tag.js` não encontrou `version.txt`/`tag.txt` e caiu no fallback `"0.6.0"`.
-
-**Verificação:**
-```bash
-# Os arquivos existem?
-ls common/scripts/version.txt
-ls common/scripts/tag.txt
-
-# O que contém?
-cat common/scripts/version.txt   # deve ser "0.7.359" (com aspas)
-cat common/scripts/tag.txt       # deve ser "0.7.413" (com aspas)
-```
-
-**Solução:** Criar/corrigir os arquivos (com aspas como parte do conteúdo):
-```bash
-echo '"0.7.359"' > common/scripts/version.txt
-echo '"0.7.413"' > common/scripts/tag.txt
-```
-Depois rebuildar os pods afetados.
-
----
-
-### 5.3 "version X is not in sync with server version Y"
-
-**Sintoma:** Mensagem de erro no browser comparando versões do cliente e do servidor.
-
-**Causa:** `VERSION` (software version) compilada no `front/bundle.js` não bate com a do `transactor/bundle.js`.
-
-**Solução:** Garantir que `tag.txt` tem o mesmo valor em ambos os builds e rebuildar `front` e `server`:
-```bash
-./3f-build.sh --vps --pod "front server"
-```
-
----
-
-### 5.4 `ancestors not found: contact:class:WorkspaceMemberStatus`
-
-**Sintoma:** Erro no console do browser ao editar issues. Campos `clientName`/`clientStage` ausentes.
-
-**Causa:** O fork adicionou `WorkspaceMemberStatus` e campos customizados ao modelo. Se o `workspace_cockroach` for a imagem oficial (não a `:3f-local`), as migrations do fork nunca rodaram.
-
-**Solução:**
-1. Verificar que `dev/docker-compose.vps.yaml` usa `hardcoreeng/workspace:3f-local`
-2. Rebuildar workspace com MODEL_VERSION **maior** que a versão atual do banco para forçar o upgrade:
-   ```bash
-   ./3f-build.sh --vps --pod workspace --skip-rush --skip-webpack
-   ```
-3. Aguardar nos logs: `---UPGRADE-DONE--- oldVersion=... requestedVersion=...`
-
----
-
-### 5.5 `rush build` falha com "Build cache only supported in Git repository"
-
-**Sintoma:** Erro durante `rush build` na VPS.
-
-**Causa:** Arquivos de dados (Elasticsearch, etc.) foram rastreados pelo git, corrompendo o repositório.
-
-**Diagnóstico:**
-```bash
-git status  # procurar arquivos em data/elastic/ ou data/cockroach/
-```
-
-**Solução:**
-```bash
-# Adicionar data/ ao .gitignore (já feito)
-echo "data/" >> .gitignore
-
-# Remover do tracking sem deletar os arquivos
-git rm -r --cached data/ 2>/dev/null || true
-git commit -m "chore: remove data/ from git tracking"
-```
-
----
-
-### 5.6 `docker-compose up` falha com `KeyError: 'ContainerConfig'`
-
-**Sintoma:** Erro ao recriar containers na VPS com docker-compose v1.
-
-**Causa:** docker-compose v1 (1.29.2) tem um bug ao recriar containers builados com Docker 24+.
-
-**Solução:** Remover os containers antes de subir:
-```bash
-docker-compose -f dev/docker-compose.vps.yaml rm -f transactor_cockroach
-docker-compose -f dev/docker-compose.vps.yaml up -d transactor_cockroach
-```
-O `3f-build.sh` já faz isso automaticamente quando detecta docker-compose v1.
-
----
-
-### 5.7 Campos/seções customizadas não aparecem (PDCA, clientName, etc.)
-
-**Sintoma:** Campos do fork ausentes na UI após deploy.
-
-**Causa provável:** migrations do workspace não rodaram (ver 5.4), ou o `front` ainda está servindo um bundle antigo.
-
-**Diagnóstico:**
-```bash
-# Ver qual imagem o front está usando
-docker inspect front --format '{{.Config.Image}}'
-# Deve ser hardcoreeng/front:3f-local
-
-# Ver MODEL_VERSION do config.json
-curl -s https://3ftasks.3fventure.tech/config.json | python3 -m json.tool
-```
-
-**Solução:** Rebuildar front e workspace:
-```bash
-./3f-build.sh --vps --pod "front workspace"
-```
-
----
-
-### 5.8 Workspace travado em `pending-creation` (nunca cria)
-
-**Sintoma:** Usuário clica "Criar workspace", fica em 0% indefinidamente. Sem erros no console.
-
-**Causa provável:** Incompatibilidade de versão entre `workspace_cockroach` e `account`. O serviço workspace sonda o account via HTTP (`POST account:3000/` com `getPendingWorkspace`) a cada 5s. Se as versões não batem, o account retorna `null` silenciosamente.
-
-**Diagnóstico:**
-```bash
-# Ver logs do workspace_cockroach
-docker-compose -f dev/docker-compose.vps.yaml logs -f workspace_cockroach 2>&1 | tail -30
-
-# Versão reportada deve ser >= 0.7.413
-# Se mostrar "0.6.x" → imagem errada (oficial em vez de :3f-local)
-```
-
-**Solução:** Garantir que workspace usa imagem `:3f-local` e rebuildar.
-
----
-
-### 5.9 URL interna retornando HTML em vez de JSON (`Unexpected token '<'`)
-
-**Sintoma:** Serviços retornam HTML (página de erro do Nginx) em vez de JSON.
-
-**Causa:** Serviço tentando conectar em `huly.local:3000` que resolve para o app nativo da VPS na porta 3000, não para o container.
-
-**Solução:** Substituir referências `huly.local:<porta>` pelos nomes internos do Docker Compose:
-- `huly.local:3000` → `account:3000`
-- `huly.local:4030` → `datalake:4030`
-
-Verificar todas as entradas `environment:` no `docker-compose.vps.yaml`.
-
----
-
-## 6. Checklist de Deploy Completo (VPS)
-
-Usar quando a VPS estiver desatualizada ou apresentar erros persistentes:
+O deploy usa os arquivos de compose que estão na VPS, então ela precisa estar com
+o commit atual:
 
 ```bash
-# 1. Atualizar código
+ssh <você>@<vps>
+cd /opt/apps/os-tasks
 git pull
-
-# 2. Verificar arquivos de versão
-cat common/scripts/version.txt  # "0.7.359"
-cat common/scripts/tag.txt      # "0.7.413"
-
-# 3. Build completo de todos os pods customizados
-./3f-build.sh --vps
-
-# 4. Aguardar upgrade do workspace nos logs
-docker-compose -f dev/docker-compose.vps.yaml logs -f workspace_cockroach 2>&1 | grep -E "UPGRADE|version"
-# Esperado: ---UPGRADE-DONE---
-
-# 5. Verificar config.json
-curl -s https://3ftasks.3fventure.tech/config.json | python3 -m json.tool
-# MODEL_VERSION deve bater com version.txt
-# VERSION deve bater com tag.txt
-
-# 6. Verificar todos os containers rodando
-docker-compose -f dev/docker-compose.vps.yaml ps
 ```
+
+> Se o `git pull` reclamar de *"local changes would be overwritten"* em
+> `common/config/rush/pnpm-lock.yaml`, descarte a versão local (a correta vem do
+> commit): `git checkout -- common/config/rush/pnpm-lock.yaml` e repita o
+> `git pull`. O `dev/.env` aparece como *untracked* — isso é esperado, **não
+> mexa nele** (contém o `SERVER_SECRET`).
+
+### 2.4 Aperte o botão
+
+1. **GitHub → aba Actions → 3F Deploy (GHCR → VPS) → Run workflow.**
+2. Preencha:
+   - **Branch:** `develop`
+   - **sha:** o SHA do commit (passo 2.2) — 7 ou 12 caracteres, a esteira expande.
+   - **pods:** o(s) pod(s) afetado(s), separados por espaço (ex.: `front`), ou `all`.
+3. **Run workflow.**
+
+O workflow valida os nomes (recusa qualquer serviço fora dos 11 permitidos),
+confirma que a imagem existe no GHCR, conecta na VPS, puxa a imagem, troca o pod
+(`up -d --no-deps`), verifica e registra no `CHANGELOG.md`. **Não há rollback
+automático** — se a verificação falhar, o job fica **vermelho** e imprime o
+comando de rollback no log.
 
 ---
 
-## 7. Estrutura de Arquivos Críticos para Build
+## 3. Confirmar que o deploy deu certo
 
-```
-huly-3f/
-├── common/scripts/
-│   ├── esbuild.js          ← orchestrador do bundle (lê show_version.js e show_tag.js)
-│   ├── show_version.js     ← retorna MODEL_VERSION (lê version.txt primeiro)
-│   ├── show_tag.js         ← retorna VERSION (lê tag.txt primeiro)
-│   ├── version.txt         ← "0.7.359" — versão do modelo de dados (com aspas)
-│   └── tag.txt             ← "0.7.413" — versão do release (com aspas)
-├── dev/
-│   ├── docker-compose.vps.yaml   ← compose da VPS (imagens :3f-local)
-│   └── docker-compose.yaml       ← compose local
-├── pods/
-│   ├── front/              ← frontend server (serve /config.json)
-│   ├── server/             ← transactor (servidor principal de dados)
-│   ├── account/            ← autenticação e workspaces
-│   ├── collaborator/       ← edição colaborativa (Yjs)
-│   └── workspace/          ← migrations e upgrade do workspace
-├── models/
-│   └── tracker/src/migration.ts  ← migrations do fork (clientName, clientStage, etc.)
-└── 3f-build.sh             ← script de build e deploy
-```
+1. **No run do GitHub:** o job termina **verde**, e o step *Deploy to VPS* mostra
+   `✅ <pod> OK` com `IMG=ghcr.io/3f-tech/os-task/<pod>:<sha>` e `STATUS=running`.
+2. **No CHANGELOG:** o deploy se registra sozinho. Confira:
+   ```bash
+   cd /opt/apps/os-tasks && git pull && tail -3 CHANGELOG.md
+   ```
+   Deve ter uma linha como `deploy <sha> → [<pods>] — ✅ sucesso`.
+3. **Na VPS**, confirme que o container roda a imagem do GHCR:
+   ```bash
+   cd /opt/apps/os-tasks
+   SVC=front   # nome do SERVIÇO (ver tabela na Referência); ex.: front, transactor_cockroach...
+   docker inspect $(docker compose -f dev/docker-compose.vps.yaml -f dev/docker-compose.registry.yaml ps -q $SVC) \
+     --format 'IMG={{.Config.Image}}  STATUS={{.State.Status}}  RESTARTS={{.RestartCount}}'
+   ```
+4. **No navegador:** abra `https://3ftasks.3fventure.tech`, dê um refresh forte
+   (Ctrl+Shift+R, para não pegar bundle em cache) e **confirme a mudança de fato**
+   — a verificação automática só prova que o pod subiu, não que o comportamento
+   esperado está lá. Isso só uma pessoa confirma.
 
 ---
 
-## 8. Referências de Logs
+## 4. Rollback (se algo der errado)
 
-### Upgrade de workspace bem-sucedido
-```
-workspace_cockroach | Starting workspace service ... for version: 0.7.359
-workspace_cockroach | upgrading job='xxxx' force=false currentVersion='0.7.358' toVersion='0.7.359'
-workspace_cockroach | ---UPGRADE-DONE--- job='xxxx' oldWorkspaceVersion={...358} requestedVersion={...359} time=619
+A imagem `:3f-local` anterior **permanece na VPS**, então voltar é imediato. O
+truque: rodar **sem** o override de registry — o compose base resolve a imagem
+`:3f-local`.
+
+```bash
+cd /opt/apps/os-tasks
+SVC=front   # o serviço que você quer reverter
+docker compose -f dev/docker-compose.vps.yaml rm -sf "$SVC"
+docker compose -f dev/docker-compose.vps.yaml up -d --no-deps "$SVC"
+
+# confirmar que voltou:
+docker inspect $(docker compose -f dev/docker-compose.vps.yaml ps -q "$SVC") \
+  --format 'IMG={{.Config.Image}}  STATUS={{.State.Status}}'
+# esperado: IMG=hardcoreeng/<pod>:3f-local  STATUS=running
 ```
 
-### Transactor pronto para conexões
-```
-transactor_cockroach | started transactor on port 3332
-```
+> ⚠️ **Rollback do grupo do model é diferente.** Reverter `server`, `workspace`,
+> `fulltext` ou `worker` para uma versão de modelo **anterior** depois que uma
+> migration já rodou **quebra o sistema** (o código antigo não conversa com o
+> banco já migrado). Para esses pods, rollback não é "voltar a imagem" — é o
+> procedimento coordenado da [seção 5](#5-caso-especial-migration--bump-de-model_version).
 
-### Erro de versão (transactor rejeita workspace)
-```
-transactor_cockroach | workspace version X.Y.Z is incompatible with server version A.B.C
-```
-Solução: rebuildar transactor com MODEL_VERSION = versão do banco.
+---
 
-### Migrations do fork (workspace)
-```
-workspace_cockroach | Running migration: clientFields
-workspace_cockroach | clientFields migration complete
-```
-Se não aparecer após upgrade, verificar `models/tracker/src/migration.ts`.
+## 5. Caso especial: migration / bump de MODEL_VERSION
+
+> 🚧 **Procedimento planejado, ainda NÃO exercitado em produção.** Leia inteiro e,
+> na primeira vez, faça em janela de baixo uso e com backup. O `deploy.yml`
+> **bloqueia** deploy pelo botão quando detecta bump de modelo — isso é
+> proposital, para forçar este fluxo coordenado.
+
+### Quando isto se aplica
+
+Quando a sua mudança **altera o modelo de dados** (schema) e por isso o
+`common/scripts/version.txt` (o `MODEL_VERSION`) precisa subir. Nesse caso o
+`version.txt` **deve** ir no commit, junto com a mudança de schema — aqui ele é
+intencional, não resíduo.
+
+### Por que é diferente
+
+- O `MODEL_VERSION` fica **embutido no bundle** de cada pod que carrega o modelo,
+  então mudá-lo exige **rebuildar** as imagens (não basta env).
+- Quatro pods embutem o modelo e **precisam ir juntos, na mesma versão**:
+  **`server`, `workspace`, `fulltext`, `worker`** (o "grupo do modelo").
+- O `workspace` roda as **migrations** no boot quando o `MODEL_VERSION` do código
+  é maior que o do banco, e sinaliza `---UPGRADE-DONE---` no log ao terminar.
+- O **transactor recusa conexões** enquanto o modelo dele for menor que o do banco
+  (tela "Preparing workspace for new version"). Por isso **deploy parcial trava o
+  sistema** — o grupo tem que subir coordenado.
+
+### Passo a passo
+
+1. **Commit:** inclua a mudança de schema **e** o `common/scripts/version.txt`
+   bumpado no mesmo commit. Push na `develop`.
+2. **Build:** o `build.yml` detecta o bump e builda a **frota inteira** (11 pods)
+   no GHCR. Aguarde verde e anote o SHA.
+3. **Backup antes de tocar na VPS:** snapshot da VPS (painel Hostinger) **e**
+   backup do CockroachDB. Migration mexe em dados — não pule.
+4. **Atualize a VPS:** `cd /opt/apps/os-tasks && git pull`.
+5. **Suba o `workspace` PRIMEIRO** e espere a migration terminar:
+   ```bash
+   cd /opt/apps/os-tasks
+   export IMAGE_TAG="<sha-de-12-chars>"
+   DC="docker compose -f dev/docker-compose.vps.yaml -f dev/docker-compose.registry.yaml"
+   $DC pull workspace_cockroach
+   $DC rm -sf workspace_cockroach && $DC up -d --no-deps workspace_cockroach
+   # acompanhe até aparecer ---UPGRADE-DONE--- :
+   $DC logs -f workspace_cockroach
+   ```
+6. **Só depois** do `---UPGRADE-DONE---`, suba os outros três do grupo (e os
+   demais pods afetados), **todos na mesma tag**:
+   ```bash
+   for svc in transactor_cockroach fulltext_cockroach time-machine; do
+     $DC pull "$svc"; $DC rm -sf "$svc"; $DC up -d --no-deps "$svc"
+   done
+   # depois os demais pods (front, account, etc.) normalmente
+   ```
+7. **Verifique** o transactor de pé (`curl -s localhost:13332/api/v1/health` → 200)
+   e o site funcionando.
+
+> Quando o cutover do grupo do modelo passar a rodar imagens do GHCR (em vez de
+> `:3f-local`), o `migration guard` do `deploy.yml` conseguirá comparar as versões
+> automaticamente e este procedimento poderá ser incorporado ao botão. Até lá, é
+> manual.
+
+---
+
+## Referência rápida
+
+### Os 11 pods que a esteira builda e deploya
+
+`server` · `front` · `account` · `workspace` · `collaborator` · `fulltext` ·
+`worker` · `preview` · `github` · `mail` · `calendar`
+
+### Nome do POD (GHCR) × nome do SERVIÇO (compose)
+
+A maioria é igual; **quatro divergem**:
+
+| Pod (no botão / GHCR) | Serviço (no docker compose) |
+|---|---|
+| `server` | `transactor_cockroach` |
+| `workspace` | `workspace_cockroach` |
+| `fulltext` | `fulltext_cockroach` |
+| `worker` | `time-machine` |
+| (os outros 7) | mesmo nome |
+
+### Grupo do modelo (vão SEMPRE juntos em bump de versão)
+
+`server` · `workspace` · `fulltext` · `worker`
+
+### O que a esteira NUNCA toca (serviços de dado e infraestrutura)
+
+`cockroach` · `minio` · `redpanda` · `elastic` · `redis` · `hulykvs` ·
+`livekit` · `livekit-egress` · e os upstream pinados (`datalake`, `stats`,
+`rekoni`, `print`, `sign`, `analytics`, `export`, `love`, `hulypulse`,
+`backup-cockroach`). O `deploy.yml` recusa qualquer um destes.
+
+### Comandos-chave (na VPS, a partir de `/opt/apps/os-tasks`)
+
+| Ação | Comando |
+|---|---|
+| Base + override (deploy/verify) | `docker compose -f dev/docker-compose.vps.yaml -f dev/docker-compose.registry.yaml …` |
+| Só base (rollback p/ `:3f-local`) | `docker compose -f dev/docker-compose.vps.yaml …` |
+| Ver imagem que um serviço roda | `docker inspect $(… ps -q <serviço>) --format '{{.Config.Image}} {{.State.Status}}'` |
+| Histórico de deploys | `tail CHANGELOG.md` |
+
+### Workflows (GitHub → aba Actions)
+
+- **3F Build (GHCR)** — automático no push da `develop`; builda e publica no GHCR.
+- **3F Deploy (GHCR → VPS)** — manual (*Run workflow*); deploya na VPS por SHA + pods.

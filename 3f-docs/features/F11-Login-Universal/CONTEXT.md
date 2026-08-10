@@ -15,6 +15,21 @@ vários sistemas da empresa.
 Os outros sistemas da 3F **não guardam usuários/senhas próprios**: eles **se conectam a esta API**
 para autenticar pessoas e/ou para administrar o cadastro central de identidade.
 
+### Além de pessoas: entidades compartilhadas
+
+A Core também abriga cadastros que **vários sistemas** precisam consumir, para não existirem em
+cópias divergentes. Desde 2026-07 isso inclui **clientes** (`/clients`), migrados da plataforma de
+contratos. O padrão é sempre o mesmo:
+
+> **A identidade fica na Core; o que é específico de um sistema fica no banco daquele sistema**, numa
+> tabela de *overlay* que referencia o id da Core (ex.: `sellers` para usuário, `bu_settings` para BU,
+> `client_settings` para cliente).
+
+Na prática, se o seu sistema guarda hoje uma tabela própria de clientes, o caminho é: ler a
+identidade da Core via HTTP e manter localmente **só** os campos que só você usa. Ao escrever, **grave
+primeiro na Core** e só depois faça o upsert local com o id retornado — as duas operações não são
+atômicas (bancos diferentes), e a ordem inversa criaria overlay órfão apontando para id inexistente.
+
 ### Modelo de integração: backend-to-backend
 
 - A comunicação é **servidor ↔ servidor**. **Nunca** chame esta API direto do navegador/app do
@@ -62,13 +77,18 @@ Para ferramentas internas de **administração** da identidade (painel de RH, ba
 
 O que essa key libera: **acesso total** à API — CRUD completo de usuários, BUs, squads,
 departamentos, cargos, bands, sistemas, vínculos (systems-users / systems-bus), API Keys e leitura
-de logs de acesso.
+de logs de acesso.  
 
 Scope embutido: `admin:*` (cobre todos os scopes).
 
 > **Resumo prático:** se a sua key é `login`, seu sistema **faz login e lê perfil**. Se a sua key é
 > `adm`, seu sistema **administra tudo**. O servidor recusa (com `403 INSUFFICIENT_SCOPE`) qualquer
 > ação fora do que o tipo da key permite — então o seu código deve assumir só o que o seu modo cobre.
+
+> **Clientes (`/clients`) exigem key `adm`.** Os scopes `clients:read`/`clients:write` **não** estão no
+> tipo `login`, e **não existirá** um tipo intermediário para "só ler clientes" — decisão tomada em
+> 2026-07-30. Se o seu sistema precisa consumir dados de cliente, ele recebe uma key `adm`; peça a um
+> administrador da Core.
 
 ---
 
@@ -112,6 +132,8 @@ Seu sistema administra o cadastro central. Padrões:
   `/positions`, `/bands`, `/systems` (ver contratos no `API.md`).
 - **Liberar um usuário a acessar um sistema** (o que destrava o login dele lá): vincule via
   `POST /systems/:systemId/users` ou `PUT /users/:userId/systems`.
+- **Resetar a senha de um usuário** para a senha padrão da 3F: `POST /users/:id/reset-password`
+  (exige key `adm` / `admin:*`).
 - **Gerenciar API Keys** de outros sistemas: `POST /api-keys` (escolhendo `type: "adm" | "login"`).
   A key crua só aparece **uma vez** na criação — capture e entregue com segurança.
 - **Auditar acessos**: `GET /systems/:systemId/access-logs` e `GET /users/:userId/access-logs`.
@@ -127,6 +149,13 @@ Seu sistema administra o cadastro central. Padrões:
 - **Envelopes padrão:** sucesso vem em `{ "data": ... }` (listas têm `{ "data": [...], "meta": {...} }`);
   erro vem em `{ "error": { "code", "message", "details?" } }`. Programe contra o **`code`**, não
   contra a mensagem.
+- **Hidrate em lote, nunca item por item.** Para resolver muitos ids de uma vez existem rotas de
+  batch: `POST /clients/batch` (`{ ids: [...] }`, máx. 200) e `GET /users/photos?ids=...` (máx. 50).
+  Numa listagem, colete os ids distintos da página, faça **uma** chamada e monte um `Map` em memória.
+  Chamada dentro de loop estoura o rate limit e é sempre um bug.
+- **Campos grandes não vêm em listagem.** `user.profile_picture`, `user.contract_base64` e
+  `client.logo_picture` só aparecem no detalhe (`GET /<recurso>/:id`) ou na rota de fotos em lote —
+  são campos grandes (base64 inline) e ficariam proibitivos em respostas de múltiplos registros.
 - **Rate limit por key:** ~100 req/min por padrão. Ao estourar: `429 RATE_LIMITED`. Implemente
   retry com backoff.
 - **Datas em UTC / ISO 8601.**
