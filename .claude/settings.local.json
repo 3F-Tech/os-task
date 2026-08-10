@@ -75,7 +75,10 @@
       "Bash(bash ./3f-build.sh --skip-webpack --pod worker)",
       "Bash(rtk docker *)",
       "Bash(rtk find *)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\models\\\\model-tag-sharing\" -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\('C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\', ''\\) } | Sort-Object | Where-Object { $_ -notmatch 'node_modules|lib|types|\\\\.rush|\\\\.validate' })"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\models\\\\model-tag-sharing\" -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\('C:\\\\Users\\\\Pedro - 3FVenture\\\\Desktop\\\\huly-3f\\\\', ''\\) } | Sort-Object | Where-Object { $_ -notmatch 'node_modules|lib|types|\\\\.rush|\\\\.validate' })",
+      "Bash(git rm *)",
+      "PowerShell(node common/scripts/install-run-rush.js validate --to @hcengineering/operational-dashboard-resources)",
+      "WebFetch(domain:developers.google.com)"
     ]
   }
 }

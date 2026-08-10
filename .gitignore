@@ -124,3 +124,5 @@ ws-tests/docker-compose.override.yml
 
 # VPS data directories (Docker bind mounts — never commit runtime data)
 data/
+deploy_key
+deploy_key.pub
