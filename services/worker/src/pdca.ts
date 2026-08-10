@@ -48,6 +48,26 @@ interface TimeMachineMessage {
 const MAX_RETRIES = 3
 const RETRY_BACKOFF_MS = [5 * 60 * 1000, 30 * 60 * 1000, 2 * 60 * 60 * 1000] // 5min, 30min, 2h
 
+// Jitter determinístico para quebrar a rajada. calculateNextCycleDate joga todo
+// ciclo semanal na segunda 00:00 e todo mensal no dia 1 00:00 — então centenas
+// disparam no MESMO instante e saturam o transactor (foi o que expôs o crash
+// intermitente do api-client). Espalhamos o PRÓXIMO disparo em até
+// SCHEDULE_JITTER_MS, com offset ESTÁVEL por issue (mesma issue → mesmo offset),
+// para o watermark de dedup continuar batendo em reentregas do Kafka.
+// Obs.: só afeta agendamentos calculados AQUI no worker (próximos ciclos). Os
+// disparos já agendados (ex.: a rajada de 01/09 marcada pelo backfill) continuam
+// em 00:00 — para aqueles a rede de segurança é o retry (isTransientError acima).
+const SCHEDULE_JITTER_MS = 4 * 60 * 60 * 1000 // 4h → 00:00–04:00 (ainda de madrugada)
+function scheduleJitter (issueId: string): number {
+  let h = 0
+  for (let i = 0; i < issueId.length; i++) h = (h * 31 + issueId.charCodeAt(i)) | 0
+  return Math.abs(h) % SCHEDULE_JITTER_MS
+}
+
+// No boot, um instante de disparo com >= este nº de issues é tratado como "rajada"
+// e espalhado (des-herd retroativo dos agendamentos JÁ existentes, ex.: 01/09).
+const BOOTSTRAP_DEHERD_THRESHOLD = 20
+
 function isTransientError (err: any): boolean {
   const msg = String(err?.message ?? err ?? '').toLowerCase()
   return (
@@ -56,7 +76,13 @@ function isTransientError (err: any): boolean {
     msg.includes('econnreset') ||
     msg.includes('etimedout') ||
     msg.includes('socket hang up') ||
-    msg.includes('network')
+    msg.includes('network') ||
+    // Sob rajada (todos os semanais caem seg. 00:00 e os mensais no dia 1), o
+    // api-client do worker às vezes recebe uma resposta degradada do transactor e
+    // estoura "Cannot read properties of null (reading '#<Object>')". É intermitente
+    // (a MESMA issue ora falha ora passa) → tratar como transitório: o retry com
+    // backoff (5min/30min/2h) cai depois do pico, quando o transactor já vazou a fila.
+    msg.includes('cannot read properties of null')
   )
 }
 
@@ -318,7 +344,7 @@ export async function processPdcaCycleEvent (
     }
 
     const dueDate = calculateDueDate(frequency, dueDays, customWeekdays)
-    const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays)
+    const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays) + scheduleJitter(String(issueId))
     ctx.info('PDCA cycle: calculated dates', { issueId, frequency, dueDays, customWeekdays, dueDate, nextDate })
 
     // Advance the watermark FIRST. Any concurrent re-delivery of this same
@@ -581,6 +607,16 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
       client = await createWorkspaceClient(workspaceId)
       const issues = await client.findAll(tracker.class.Issue, { pdcaCycleActive: true } as any)
 
+      // De-herd retroativo: conta quantas issues já estão agendadas para o MESMO
+      // instante. Clusters grandes (ex.: 1201 mensais em 01/09 00:00, semanais na
+      // segunda) saturam o transactor no disparo → espalhamos dentro da janela.
+      const clusterCount = new Map<number, number>()
+      for (const issue of issues) {
+        const d = (issue as any).pdcaNextCycleDate as number | undefined
+        if (d != null) clusterCount.set(d, (clusterCount.get(d) ?? 0) + 1)
+      }
+      let deHerded = 0
+
       for (const issue of issues) {
         const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
         const resetStatus = (issue as any).pdcaCycleResetStatus
@@ -589,9 +625,21 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
         if (frequency === 'custom' && (customWeekdays == null || customWeekdays.length === 0)) continue
 
         const existingDate = (issue as any).pdcaNextCycleDate as number | undefined
-        const targetDate = existingDate ?? calculateNextCycleDate(frequency, Date.now(), customWeekdays)
+        let targetDate = existingDate ?? (calculateNextCycleDate(frequency, Date.now(), customWeekdays) + scheduleJitter(String(issue._id)))
+        let rewrite = existingDate == null
 
-        if (existingDate == null) {
+        // Instante lotado → espalha por offset estável da issue. Idempotente: depois
+        // de espalhar, cada instante fica com 1 issue, então num próximo boot não re-mexe.
+        if (existingDate != null && (clusterCount.get(existingDate) ?? 0) >= BOOTSTRAP_DEHERD_THRESHOLD) {
+          const spread = existingDate + scheduleJitter(String(issue._id))
+          if (spread !== existingDate) {
+            targetDate = spread
+            rewrite = true
+            deHerded++
+          }
+        }
+
+        if (rewrite) {
           await client.update(issue, { pdcaNextCycleDate: targetDate } as any)
         }
 
@@ -602,9 +650,11 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
           topic: QueueTopic.PdcaCycle,
           data: { issueId: issue._id, workspaceId, expectedNextCycleDate: targetDate }
         })
-
-        ctx.info('PDCA bootstrap: scheduled', { issueId: issue._id, targetDate: new Date(targetDate).toISOString(), workspace: workspaceId })
       }
+      if (deHerded > 0) {
+        ctx.info('PDCA bootstrap: de-herded clustered schedules', { workspace: workspaceId, deHerded })
+      }
+      ctx.info('PDCA bootstrap: scheduled', { workspace: workspaceId, count: issues.length })
     } catch (err: any) {
       ctx.warn('PDCA bootstrap: error for workspace', {
         workspace: workspaceId,
