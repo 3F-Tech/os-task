@@ -122,18 +122,49 @@
 
   async function toggleActive (val: boolean): Promise<void> {
     const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
-    if (issue._id && issue._class) {
-      if (val && canActivate(issue.pdcaCycleFrequency, customWeekdays) && issue.pdcaCycleResetStatus != null) {
-        const nextDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency as PdcaFrequency, Date.now(), customWeekdays)
-        await client.update(issue, { pdcaCycleActive: true, pdcaNextCycleDate: nextDate } as any)
+
+    if (!val) {
+      // Desativar: só baixa a flag.
+      if (issue._id && issue._class) {
+        await client.update(issue, { pdcaCycleActive: false })
       } else {
-        await client.update(issue, { pdcaCycleActive: val })
+        issue.pdcaCycleActive = false
       }
+      return
+    }
+
+    // Ativar: PERSISTE os defaults que a UI antes só EXIBIA. O dropdown mostrava
+    // "Semanal" (selectedFrequency = pdcaCycleFrequency ?? Weekly) e o vencimento
+    // "sexta", mas esses valores nunca eram gravados se o usuário não mexesse nos
+    // controles — então o doc ficava pdcaCycleActive=true com frequency/resetStatus
+    // ausentes e NUNCA ciclava (trigger/bootstrap/worker exigem frequency+resetStatus).
+    // Isso afetava principalmente templates: toda tarefa gerada nascia sem PDCA efetivo.
+    const freq = (issue.pdcaCycleFrequency ?? PdcaFrequency.Weekly) as PdcaFrequency
+    const resetStatus = issue.pdcaCycleResetStatus ?? (statuses.length > 0 ? statuses[0]._id : undefined)
+    const dueDays =
+      ((issue as any).pdcaCycleDueDays as number[] | undefined) ??
+      (freq === PdcaFrequency.Weekly ? [5] : undefined) // 5 = sexta (default exibido)
+
+    const update: Record<string, any> = {
+      pdcaCycleActive: true,
+      pdcaCycleFrequency: freq
+    }
+    if (resetStatus != null) update.pdcaCycleResetStatus = resetStatus
+    if (dueDays != null) update.pdcaCycleDueDays = dueDays
+    if (canActivate(freq, customWeekdays) && resetStatus != null) {
+      update.pdcaNextCycleDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(freq, Date.now(), customWeekdays)
+    }
+
+    if (issue._id && issue._class) {
+      await client.update(issue, update as any)
     } else {
-      issue.pdcaCycleActive = val
-      if (val && canActivate(issue.pdcaCycleFrequency, customWeekdays) && issue.pdcaCycleResetStatus != null) {
-        ;(issue as any).pdcaNextCycleDate = (issue as any).pdcaNextCycleDate ?? calcNextCycleDate(issue.pdcaCycleFrequency as PdcaFrequency, Date.now(), customWeekdays)
-      }
+      // Draft (sem _id): mutação direta campo a campo para o Svelte reagir
+      // (Object.assign não dispara reatividade nas $: deste componente).
+      issue.pdcaCycleActive = true
+      issue.pdcaCycleFrequency = freq
+      if (resetStatus != null) issue.pdcaCycleResetStatus = resetStatus
+      if (dueDays != null) (issue as any).pdcaCycleDueDays = dueDays
+      if (update.pdcaNextCycleDate != null) (issue as any).pdcaNextCycleDate = update.pdcaNextCycleDate
     }
   }
 
