@@ -43,6 +43,10 @@
 
   let popupElement: HTMLDivElement | undefined = undefined
   export let search: string = ''
+  // Normalizador opcional aplicado aos DOIS lados da busca (item e termo digitado).
+  // Default = só lowercase (comportamento histórico). O seletor de clientes 3F
+  // passa um normalizador sem-acento para a busca ignorar diacríticos.
+  export let searchNormalize: ((s: string) => string) | undefined = undefined
 
   const dispatch = createEventDispatcher()
 
@@ -108,8 +112,10 @@
 
   $: void translateLabels(value)
 
+  $: normalizeSearch = searchNormalize ?? ((s: string) => s.toLowerCase())
+  $: normalizedQuery = normalizeSearch(search)
   $: filteredObjects = value.filter((el) =>
-    (itemLabelsTranslation.get(el.label ?? '') ?? el.text ?? '').toLowerCase().includes(search.toLowerCase())
+    normalizeSearch(itemLabelsTranslation.get(el.label ?? '') ?? el.text ?? '').includes(normalizedQuery)
   )
 
   $: huge = size === 'medium' || size === 'large'

@@ -167,7 +167,7 @@ export function openClientPopup (
     void ensureClients()
   }
   const items = clientPopupItems(state.clients, currentId)
-  showPopup(SelectPopup, { value: items, searchable: true, width: 'large' }, eventToHTMLElement(event), (selectedId: string | null) => {
+  showPopup(SelectPopup, { value: items, searchable: true, width: 'large', searchNormalize: normalizeClient }, eventToHTMLElement(event), (selectedId: string | null) => {
     if (selectedId == null) return
     const c = state.byId.get(Number(selectedId))
     if (c === undefined) return
