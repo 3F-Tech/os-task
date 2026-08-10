@@ -280,16 +280,24 @@ jobs:
           cat > /tmp/deploy_remote.sh <<'REMOTE'
           set -euo pipefail
 
-          PROJECT_DIR="$1"
-          REGISTRY="$2"
-          SHA12="$3"
-          PODS_STR="$4"
-          SERVICES_STR="$5"
-          NEED_SERVER="$6"
-          NEED_FRONT="$7"
+          # Recebidos como variáveis de ambiente no comando remoto. Não use
+          # argumentos posicionais aqui: o SSH remonta/reinterpreta a command
+          # line e listas com espaços deslocariam os parâmetros seguintes.
+          : "${PROJECT_DIR:?PROJECT_DIR não informado}"
+          : "${REGISTRY:?REGISTRY não informado}"
+          : "${SHA12:?SHA12 não informado}"
+          : "${PODS_STR:?PODS_STR não informado}"
+          : "${SERVICES_STR:?SERVICES_STR não informado}"
+          : "${NEED_SERVER:?NEED_SERVER não informado}"
+          : "${NEED_FRONT:?NEED_FRONT não informado}"
 
           read -ra PODS <<< "$PODS_STR"
           read -ra SVCS <<< "$SERVICES_STR"
+
+          if [ "${#PODS[@]}" -ne "${#SVCS[@]}" ]; then
+            echo "ERRO: listas desalinhadas: ${#PODS[@]} pod(s), ${#SVCS[@]} serviço(s). Abortando antes do deploy."
+            exit 1
+          fi
 
           cd "$PROJECT_DIR"
           # project dir = dev/ (1º -f) → carrega dev/.env (SERVER_SECRET etc.).
@@ -321,20 +329,47 @@ jobs:
           fi
           echo "✓ dev/.env com SERVER_SECRET presente."
 
-          # ---- PRÉ-CHECK 3: rede de rollback (imagem base local existe) -----
-          # Deriva a imagem do compose BASE (sem override) — cobre transactor
-          # (:3f-local) e worker (:latest, sem :3f-local) sem hardcode.
+          # ---- PRÉ-CHECK 3: rede de rollback + imagem rodando agora --------
+          # Rollback HOJE = re-rodar este workflow com um SHA anterior (a
+          # imagem está no GHCR). A imagem base :3f-local só é rede de segurança
+          # no PRIMEIRO cutover de cada pod (enquanto o serviço ainda roda
+          # :3f-local): depois da migração ela some em limpezas do Docker e NÃO
+          # deve mais bloquear o deploy. Em todos os casos imprime a imagem
+          # rodando AGORA (alvo de rollback) e o comando correto para reverter.
           for svc in "${SVCS[@]}"; do
-            base_img="$($DC_BASE config --images "$svc" 2>/dev/null | head -1 || true)"
-            if [ -z "$base_img" ]; then
-              echo "ERRO: não consegui resolver a imagem base do serviço '$svc' no compose. Abortando."
-              exit 1
+            cid_now="$($DC_BASE ps -q "$svc" 2>/dev/null | head -1 || true)"
+            running_img=""
+            if [ -n "$cid_now" ]; then
+              running_img="$(docker inspect "$cid_now" --format '{{.Config.Image}}' 2>/dev/null | tr -d '[:space:]' || true)"
             fi
-            if ! docker image inspect "$base_img" >/dev/null 2>&1; then
-              echo "ERRO: imagem de rollback '$base_img' ($svc) NÃO existe localmente. Sem rede de rollback → abortando antes de deployar."
-              exit 1
+
+            if [ -z "$running_img" ]; then
+              echo "⚠️  $svc: nenhum container rodando agora — nada a preservar como rollback local."
+              echo "    Rollback (se preciso após o deploy): re-rode este workflow com um SHA anterior (imagem no GHCR)."
+              continue
             fi
-            echo "✓ rollback disponível para $svc: $base_img"
+
+            echo "→ $svc rodando agora: $running_img  (alvo de rollback)"
+            running_tag="${running_img##*:}"
+
+            if [ "${running_img#$REGISTRY/}" != "$running_img" ] || echo "$running_tag" | grep -qiE '^[0-9a-f]{12}$'; then
+              # Já migrado para o GHCR → as tags anteriores estão no registry.
+              echo "✓ $svc já em GHCR — rollback disponível pelo registry."
+              echo "    Para reverter este deploy: re-rode este workflow com sha=$running_tag (a versão rodando agora)."
+            else
+              # Ainda pré-cutover (:3f-local) → o único rollback é a imagem local.
+              base_img="$($DC_BASE config --images "$svc" 2>/dev/null | head -1 || true)"
+              if [ -z "$base_img" ]; then
+                echo "ERRO: não consegui resolver a imagem base do serviço '$svc' no compose. Abortando."
+                exit 1
+              fi
+              if ! docker image inspect "$base_img" >/dev/null 2>&1; then
+                echo "ERRO: $svc ainda roda pré-cutover ($running_img) e a imagem de rollback local '$base_img' NÃO existe. Sem rede de rollback → abortando."
+                exit 1
+              fi
+              echo "✓ $svc pré-cutover — rollback local disponível: $base_img"
+              echo "    Para voltar: cd $PROJECT_DIR && $DC_BASE rm -sf $svc && $DC_BASE up -d --no-deps $svc"
+            fi
           done
 
           # ---- PULL (zero downtime — só baixa) -----------------------------
@@ -404,9 +439,13 @@ jobs:
           REMOTE
 
           SSH="ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${VPS_USER}@${VPS_HOST}"
-          $SSH 'bash -s' -- \
-            "$PROJECT_DIR" "$REGISTRY" "$SHA12" "$PODS" "$SERVICES" "$NEED_SERVER" "$NEED_FRONT" \
-            < /tmp/deploy_remote.sh
+          # ssh envia o comando remoto como uma string, que será interpretada
+          # novamente pelo shell remoto. %q preserva cada valor como uma única
+          # palavra mesmo quando PODS/SERVICES contêm vários itens.
+          printf -v REMOTE_CMD \
+            'PROJECT_DIR=%q REGISTRY=%q SHA12=%q PODS_STR=%q SERVICES_STR=%q NEED_SERVER=%q NEED_FRONT=%q bash -s' \
+            "$PROJECT_DIR" "$REGISTRY" "$SHA12" "$PODS" "$SERVICES" "$NEED_SERVER" "$NEED_FRONT"
+          $SSH "$REMOTE_CMD" < /tmp/deploy_remote.sh
 
       # -----------------------------------------------------------------------
       # 6) Só no sucesso: registra no CHANGELOG.md e commita com [skip ci]
