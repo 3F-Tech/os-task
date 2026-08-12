@@ -21,6 +21,7 @@
     FindResult,
     getObjectValue,
     Ref,
+    RefTo,
     SortingOrder,
     Space
   } from '@hcengineering/core'
@@ -87,20 +88,24 @@
     objectsPromise = undefined
     values.clear()
     realValues.clear()
-    if ((filter.key.attribute.type as ArrOf<Doc>).of._class === core.class.EnumOf) {
+    const hierarchy = client.getHierarchy()
+    const arrayType = filter.key.attribute.type as ArrOf<Doc>
+    const itemType = arrayType.of
+    if (itemType._class === core.class.EnumOf) {
       await getEnumValues(search)
       return
     }
+
+    const isReference = hierarchy.isDerived(itemType._class, core.class.RefTo)
     const resultQuery =
-      search !== ''
+      search !== '' && !isReference
         ? {
             [filter.key.key]: { $like: '%' + search + '%' }
           }
         : {}
     let prefix = ''
-    const hieararchy = client.getHierarchy()
-    const attr = hieararchy.getAttribute(filter.key._class, filter.key.key)
-    if (hieararchy.isMixin(attr.attributeOf)) {
+    const attr = hierarchy.getAttribute(filter.key._class, filter.key.key)
+    if (hierarchy.isMixin(attr.attributeOf)) {
       prefix = attr.attributeOf + '.'
     }
     objectsPromise = client.findAll(
@@ -115,8 +120,8 @@
 
     for (const object of res) {
       let asDoc = object
-      if (hieararchy.isMixin(filter.key._class)) {
-        asDoc = hieararchy.as(object, filter.key._class)
+      if (hierarchy.isMixin(filter.key._class)) {
+        asDoc = hierarchy.as(object, filter.key._class)
       }
       const arr = getObjectValue(filter.key.key, asDoc)
       if (!Array.isArray(arr)) continue
@@ -126,8 +131,37 @@
         realValues.set(value, (realValues.get(value) ?? new Set()).add(realValue))
       }
     }
+
+    if (search !== '' && isReference) {
+      const targetClass = (itemType as RefTo<Doc>).to
+      const target = hierarchy.getClass(targetClass)
+      const filteringKey = target.filteringKey
+
+      if (filteringKey !== undefined) {
+        const refs = Array.from(new Set(Array.from(realValues.values()).flatMap((items) => Array.from(items))))
+        objectsPromise = client.findAll(
+          targetClass,
+          {
+            [filteringKey]: { $like: '%' + search + '%' },
+            _id: { $in: refs }
+          },
+          {
+            projection: { _id: 1 }
+          }
+        )
+        const matchingRefs = new Set((await objectsPromise).map((doc) => doc._id))
+
+        for (const [value, items] of realValues) {
+          if (!Array.from(items).some((item) => matchingRefs.has(item))) {
+            values.delete(value)
+            realValues.delete(value)
+          }
+        }
+      }
+    }
+
     for (const object of filter.value.map((p) => p[0])) {
-      values.add(object)
+      if (!isReference || search === '' || realValues.has(object)) values.add(object)
     }
     values = values
     objectsPromise = undefined
