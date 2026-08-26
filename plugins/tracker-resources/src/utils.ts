@@ -45,6 +45,7 @@ import {
   selectedTaskTypeStore,
   activeProjects as taskActiveProjects,
   taskTypeStore,
+  typeStore,
   typesOfJoinedProjectsStore
 } from '@hcengineering/task-resources'
 import {
@@ -559,6 +560,91 @@ export async function collectIssues (client: TxOperations, docs: Doc[]): Promise
     }
   }
   return result
+}
+
+/**
+ * @public
+ *
+ * Troca o ProjectType de um projeto existente, remapeando todas as issues (e templates) do
+ * projeto para o `kind`/`status` válidos do novo tipo. O mapeamento é por categoria de status:
+ *  - categoria "Won"  → primeiro status "Won" do novo tipo (finalizado é preservado);
+ *  - categoria "Lost" → primeiro status "Lost" do novo tipo (cancelado é preservado);
+ *  - qualquer outra (em aberto) → status inicial do novo tipo.
+ *
+ * As roles do tipo anterior NÃO são migradas (papéis pertencem ao ProjectType); apenas garantimos
+ * o mixin do novo `targetClass` para o projeto continuar consistente. Toda a migração roda num
+ * único `apply` (atômica): ou tudo é aplicado, ou nada.
+ */
+export async function changeProjectType (
+  client: TxOperations,
+  project: Project,
+  newTypeId: Ref<ProjectType>,
+  preferredInitial?: Ref<IssueStatus>
+): Promise<void> {
+  const hierarchy = client.getHierarchy()
+  const newType = get(typeStore).get(newTypeId)
+  if (newType === undefined) {
+    throw new Error(`Project type ${newTypeId} not found`)
+  }
+
+  // TaskType de Issue dentro do novo tipo (assume o primeiro, como no resto do tracker)
+  const targetTaskType = Array.from(get(taskTypeStore).values()).find(
+    (tt) => tt.parent === newTypeId && tt.ofClass === tracker.class.Issue
+  )
+  if (targetTaskType === undefined) {
+    throw new Error(`No issue task type found for project type ${newTypeId}`)
+  }
+  if (targetTaskType.statuses.length === 0) {
+    throw new Error(`Task type ${targetTaskType._id} has no statuses`)
+  }
+
+  const statuses = get(statusStore).byId
+
+  // Status-alvo por categoria, a partir da lista ordenada de status do novo TaskType
+  const initial: Ref<IssueStatus> = (
+    preferredInitial !== undefined && targetTaskType.statuses.includes(preferredInitial)
+      ? preferredInitial
+      : targetTaskType.statuses[0]
+  ) as Ref<IssueStatus>
+  const findByCategory = (category: Ref<StatusCategory>): Ref<IssueStatus> | undefined =>
+    targetTaskType.statuses.find((s) => statuses.get(s)?.category === category) as Ref<IssueStatus> | undefined
+  const wonStatus = findByCategory(task.statusCategory.Won) ?? initial
+  const lostStatus = findByCategory(task.statusCategory.Lost) ?? initial
+
+  const applyOps = client.apply('change-project-type')
+
+  // Todas as issues do projeto (sub-issues compartilham o mesmo space)
+  const issues = await client.findAll(tracker.class.Issue, { space: project._id })
+  for (const issue of issues) {
+    const category = statuses.get(issue.status)?.category
+    const newStatus =
+      category === task.statusCategory.Won
+        ? wonStatus
+        : category === task.statusCategory.Lost
+          ? lostStatus
+          : initial
+    if (issue.status !== newStatus || issue.kind !== targetTaskType._id) {
+      await applyOps.update(issue, { status: newStatus, kind: targetTaskType._id })
+    }
+  }
+
+  // Templates do projeto: só o kind (templates não guardam status de execução)
+  const templates = await client.findAll(tracker.class.IssueTemplate, { space: project._id })
+  for (const template of templates) {
+    if (template.kind !== targetTaskType._id) {
+      await applyOps.update(template, { kind: targetTaskType._id })
+    }
+  }
+
+  // O próprio projeto por último, dentro do mesmo apply
+  await applyOps.update(project, { type: newTypeId, defaultIssueStatus: initial })
+
+  await applyOps.commit()
+
+  // Garante o mixin do targetClass do novo tipo (guarda roles/atributos por tipo)
+  if (!hierarchy.hasMixin(project, newType.targetClass)) {
+    await client.createMixin(project._id, tracker.class.Project, core.space.Space, newType.targetClass, {})
+  }
 }
 
 /**

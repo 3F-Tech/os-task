@@ -28,11 +28,19 @@
     SpaceType,
     generateId,
     getCurrentAccount,
+    hasAccountRole,
     notEmpty,
     setWorkspaceGuestAutoJoinRoles
   } from '@hcengineering/core'
   import { Asset } from '@hcengineering/platform'
-  import presentation, { IconWithEmoji, Card, createQuery, getClient, hasResource } from '@hcengineering/presentation'
+  import presentation, {
+    IconWithEmoji,
+    Card,
+    MessageBox,
+    createQuery,
+    getClient,
+    hasResource
+  } from '@hcengineering/presentation'
   import task, { ProjectType, TaskType } from '@hcengineering/task'
   import { taskTypeStore, typeStore } from '@hcengineering/task-resources'
   import { IssueStatus, Project, TimeReportDayType, TrackerEvents } from '@hcengineering/tracker'
@@ -55,6 +63,7 @@
   import { createEventDispatcher } from 'svelte'
 
   import tracker from '../../plugin'
+  import { changeProjectType } from '../../utils'
   import StatusSelector from '../issues/StatusSelector.svelte'
 
   export let project: Project | undefined = undefined
@@ -104,6 +113,13 @@
   }
 
   $: isNew = project == null
+
+  // Trocar o tipo de um projeto existente é permitido apenas para o owner do projeto
+  // ou para quem tem role de sistema Owner (Owner/Admin).
+  const me = getCurrentAccount()
+  $: isProjectOwner = project?.owners?.includes(me.uuid) ?? false
+  $: canChangeType = !isNew && (isProjectOwner || hasAccountRole(me, AccountRole.Owner))
+  $: typeChanged = !isNew && project !== undefined && typeId !== undefined && typeId !== project.type
 
   async function handleSave (): Promise<void> {
     if (isNew) {
@@ -155,6 +171,41 @@
       return
     }
 
+    // Troca de tipo: operação pesada (remapeia status/kind de todas as tarefas). Confirma antes.
+    if (typeChanged && typeId !== undefined) {
+      const targetProject = project
+      const newTypeId = typeId
+      const initial = defaultStatus
+      const res = await client.findAll(tracker.class.Issue, { space: targetProject._id }, { limit: 1, total: true })
+      showPopup(MessageBox, {
+        label: tracker.string.ChangeProjectType,
+        message: tracker.string.ChangeProjectTypeConfirm,
+        params: { count: res.total },
+        dangerous: true,
+        action: async () => {
+          isSaving = true
+          try {
+            await changeProjectType(client, targetProject, newTypeId, initial)
+            // demais campos do formulário; roles e default status são tratados pela migração
+            await applyFieldUpdates(false)
+          } finally {
+            isSaving = false
+          }
+          close()
+        }
+      })
+      return
+    }
+
+    await applyFieldUpdates(true)
+    close()
+  }
+
+  async function applyFieldUpdates (includeTypeScopedFields: boolean): Promise<void> {
+    if (project == null || typeType?.targetClass === undefined) {
+      return
+    }
+
     const { sequence, ...projectData } = getProjectData()
     const update: DocumentUpdate<Project> = {}
     if (projectData.name !== project?.name) {
@@ -169,7 +220,7 @@
     if (projectData.defaultAssignee !== project?.defaultAssignee) {
       update.defaultAssignee = projectData.defaultAssignee
     }
-    if (projectData.defaultIssueStatus !== project?.defaultIssueStatus) {
+    if (includeTypeScopedFields && projectData.defaultIssueStatus !== project?.defaultIssueStatus) {
       update.defaultIssueStatus = projectData.defaultIssueStatus
     }
     if (projectData.icon !== project?.icon) {
@@ -217,7 +268,7 @@
       isSaving = false
     }
 
-    if (rolesAssignment && !deepEqual(rolesAssignment, getRolesAssignment())) {
+    if (includeTypeScopedFields && rolesAssignment && !deepEqual(rolesAssignment, getRolesAssignment())) {
       await client.updateMixin(
         project._id,
         tracker.class.Project,
@@ -226,8 +277,6 @@
         rolesAssignment
       )
     }
-
-    close()
   }
 
   $: setDefaultMembers(typeType)
@@ -393,7 +442,7 @@
 
       <Component
         is={task.component.ProjectTypeSelector}
-        disabled={!isNew}
+        disabled={!isNew && !canChangeType}
         props={{
           descriptors: [tracker.descriptors.ProjectType],
           type: typeId,
