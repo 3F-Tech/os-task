@@ -17,9 +17,10 @@
   import { getClient } from '@hcengineering/presentation'
   import { IssueDraft, IssueTemplate, IssueTemplateChild, TrackerEvents } from '@hcengineering/tracker'
   import { Button, ButtonKind, ButtonSize, eventToHTMLElement, showPopup } from '@hcengineering/ui'
-  import { EditBoxPopup, getObjectId } from '@hcengineering/view-resources'
+  import { getObjectId } from '@hcengineering/view-resources'
   import { createEventDispatcher } from 'svelte'
   import tracker from '../../plugin'
+  import EstimationValuePopup from '../issues/timereport/EstimationValuePopup.svelte'
   import TimePresenter from '../issues/timereport/TimePresenter.svelte'
   import { Analytics } from '@hcengineering/analytics'
 
@@ -41,11 +42,16 @@
       return
     }
 
-    showPopup(EditBoxPopup, { value: value.estimation, format: 'number' }, eventToHTMLElement(event), (res) => {
-      if (res !== undefined) {
-        changeEstimation(res)
-      }
-    })
+    showPopup(
+      EstimationValuePopup,
+      {
+        value: value.estimation,
+        onChange: (res: number) => {
+          void changeEstimation(res)
+        }
+      },
+      eventToHTMLElement(event)
+    )
   }
 
   const changeEstimation = async (newEstimation: number | undefined) => {

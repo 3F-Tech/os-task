@@ -17,7 +17,7 @@
   import type { IntlString } from '@hcengineering/platform'
   import type { ButtonSize } from '@hcengineering/ui'
   import { EditBox, Label, showPopup, eventToHTMLElement, Button } from '@hcengineering/ui'
-  import { EditBoxPopup } from '@hcengineering/view-resources'
+  import EstimationValuePopup from './EstimationValuePopup.svelte'
   import TimePresenter from './TimePresenter.svelte'
 
   // export let label: IntlString
@@ -40,6 +40,26 @@
       onChange(value)
     }
   }
+
+  function openPopup (ev: MouseEvent): void {
+    if (shown || readonly) return
+    showPopup(
+      EstimationValuePopup,
+      {
+        value,
+        // O placeholder é o label do atributo ("Estimativa" ou "Tempo restante").
+        label: placeholder,
+        onChange: (res: number) => {
+          value = res
+          onChange(value)
+        }
+      },
+      eventToHTMLElement(ev),
+      () => {
+        shown = false
+      }
+    )
+  }
 </script>
 
 {#if kind === 'button' || kind === 'link'}
@@ -49,17 +69,7 @@
     {justify}
     {width}
     disabled={readonly}
-    on:click={(ev) => {
-      if (!shown && !readonly) {
-        showPopup(EditBoxPopup, { value, format: 'number' }, eventToHTMLElement(ev), (res) => {
-          if (Number.isFinite(res)) {
-            value = res
-            onChange(value)
-          }
-          shown = false
-        })
-      }
-    }}
+    on:click={openPopup}
   >
     <svelte:fragment slot="content">
       {#if value != null}

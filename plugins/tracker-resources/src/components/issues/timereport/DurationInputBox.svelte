@@ -25,8 +25,10 @@
   export let value: number | undefined = undefined
   export let disabled: boolean = false
   export let autoFocus: boolean = false
+  // Teto do segmento de hora. 23 (relógio) serve para lançamento de tempo gasto;
+  // estimativa passa disso, então usa um teto maior.
+  export let maxHour: number = 23
 
-  const MAX_HOUR = 23
   const MAX_MIN = 59
 
   type Seg = 'hour' | 'min'
@@ -40,10 +42,12 @@
   let selected: Seg | null = null
   // Quando true, o próximo dígito digitado substitui o segmento (em vez de acumular).
   let startTyping = false
+  // Dígitos já digitados no segmento em foco; zera a cada (re)início de digitação.
+  let typedDigits = 0
   const els: Record<Seg, HTMLElement | undefined> = { hour: undefined, min: undefined }
 
   function clampH (x: number): number {
-    return Math.max(0, Math.min(MAX_HOUR, x))
+    return Math.max(0, Math.min(maxHour, x))
   }
   function clampM (x: number): number {
     return Math.max(0, Math.min(MAX_MIN, x))
@@ -79,26 +83,27 @@
     else m = clampM(x)
   }
   function getMax (s: Seg): number {
-    return s === 'hour' ? MAX_HOUR : MAX_MIN
+    return s === 'hour' ? maxHour : MAX_MIN
   }
 
   function focusSeg (s: Seg): void {
     selected = s
     startTyping = true
+    typedDigits = 0
   }
 
-  // ↑ com carry: minuto 59 -> 00 e +1h; trava no topo 23:59 e na hora 23.
+  // ↑ com carry: minuto 59 -> 00 e +1h; trava no topo (maxHour:59) e em maxHour.
   function stepUp (s: Seg): void {
     if (s === 'min') {
       if (m >= MAX_MIN) {
-        if (h >= MAX_HOUR) return
+        if (h >= maxHour) return
         m = 0
         h = clampH(h + 1)
       } else {
         m = m + 1
       }
     } else {
-      if (h >= MAX_HOUR) return
+      if (h >= maxHour) return
       h = h + 1
     }
     emit()
@@ -128,21 +133,25 @@
     if (ev.key >= '0' && ev.key <= '9') {
       ev.preventDefault()
       const num = parseInt(ev.key, 10)
-      // segundo dígito (não estava em startTyping) sempre avança o foco depois
-      const advanceAfter = !startTyping
       if (startTyping) {
         setVal(s, num)
         startTyping = false
+        typedDigits = 1
       } else {
         let next = getVal(s) * 10 + num
         if (next > getMax(s)) next = getMax(s)
         setVal(s, next)
+        typedDigits += 1
       }
       emit()
-      // auto-avanço hora -> minuto (no 2º dígito, ou no 1º dígito >= 3)
-      if (s === 'hour' && (advanceAfter || h > 2)) {
+      // Auto-avanço hora -> minuto: quando o segmento já recebeu todos os dígitos
+      // que cabem no teto, ou quando um dígito a mais o estouraria (ex.: teto 23
+      // e hora 3 — "3x" nunca é hora válida). Com teto 23 isto reproduz exatamente
+      // a regra anterior ("2º dígito, ou 1º dígito >= 3").
+      if (s === 'hour' && (typedDigits >= getMax(s).toString().length || getVal(s) * 10 > getMax(s))) {
         selected = 'min'
         startTyping = true
+        typedDigits = 0
       }
     } else if (ev.code === 'ArrowUp') {
       ev.preventDefault()
@@ -154,6 +163,7 @@
       ev.preventDefault()
       setVal(s, 0)
       startTyping = true
+      typedDigits = 0
       emit()
     } else if (ev.code === 'ArrowLeft') {
       ev.preventDefault()

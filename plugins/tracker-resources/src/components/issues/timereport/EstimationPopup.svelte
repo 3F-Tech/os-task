@@ -16,19 +16,17 @@
 <script lang="ts">
   import presentation, { Card, createQuery, getClient } from '@hcengineering/presentation'
   import { Issue, Project } from '@hcengineering/tracker'
-  import { Button, EditStyle, eventToHTMLElement, IconAdd, Label, showPopup } from '@hcengineering/ui'
-  import { EditBoxPopup } from '@hcengineering/view-resources'
+  import { Button, IconAdd, Label, showPopup } from '@hcengineering/ui'
   import { createEventDispatcher } from 'svelte'
   import tracker from '../../../plugin'
   import IssuePresenter from '../IssuePresenter.svelte'
   import EstimationStatsPresenter from './EstimationStatsPresenter.svelte'
+  import EstimationValuePopup from './EstimationValuePopup.svelte'
   import SubIssuesEstimations from './SubIssuesEstimations.svelte'
   import TimeSpendReportPopup from './TimeSpendReportPopup.svelte'
   import TimeSpendReports from './TimeSpendReports.svelte'
   import TimePresenter from './TimePresenter.svelte'
 
-  export let format: 'text' | 'password' | 'number'
-  export let kind: EditStyle = 'search-style'
   export let object: Issue
 
   $: _value = object.estimation
@@ -59,6 +57,24 @@
     }
   )
   $: defaultTimeReportDay = currentProject?.defaultTimeReportDay
+
+  function editEstimation (): void {
+    showPopup(
+      EstimationValuePopup,
+      {
+        value: object.estimation,
+        issue: object,
+        onChange: (res: number) => {
+          if (_value !== res) {
+            _value = res
+            void client.update(object, { estimation: res })
+            object.estimation = res
+          }
+        }
+      },
+      'top'
+    )
+  }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -81,28 +97,7 @@
       <Label label={tracker.string.Estimation} />
       <div
         class="ml-2 mr-4"
-        on:click={(evt) => {
-          showPopup(
-            EditBoxPopup,
-            {
-              value: object.estimation === 0 ? undefined : object.estimation,
-              format,
-              kind,
-              placeholder: tracker.string.Estimation,
-              maxDigitsAfterPoint: 3
-            },
-            eventToHTMLElement(evt),
-            (res) => {
-              if (typeof res === 'number') {
-                if (_value !== res) {
-                  _value = res
-                  client.update(object, { estimation: res })
-                  object.estimation = res
-                }
-              }
-            }
-          )
-        }}
+        on:click={editEstimation}
       >
         <EstimationStatsPresenter value={object} estimation={_value} />
       </div>
