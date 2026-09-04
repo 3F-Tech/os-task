@@ -7,3 +7,4 @@
 - **2026-08-10 20:19 UTC** — deploy `2bb60cd8a2e2` → [front] — ✅ sucesso (por PedroBartelle3F, run 31428370539)
 - **2026-08-12 13:32 UTC** — deploy `c2989b2ff77e` → [front] — ✅ sucesso (por PedroBartelle3F, run 31601888167)
 - **2026-08-26 20:25 UTC** — deploy `aea4fa5598b3` → [front] — ✅ sucesso (por PedroBartelle3F, run 33010214095)
+- **2026-09-04 13:00 UTC** — deploy `f160816a87c9` → [front] — ✅ sucesso (por PedroBartelle3F, run 33875629534)
