@@ -3,6 +3,7 @@
 // "Trocar tipo de projeto" vai propor, com as contagens reais de tarefas.
 //
 // Replica a lógica de plugins/tracker-resources/src/utils.ts (buildStatusMigrationPlan):
+//   grupos         : (tipo de tarefa, tarefa-raiz OU subtarefa) — um tipo 'both' rende dois
 //   tipo de tarefa : nome → papel compatível ('task'/'subtask'/'both') → posição → primeiro
 //   status         : nome → categoria + posição relativa → primeiro status do tipo destino
 //
@@ -73,19 +74,26 @@ function kindsCompatible (from: string, to: string): boolean {
   return from === to || from === 'both' || to === 'both'
 }
 
-function suggestTaskType (from: any, sources: any[], targets: any[]): any {
-  if (from == null) return targets[0]
-  const byName = targets.find((it) => norm(it.name) === norm(from.name))
-  if (byName != null) return byName
+// `role` é o papel EFETIVO do grupo ('task' para as raízes, 'subtask' para as subtarefas),
+// não o declarado no tipo de origem — que pode ser 'both' e não decide nada.
+function suggestTaskType (from: any, role: string, sources: any[], targets: any[]): any {
+  const fits = (tt: any): boolean => kindsCompatible(role, tt.kind)
 
-  const compatible = targets.filter((it) => kindsCompatible(from.kind, it.kind))
+  if (from != null) {
+    const byName = targets.find((it) => norm(it.name) === norm(from.name) && fits(it))
+    if (byName != null) return byName
+  }
+
+  const compatible = targets.filter(fits)
   const pool = compatible.length > 0 ? compatible : targets
-  const sameRole = pool.filter((it) => it.kind === from.kind)
-  const preferred = sameRole.length > 0 ? sameRole : pool
+  const exact = pool.filter((it) => it.kind === role)
+  const preferred = exact.length > 0 ? exact : pool
 
-  const peers = sources.filter((it) => it.kind === from.kind)
-  const idx = peers.findIndex((it) => it._id === from._id)
-  if (idx >= 0 && idx < preferred.length) return preferred[idx]
+  if (from != null) {
+    const peers = sources.filter((it) => kindsCompatible(role, it.kind))
+    const idx = peers.findIndex((it) => it._id === from._id)
+    if (idx >= 0 && idx < preferred.length) return preferred[idx]
+  }
   return preferred[0]
 }
 
@@ -183,12 +191,15 @@ async function run (): Promise<void> {
   console.log(`   tipo atual : ${currentType?.name ?? project.type}  [classic=${currentType?.classic === true}]`)
   console.log(`   tarefas    : ${issues.length}  (inclui subtarefas de qualquer profundidade)\n`)
 
-  const counts = new Map<string, { kind: string, status: string, count: number }>()
+  // Subtarefa = tem pai. `attachedTo` é o campo canônico (NoParent = raiz).
+  const NO_PARENT = 'tracker:ids:NoParent'
+  const counts = new Map<string, { kind: string, isSubtask: boolean, status: string, count: number }>()
   for (const i of issues) {
-    const key = `${i.kind}|${i.status}`
+    const isSubtask = i.attachedTo != null && i.attachedTo !== NO_PARENT
+    const key = `${i.kind}|${isSubtask ? 'sub' : 'root'}|${i.status}`
     const e = counts.get(key)
     if (e != null) e.count++
-    else counts.set(key, { kind: i.kind, status: i.status, count: 1 })
+    else counts.set(key, { kind: i.kind, isSubtask, status: i.status, count: 1 })
   }
 
   const sourceTTs = issueTaskTypes(currentType)
@@ -212,37 +223,40 @@ async function run (): Promise<void> {
 
   let needsAttention = 0
   for (const kind of orderedKinds) {
-    const entries = Array.from(counts.values()).filter((e) => e.kind === kind)
-    if (entries.length === 0) continue
-    const srcTT = ttById.get(kind)
-    const total = entries.reduce((s, e) => s + e.count, 0)
+    for (const isSubtask of [false, true]) {
+      const entries = Array.from(counts.values()).filter((e) => e.kind === kind && e.isSubtask === isSubtask)
+      if (entries.length === 0) continue
+      const srcTT = ttById.get(kind)
+      const total = entries.reduce((s, e) => s + e.count, 0)
+      const role = isSubtask ? 'subtask' : 'task'
 
-    const dstTT = targetType != null ? suggestTaskType(srcTT, sourceTTs, targetTTs) : undefined
-    const header = `${srcTT?.name ?? kind} [${ROLE_LABEL[srcTT?.kind] ?? '?'}]  ·  ${total} tarefa(s)`
-    console.log('─'.repeat(78))
-    console.log(dstTT != null ? `${header}  →  ${dstTT.name} [${ROLE_LABEL[dstTT.kind]}]` : header)
+      const dstTT = targetType != null ? suggestTaskType(srcTT, role, sourceTTs, targetTTs) : undefined
+      const header = `${srcTT?.name ?? kind} · ${isSubtask ? 'SUBTAREFAS' : 'TAREFAS'}  ·  ${total}`
+      console.log('─'.repeat(78))
+      console.log(dstTT != null ? `${header}  →  ${dstTT.name} [${ROLE_LABEL[dstTT.kind]}]` : header)
 
-    const srcStatuses = ((srcTT?.statuses ?? []) as string[]).map((id) => stById.get(id)).filter((x: any) => x != null)
-    const dstStatuses = dstTT != null ? ((dstTT.statuses ?? []) as string[]).map((id) => stById.get(id)).filter((x: any) => x != null) : []
+      const srcStatuses = ((srcTT?.statuses ?? []) as string[]).map((id) => stById.get(id)).filter((x: any) => x != null)
+      const dstStatuses = dstTT != null ? ((dstTT.statuses ?? []) as string[]).map((id) => stById.get(id)).filter((x: any) => x != null) : []
 
-    const ordered = [...entries].sort((a, b) => {
-      const ia = (srcTT?.statuses ?? []).indexOf(a.status)
-      const ib = (srcTT?.statuses ?? []).indexOf(b.status)
-      return (ia === -1 ? 1e9 : ia) - (ib === -1 ? 1e9 : ib)
-    })
+      const ordered = [...entries].sort((a, b) => {
+        const ia = (srcTT?.statuses ?? []).indexOf(a.status)
+        const ib = (srcTT?.statuses ?? []).indexOf(b.status)
+        return (ia === -1 ? 1e9 : ia) - (ib === -1 ? 1e9 : ib)
+      })
 
-    for (const e of ordered) {
-      const from = stById.get(e.status)
-      const fromCat = typeof from?.category === 'string' ? (CATEGORY_LABEL[from.category] ?? from.category) : '?'
-      const left = `  ${String(from?.name ?? e.status).padEnd(26)} ${String(e.count).padStart(4)}  (${fromCat})`
-      if (dstTT == null) {
-        console.log(left)
-        continue
+      for (const e of ordered) {
+        const from = stById.get(e.status)
+        const fromCat = typeof from?.category === 'string' ? (CATEGORY_LABEL[from.category] ?? from.category) : '?'
+        const left = `  ${String(from?.name ?? e.status).padEnd(26)} ${String(e.count).padStart(4)}  (${fromCat})`
+        if (dstTT == null) {
+          console.log(left)
+          continue
+        }
+        const { to, how } = suggestStatus(from, srcStatuses, dstStatuses)
+        const flag = how === 'nome' ? '✅' : '⚠️ '
+        if (how !== 'nome') needsAttention += e.count
+        console.log(`${left}  →  ${flag} ${String(to?.name ?? '?').padEnd(24)} [${how}]`)
       }
-      const { to, how } = suggestStatus(from, srcStatuses, dstStatuses)
-      const flag = how === 'nome' ? '✅' : '⚠️ '
-      if (how !== 'nome') needsAttention += e.count
-      console.log(`${left}  →  ${flag} ${String(to?.name ?? '?').padEnd(24)} [${how}]`)
     }
   }
 

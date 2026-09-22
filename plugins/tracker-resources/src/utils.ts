@@ -582,6 +582,8 @@ export async function collectIssues (client: TxOperations, docs: Doc[]): Promise
  */
 export interface StatusMigrationRow {
   fromKind: Ref<TaskType>
+  /** Tarefas-raiz e subtarefas são linhas separadas: podem ir para tipos de tarefa diferentes. */
+  isSubtask: boolean
   from: Ref<IssueStatus>
   toKind: Ref<TaskType>
   to: Ref<IssueStatus>
@@ -599,6 +601,12 @@ export interface StatusMigrationRow {
 export interface StatusMigrationGroup {
   fromKind: Ref<TaskType>
   fromKindName: string
+  /**
+   * Se este grupo é o das SUBtarefas daquele tipo de tarefa. Um tipo de papel 'both' rende dois
+   * grupos — um de tarefas-raiz, outro de subtarefas —, para que cada um possa ir para um tipo
+   * de tarefa diferente no destino.
+   */
+  isSubtask: boolean
   toKind: Ref<TaskType>
   count: number
   rows: StatusMigrationRow[]
@@ -640,8 +648,22 @@ export type StatusMigrationMapping = Map<string, StatusMigrationTarget>
  *
  * Chave de uma tarefa no de-para: o par (tipo de tarefa, status).
  */
-export function statusMigrationKey (kind: Ref<TaskType> | undefined, status: Ref<IssueStatus>): string {
-  return `${kind ?? ''}|${status}`
+export function statusMigrationKey (
+  kind: Ref<TaskType> | undefined,
+  status: Ref<IssueStatus>,
+  isSubtask: boolean
+): string {
+  return `${kind ?? ''}|${isSubtask ? 'sub' : 'root'}|${status}`
+}
+
+/**
+ * @public
+ *
+ * Uma issue é subtarefa quando tem pai. `attachedTo` é o campo canônico (`NoParent` = raiz);
+ * `parents` é derivado por trigger e pode estar defasado.
+ */
+export function isSubtaskIssue (issue: { attachedTo?: Ref<Issue> }): boolean {
+  return issue.attachedTo !== undefined && issue.attachedTo !== tracker.ids.NoParent
 }
 
 /**
@@ -762,32 +784,41 @@ function taskKindsCompatible (from: TaskTypeKind, to: TaskTypeKind): boolean {
 }
 
 /**
- * Casa um tipo de tarefa de origem com um do destino:
- *  1. mesmo nome (sem acento, sem caixa) — é o mesmo tipo, independente do papel;
- *  2. entre os de papel compatível, preferindo papel idêntico, o de mesma posição relativa;
- *  3. o primeiro candidato compatível.
+ * Casa um tipo de tarefa de origem com um do destino, dado o papel EFETIVO das tarefas do grupo
+ * ('task' para as raízes, 'subtask' para as subtarefas) — e não o papel declarado no tipo de
+ * origem, que pode ser 'both' e portanto não decide nada:
+ *  1. mesmo nome (sem acento, sem caixa), desde que o destino comporte esse papel;
+ *  2. entre os que comportam o papel, preferindo os de papel exato, o de mesma posição relativa;
+ *  3. o primeiro candidato que comporta o papel.
  */
-function suggestTaskType (from: TaskType | undefined, sources: TaskType[], targets: TaskType[]): Ref<TaskType> {
-  if (from === undefined) {
-    return targets[0]._id
+function suggestTaskType (
+  from: TaskType | undefined,
+  role: TaskTypeKind,
+  sources: TaskType[],
+  targets: TaskType[]
+): Ref<TaskType> {
+  const fits = (tt: TaskType): boolean => taskKindsCompatible(role, tt.kind)
+
+  if (from !== undefined) {
+    const name = normalizeTypeName(from.name)
+    const byName = targets.find((it) => normalizeTypeName(it.name) === name && fits(it))
+    if (byName !== undefined) {
+      return byName._id
+    }
   }
 
-  const name = normalizeTypeName(from.name)
-  const byName = targets.find((it) => normalizeTypeName(it.name) === name)
-  if (byName !== undefined) {
-    return byName._id
-  }
-
-  const compatible = targets.filter((it) => taskKindsCompatible(from.kind, it.kind))
+  const compatible = targets.filter(fits)
   const pool = compatible.length > 0 ? compatible : targets
-  const sameRole = pool.filter((it) => it.kind === from.kind)
-  const preferred = sameRole.length > 0 ? sameRole : pool
+  const exact = pool.filter((it) => it.kind === role)
+  const preferred = exact.length > 0 ? exact : pool
 
-  // Posição relativa entre os tipos de MESMO papel, para não comparar tarefa com subtarefa.
-  const peers = sources.filter((it) => it.kind === from.kind)
-  const idx = peers.findIndex((it) => it._id === from._id)
-  if (idx >= 0 && idx < preferred.length) {
-    return preferred[idx]._id
+  if (from !== undefined) {
+    // Posição relativa entre os tipos de origem que também servem a este papel.
+    const peers = sources.filter((it) => taskKindsCompatible(role, it.kind))
+    const idx = peers.findIndex((it) => it._id === from._id)
+    if (idx >= 0 && idx < preferred.length) {
+      return preferred[idx]._id
+    }
   }
 
   return preferred[0]._id
@@ -853,24 +884,33 @@ export async function buildStatusMigrationPlan (
   const byId = get(statusStore).byId
   const allTaskTypes = get(taskTypeStore)
 
-  // Contagem por par (kind, status). Projeção mínima: só o que decide a migração.
+  // Contagem por (tipo de tarefa, raiz-ou-subtarefa, status). `attachedTo` entra na projeção
+  // porque é ele que separa tarefa de subtarefa.
   const issues = await client.findAll(
     tracker.class.Issue,
     { space: project._id },
-    { projection: { _id: 1, status: 1, kind: 1 } }
+    { projection: { _id: 1, status: 1, kind: 1, attachedTo: 1 } }
   )
-  const counts = new Map<string, { kind: Ref<TaskType>, status: Ref<IssueStatus>, count: number }>()
+  interface Bucket {
+    kind: Ref<TaskType>
+    isSubtask: boolean
+    status: Ref<IssueStatus>
+    count: number
+  }
+  const counts = new Map<string, Bucket>()
   for (const issue of issues) {
-    const key = statusMigrationKey(issue.kind, issue.status)
+    const isSubtask = isSubtaskIssue(issue)
+    const key = statusMigrationKey(issue.kind, issue.status, isSubtask)
     const entry = counts.get(key)
     if (entry !== undefined) {
       entry.count++
     } else {
-      counts.set(key, { kind: issue.kind, status: issue.status, count: 1 })
+      counts.set(key, { kind: issue.kind, isSubtask, status: issue.status, count: 1 })
     }
   }
 
-  // Ordem de exibição dos tipos de tarefa: a do tipo atual; tipos legados entram no fim.
+  // Ordem de exibição: a dos tipos de tarefa do tipo atual (tipos legados no fim) e, dentro de
+  // cada um, as tarefas-raiz antes das subtarefas.
   const currentType = get(typeStore).get(project.type)
   const sourceTaskTypes = currentType !== undefined ? getIssueTaskTypes(currentType) : []
   const orderedKinds: Array<Ref<TaskType>> = sourceTaskTypes.map((it) => it._id)
@@ -882,36 +922,41 @@ export async function buildStatusMigrationPlan (
 
   const groups: StatusMigrationGroup[] = []
   for (const kind of orderedKinds) {
-    const entries = Array.from(counts.values()).filter((it) => it.kind === kind)
-    // Tipo de tarefa do tipo atual sem nenhuma tarefa não exige decisão do usuário.
-    if (entries.length === 0) continue
+    for (const isSubtask of [false, true]) {
+      const entries = Array.from(counts.values()).filter((it) => it.kind === kind && it.isSubtask === isSubtask)
+      // Combinação sem nenhuma tarefa não exige decisão do usuário.
+      if (entries.length === 0) continue
 
-    const sourceTaskType = allTaskTypes.get(kind)
-    const toKind = suggestTaskType(sourceTaskType, sourceTaskTypes, targetTaskTypes)
+      const sourceTaskType = allTaskTypes.get(kind)
+      const role: TaskTypeKind = isSubtask ? 'subtask' : 'task'
+      const toKind = suggestTaskType(sourceTaskType, role, sourceTaskTypes, targetTaskTypes)
 
-    // Ordem dos status dentro do grupo: a do tipo de tarefa de origem; legados no fim.
-    const orderedStatuses = (sourceTaskType?.statuses ?? []) as Array<Ref<IssueStatus>>
-    const sorted = [...entries].sort((a, b) => {
-      const ia = orderedStatuses.indexOf(a.status)
-      const ib = orderedStatuses.indexOf(b.status)
-      return (ia === -1 ? Number.MAX_SAFE_INTEGER : ia) - (ib === -1 ? Number.MAX_SAFE_INTEGER : ib)
-    })
+      // Ordem dos status dentro do grupo: a do tipo de tarefa de origem; legados no fim.
+      const orderedStatuses = (sourceTaskType?.statuses ?? []) as Array<Ref<IssueStatus>>
+      const sorted = [...entries].sort((a, b) => {
+        const ia = orderedStatuses.indexOf(a.status)
+        const ib = orderedStatuses.indexOf(b.status)
+        return (ia === -1 ? Number.MAX_SAFE_INTEGER : ia) - (ib === -1 ? Number.MAX_SAFE_INTEGER : ib)
+      })
 
-    const rows = sorted.map((entry) => ({
-      fromKind: kind,
-      from: entry.status,
-      toKind,
-      count: entry.count,
-      ...suggestRowTarget(entry.status, sourceTaskType, toKind, statusesByTaskType, byId, initial)
-    }))
+      const rows = sorted.map((entry) => ({
+        fromKind: kind,
+        isSubtask,
+        from: entry.status,
+        toKind,
+        count: entry.count,
+        ...suggestRowTarget(entry.status, sourceTaskType, toKind, statusesByTaskType, byId, initial)
+      }))
 
-    groups.push({
-      fromKind: kind,
-      fromKindName: sourceTaskType?.name ?? '',
-      toKind,
-      count: entries.reduce((sum, it) => sum + it.count, 0),
-      rows
-    })
+      groups.push({
+        fromKind: kind,
+        fromKindName: sourceTaskType?.name ?? '',
+        isSubtask,
+        toKind,
+        count: entries.reduce((sum, it) => sum + it.count, 0),
+        rows
+      })
+    }
   }
 
   return { groups, targetTaskTypes, statusesByTaskType, initial, total: issues.length }
@@ -991,9 +1036,10 @@ export async function changeProjectType (
   const isValidTarget = (kind: Ref<TaskType>, status: Ref<IssueStatus>): boolean =>
     statusesByTaskType.get(kind)?.includes(status) ?? false
 
-  /** Fallback: casa o tipo de tarefa por nome e, dentro dele, o status pela categoria. */
+  /** Fallback: casa o tipo de tarefa por nome/papel e, dentro dele, o status pela categoria. */
   const fallbackFor = (issue: Issue): StatusMigrationTarget => {
-    const kind = suggestTaskType(allTaskTypes.get(issue.kind), sourceTaskTypes, taskTypes)
+    const role: TaskTypeKind = isSubtaskIssue(issue) ? 'subtask' : 'task'
+    const kind = suggestTaskType(allTaskTypes.get(issue.kind), role, sourceTaskTypes, taskTypes)
     const targetIds = statusesByTaskType.get(kind) ?? []
     const category = byId.get(issue.status)?.category
     const byCategory =
@@ -1010,7 +1056,7 @@ export async function changeProjectType (
     const batch = pending.slice(i, i + batchSize)
     const applyOps = client.apply('change-project-type')
     for (const issue of batch) {
-      const mapped = mapping?.get(statusMigrationKey(issue.kind, issue.status))
+      const mapped = mapping?.get(statusMigrationKey(issue.kind, issue.status, isSubtaskIssue(issue)))
       const target = mapped !== undefined && isValidTarget(mapped.kind, mapped.status) ? mapped : fallbackFor(issue)
       if (issue.status !== target.status || issue.kind !== target.kind) {
         // status e kind juntos: ver nota sobre os triggers no doc desta função.
@@ -1032,9 +1078,10 @@ export async function changeProjectType (
   if (templates.length > 0) {
     const applyOps = client.apply('change-project-type-templates')
     for (const template of templates) {
+      // Template descreve tarefa-raiz (os filhos dele viram subtarefas na aplicação).
       const newKind =
         template.kind !== undefined
-          ? suggestTaskType(allTaskTypes.get(template.kind), sourceTaskTypes, taskTypes)
+          ? suggestTaskType(allTaskTypes.get(template.kind), 'task', sourceTaskTypes, taskTypes)
           : defaultTaskType._id
       if (template.kind !== newKind) {
         await applyOps.update(template, { kind: newKind })

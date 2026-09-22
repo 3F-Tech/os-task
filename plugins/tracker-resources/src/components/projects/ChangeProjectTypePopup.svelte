@@ -30,6 +30,7 @@
     statusMigrationKey,
     suggestRowTarget,
     type StatusMigrationGroup,
+    type StatusMigrationRow,
     type StatusMigrationMapping,
     type StatusMigrationPlan
   } from '../../utils'
@@ -78,14 +79,14 @@
     const next: StatusMigrationMapping = new Map()
     for (const group of groups) {
       for (const row of group.rows) {
-        next.set(statusMigrationKey(row.fromKind, row.from), { kind: row.toKind, status: row.to })
+        next.set(statusMigrationKey(row.fromKind, row.from, row.isSubtask), { kind: row.toKind, status: row.to })
       }
     }
     mapping = next
   }
 
   function setRowTarget (group: StatusMigrationGroup, from: Ref<IssueStatus>, to: Ref<IssueStatus>): void {
-    const row = group.rows.find((it) => it.from === from)
+    const row = group.rows.find((it) => it.from === from && it.isSubtask === group.isSubtask)
     if (row === undefined) return
     row.to = to
     groups = groups
@@ -118,6 +119,19 @@
     return $statusStore.byId.get(id) as IssueStatus | undefined
   }
 
+  /**
+   * Chaves do `{#each}`. O tipo de tarefa sozinho NÃO identifica um grupo: um tipo de papel
+   * 'both' rende dois grupos (raízes e subtarefas) com o mesmo `fromKind`, e chave repetida faz
+   * o Svelte reaproveitar o bloco errado — dois grupos idênticos na tela.
+   */
+  function groupKey (group: StatusMigrationGroup): string {
+    return `${group.fromKind}|${group.isSubtask ? 'sub' : 'root'}`
+  }
+
+  function rowKey (row: StatusMigrationRow): string {
+    return statusMigrationKey(row.fromKind, row.from, row.isSubtask)
+  }
+
   /** Papel do tipo de tarefa: o "Tarefa / Sub-Tarefa / Tarefa e Sub-Tarefa" da configuração do tipo. */
   function roleLabel (kind: TaskTypeKind | undefined): IntlString | undefined {
     if (kind === 'task') return tracker.string.ChangeProjectTypeRoleTask
@@ -126,7 +140,15 @@
     return undefined
   }
 
-  /** Um tipo 'task' não deve virar 'subtask' e vice-versa; 'both' serve para os dois. */
+  /**
+   * O papel que interessa é o EFETIVO do grupo — se aquelas tarefas são raízes ou subtarefas —
+   * e não o declarado no tipo de origem, que pode ser 'both' e não decide nada.
+   */
+  function groupRole (group: StatusMigrationGroup): TaskTypeKind {
+    return group.isSubtask ? 'subtask' : 'task'
+  }
+
+  /** Um grupo de subtarefas não deve ir para um tipo que só serve a tarefas, e vice-versa. */
   function roleMismatch (from: TaskTypeKind | undefined, to: TaskTypeKind | undefined): boolean {
     if (from === undefined || to === undefined) return false
     return from !== to && from !== 'both' && to !== 'both'
@@ -192,15 +214,15 @@
         <Label label={tracker.string.ChangeProjectTypeNoTasks} />
       </div>
     {:else}
-      {#each groups as group (group.fromKind)}
+      {#each groups as group (groupKey(group))}
         {#if showTaskTypes}
-          {@const fromRole = $taskTypeStore.get(group.fromKind)?.kind}
+          {@const fromRole = groupRole(group)}
           {@const toRole = $taskTypeStore.get(group.toKind)?.kind}
           <div class="group-header mt-3 mb-2">
             <div class="flex-row-center">
               <span class="fs-title mr-2">{group.fromKindName}</span>
               {#if roleLabel(fromRole) !== undefined}
-                <span class="content-dark-color text-sm mr-2">(<Label label={roleLabel(fromRole)} />)</span>
+                <span class="role-chip mr-2"><Label label={roleLabel(fromRole)} /></span>
               {/if}
               <span class="content-dark-color text-sm mr-2">
                 <Label label={tracker.string.ChangeProjectTypeTaskCount} params={{ count: group.count }} />
@@ -236,7 +258,7 @@
           <span class="fs-title"><Label label={tracker.string.ChangeProjectTypeTo} /></span>
         </div>
 
-        {#each group.rows as row (row.from)}
+        {#each group.rows as row (rowKey(row))}
           <div class="mapping-row">
             <div class="from flex-row-center">
               <StatusPresenter
@@ -308,6 +330,16 @@
   /* Não existe classe utilitária .warning-color no tema (só a variável); define aqui. */
   .role-mismatch {
     color: var(--theme-warning-color);
+  }
+
+  /* Papel do grupo (tarefa/subtarefa) — o que decide para qual tipo de tarefa ele pode ir. */
+  .role-chip {
+    padding: 0.0625rem 0.375rem;
+    font-size: 0.75rem;
+    color: var(--theme-content-color);
+    background-color: var(--theme-button-hovered);
+    border-radius: 0.25rem;
+    white-space: nowrap;
   }
 
   .group-header {
