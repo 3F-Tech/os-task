@@ -10,3 +10,4 @@
 - **2026-09-04 13:00 UTC** — deploy `f160816a87c9` → [front] — ✅ sucesso (por PedroBartelle3F, run 33875629534)
 - **2026-09-11 13:57 UTC** — deploy `43a92691a6b9` → [server] — ✅ sucesso (por PedroBartelle3F, run 34607233808)
 - **2026-09-11 13:58 UTC** — deploy `43a92691a6b9` → [front] — ✅ sucesso (por PedroBartelle3F, run 34607374389)
+- **2026-09-23 00:04 UTC** — deploy `6655f17eb56e` → [front] — ✅ sucesso (por PedroBartelle3F, run 35800326621)
