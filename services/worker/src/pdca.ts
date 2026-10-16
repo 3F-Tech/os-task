@@ -19,7 +19,8 @@ import { MeasureMetricsContext, systemAccountUuid, TxOperations, type Class, typ
 import { getPlatformQueue } from '@hcengineering/kafka'
 import { generateToken } from '@hcengineering/server-token'
 import { QueueTopic } from '@hcengineering/server-core'
-import type { Issue, IssueStatus, PdcaFrequency } from '@hcengineering/tracker'
+import task from '@hcengineering/task'
+import type { Issue, IssueStatus, PdcaFrequency, Project } from '@hcengineering/tracker'
 import tracker from '@hcengineering/tracker'
 import type { TimeMachineDB } from './db'
 import config from './config'
@@ -56,7 +57,7 @@ const RETRY_BACKOFF_MS = [5 * 60 * 1000, 30 * 60 * 1000, 2 * 60 * 60 * 1000] // 
 // para o watermark de dedup continuar batendo em reentregas do Kafka.
 // Obs.: só afeta agendamentos calculados AQUI no worker (próximos ciclos). Os
 // disparos já agendados (ex.: a rajada de 01/09 marcada pelo backfill) continuam
-// em 00:00 — para aqueles a rede de segurança é o retry (isTransientError acima).
+// em 00:00 — para aqueles vale o de-herd retroativo do bootstrap.
 const SCHEDULE_JITTER_MS = 4 * 60 * 60 * 1000 // 4h → 00:00–04:00 (ainda de madrugada)
 function scheduleJitter (issueId: string): number {
   let h = 0
@@ -68,6 +69,16 @@ function scheduleJitter (issueId: string): number {
 // e espalhado (des-herd retroativo dos agendamentos JÁ existentes, ex.: 01/09).
 const BOOTSTRAP_DEHERD_THRESHOLD = 20
 
+// No boot, um ciclo vencido há mais que isto NÃO dispara: pula para o próximo
+// regular. Cobre o worker parado por pouco tempo (o ciclo da madrugada ainda roda
+// no boot) sem reexecutar semanas de atraso de uma vez — foi o que aconteceu em
+// 16/10, quando o reboot da VPS disparou 618 ciclos órfãos em 18 minutos.
+const BOOTSTRAP_MAX_LATENESS_MS = 48 * 60 * 60 * 1000
+
+// Só falha de rede/conexão é transitória. "Cannot read properties of null
+// (reading '#<Object>')" já foi tratado aqui como transitório e não era: vinha de
+// IssueStatus com $lookup vazado no modelo em memória do transactor, falhava em
+// todos os retries e a tarefa ficava órfã (incidente de 16/10).
 function isTransientError (err: any): boolean {
   const msg = String(err?.message ?? err ?? '').toLowerCase()
   return (
@@ -76,14 +87,29 @@ function isTransientError (err: any): boolean {
     msg.includes('econnreset') ||
     msg.includes('etimedout') ||
     msg.includes('socket hang up') ||
-    msg.includes('network') ||
-    // Sob rajada (todos os semanais caem seg. 00:00 e os mensais no dia 1), o
-    // api-client do worker às vezes recebe uma resposta degradada do transactor e
-    // estoura "Cannot read properties of null (reading '#<Object>')". É intermitente
-    // (a MESMA issue ora falha ora passa) → tratar como transitório: o retry com
-    // backoff (5min/30min/2h) cai depois do pico, quando o transactor já vazou a fila.
-    msg.includes('cannot read properties of null')
+    msg.includes('network')
   )
+}
+
+// IssueStatus é doc de MODELO: o modelo local, carregado na conexão, já tem todos.
+// Não buscar status via REST — um lookup aninhado da UI (abrir uma sub-tarefa)
+// grava $lookup nos status do modelo em memória do transactor, e a leitura REST
+// desses status quebra no api-client.
+function findStatus (client: TxOperations, id: Ref<IssueStatus> | undefined): IssueStatus | undefined {
+  if (id == null) return undefined
+  return client.getModel().findAllSync(tracker.class.IssueStatus, { _id: id })[0]
+}
+
+// Status "concluído" do fluxo da PRÓPRIA tarefa (o task type dela), na ordem do
+// fluxo. Antes pegava o primeiro Won do workspace inteiro — em geral o
+// tracker:status:Done, que nem existe no tipo do projeto.
+function findWonStatus (client: TxOperations, issue: Issue): IssueStatus | undefined {
+  const taskType = client.getModel().findAllSync(task.class.TaskType, { _id: issue.kind })[0]
+  for (const id of taskType?.statuses ?? []) {
+    const status = findStatus(client, id as Ref<IssueStatus>)
+    if (status?.category === task.statusCategory.Won) return status
+  }
+  return undefined
 }
 
 function calculateNextCycleDate (frequency: PdcaFrequency, from: number, customWeekdays?: number[]): number {
@@ -263,6 +289,7 @@ async function rescheduleForRetry (
       retryCount,
       err: err?.message ?? String(err)
     })
+    await skipToNextCycle(ctx, event, err)
     return
   }
   const delayMs = RETRY_BACKOFF_MS[retryCount] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1]
@@ -289,6 +316,44 @@ async function rescheduleForRetry (
       issueId: event.issueId,
       err: rescheduleErr?.message ?? String(rescheduleErr)
     })
+  }
+}
+
+// Pula o ciclo que não deu para processar e agenda o PRÓXIMO regular. Antes, desistir
+// não reagendava nada: a tarefa ficava ativa sem evento no TimeMachine ("órfã") e só
+// voltava no próximo boot do worker, que reexecutava todas de uma vez.
+async function skipToNextCycle (ctx: MeasureMetricsContext, event: PdcaCycleEvent, err: any): Promise<void> {
+  let client: TxOperations | undefined
+  try {
+    client = await createWorkspaceClient(event.workspaceId)
+    const issue = await client.findOne(tracker.class.Issue, { _id: event.issueId })
+    const frequency = (issue as any)?.pdcaCycleFrequency as PdcaFrequency | undefined
+    if (issue == null || (issue as any).pdcaCycleActive !== true || frequency == null) return
+    const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
+    const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays) + scheduleJitter(String(issue._id))
+    await client.update(issue, { pdcaNextCycleDate: nextDate } as any)
+    const producer = getPlatformQueue(SERVICE_NAME, config.QueueRegion).getProducer<TimeMachineMessage>(ctx, QueueTopic.TimeMachine)
+    await producer.send(ctx, event.workspaceId, [{
+      type: 'schedule',
+      id: `pdca_${event.issueId}`,
+      targetDate: nextDate,
+      topic: QueueTopic.PdcaCycle,
+      data: { issueId: event.issueId, workspaceId: event.workspaceId, expectedNextCycleDate: nextDate }
+    }])
+    ctx.warn('PDCA cycle: cycle skipped, next one scheduled', {
+      issueId: event.issueId,
+      workspaceId: event.workspaceId,
+      nextDate,
+      err: err?.message ?? String(err)
+    })
+  } catch (scheduleErr: any) {
+    ctx.error('PDCA cycle: could not schedule the next cycle — issue has no event until the next worker boot', {
+      issueId: event.issueId,
+      workspaceId: event.workspaceId,
+      err: scheduleErr?.message ?? String(scheduleErr)
+    })
+  } finally {
+    await client?.close()
   }
 }
 
@@ -327,6 +392,20 @@ export async function processPdcaCycleEvent (
       return
     }
 
+    // Lido ANTES de qualquer escrita: no modo duplicar, falhar depois de desativar a
+    // original e antes de criar a cópia deixa a tarefa sem ciclo nenhum.
+    const project = await client.findOne(tracker.class.Project, { _id: issue.space as Ref<Project> })
+    if (project == null) {
+      throw new Error(`PDCA: project not found for space ${String(issue.space)}`)
+    }
+    // Projeto arquivado não cicla: o servidor esconde essas tarefas das consultas
+    // comuns, mas o worker (conta de sistema) as via e seguia resetando/duplicando
+    // sem ninguém ver — eram 602 das 982 tarefas com PDCA em 16/10.
+    if (project.archived) {
+      ctx.info('PDCA cycle: skipping — project archived', { issueId, project: project.identifier })
+      return
+    }
+
     // Idempotency guard: if this event was scheduled with a specific watermark
     // and the issue's pdcaNextCycleDate has already moved past that watermark,
     // the cycle was already processed (typically by a redelivered Kafka msg).
@@ -354,8 +433,7 @@ export async function processPdcaCycleEvent (
     await client.update(issue, { pdcaNextCycleDate: nextDate } as any)
 
     // Capture snapshot before any mutation
-    const prevStatusDoc = await client.findOne(tracker.class.IssueStatus, { _id: issue.status })
-    const prevStatusName = prevStatusDoc?.name ?? '—'
+    const prevStatusName = findStatus(client, issue.status)?.name ?? '—'
     const prevReportedTime = issue.reportedTime ?? 0
     const prevDueDate = issue.dueDate
     const prevCompletedDate = issue.completedDate
@@ -367,11 +445,7 @@ export async function processPdcaCycleEvent (
       // redelivery of this event reads pdcaCycleActive=false and skips.
       // Without this the storm could create N copies before any deactivation
       // propagates (the bug that produced 355 ghost Diario issues).
-      const allStatuses = await client.findAll(tracker.class.IssueStatus, {})
-      // NB: correct category id is "task:statusCategory:Won" — earlier we had
-      // "task:category:Won" (typo) so wonStatus was always undefined and the
-      // deactivation block was silently skipped.
-      const wonStatus = allStatuses.find((s: any) => s.category === 'task:statusCategory:Won')
+      const wonStatus = findWonStatus(client, issue)
       if (wonStatus != null) {
         await client.update(issue, { status: wonStatus._id, pdcaCycleActive: false } as any)
         ctx.info('PDCA cycle: original deactivated and marked as done', { issueId, wonStatus: wonStatus._id })
@@ -384,10 +458,6 @@ export async function processPdcaCycleEvent (
       // Bump project sequence to get a unique number + identifier for the new issue.
       // Without this the duplicated issue has no identifier and shows up as a
       // "ghost task" in the UI.
-      const project = await client.findOne(tracker.class.Project, { _id: issue.space })
-      if (project == null) {
-        throw new Error(`PDCA duplicate: project not found for space ${String(issue.space)}`)
-      }
       const inc = await client.update(project, { $inc: { sequence: 1 } } as any, true)
       const number = ((inc as any)?.object?.sequence) ?? ((project.sequence ?? 0) + 1)
       const newIdentifier = `${project.identifier}-${number}`
@@ -572,6 +642,8 @@ export async function processPdcaCycleEvent (
     })
     if (isTransientError(err)) {
       await rescheduleForRetry(ctx, event, err)
+    } else {
+      await skipToNextCycle(ctx, event, err)
     }
   } finally {
     if (client != null) {
@@ -606,6 +678,10 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
     try {
       client = await createWorkspaceClient(workspaceId)
       const issues = await client.findAll(tracker.class.Issue, { pdcaCycleActive: true } as any)
+      const projects = await client.findAll(tracker.class.Project, {}, { showArchived: true })
+      const archivedSpaces = new Set<string>(projects.filter((p) => p.archived).map((p) => p._id))
+      let skippedArchived = 0
+      let skippedLate = 0
 
       // De-herd retroativo: conta quantas issues já estão agendadas para o MESMO
       // instante. Clusters grandes (ex.: 1201 mensais em 01/09 00:00, semanais na
@@ -618,6 +694,10 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
       let deHerded = 0
 
       for (const issue of issues) {
+        if (archivedSpaces.has(issue.space)) {
+          skippedArchived++
+          continue
+        }
         const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
         const resetStatus = (issue as any).pdcaCycleResetStatus
         const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
@@ -628,9 +708,14 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
         let targetDate = existingDate ?? (calculateNextCycleDate(frequency, Date.now(), customWeekdays) + scheduleJitter(String(issue._id)))
         let rewrite = existingDate == null
 
-        // Instante lotado → espalha por offset estável da issue. Idempotente: depois
-        // de espalhar, cada instante fica com 1 issue, então num próximo boot não re-mexe.
-        if (existingDate != null && (clusterCount.get(existingDate) ?? 0) >= BOOTSTRAP_DEHERD_THRESHOLD) {
+        if (existingDate != null && existingDate < Date.now() - BOOTSTRAP_MAX_LATENESS_MS) {
+          // Atrasado demais: pula para o próximo ciclo regular em vez de disparar agora.
+          targetDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays) + scheduleJitter(String(issue._id))
+          rewrite = true
+          skippedLate++
+        } else if (existingDate != null && (clusterCount.get(existingDate) ?? 0) >= BOOTSTRAP_DEHERD_THRESHOLD) {
+          // Instante lotado → espalha por offset estável da issue. Idempotente: depois
+          // de espalhar, cada instante fica com 1 issue, então num próximo boot não re-mexe.
           const spread = existingDate + scheduleJitter(String(issue._id))
           if (spread !== existingDate) {
             targetDate = spread
@@ -654,7 +739,14 @@ export async function bootstrapPdcaSchedules (ctx: MeasureMetricsContext, db: Ti
       if (deHerded > 0) {
         ctx.info('PDCA bootstrap: de-herded clustered schedules', { workspace: workspaceId, deHerded })
       }
-      ctx.info('PDCA bootstrap: scheduled', { workspace: workspaceId, count: issues.length })
+      if (skippedLate > 0) {
+        ctx.warn('PDCA bootstrap: overdue cycles skipped to the next one', { workspace: workspaceId, skippedLate })
+      }
+      ctx.info('PDCA bootstrap: scheduled', {
+        workspace: workspaceId,
+        count: issues.length - skippedArchived,
+        skippedArchived
+      })
     } catch (err: any) {
       ctx.warn('PDCA bootstrap: error for workspace', {
         workspace: workspaceId,
