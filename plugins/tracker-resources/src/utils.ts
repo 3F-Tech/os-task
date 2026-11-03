@@ -43,6 +43,7 @@ import { type IntlString } from '@hcengineering/platform'
 import { createQuery, getClient, onClient } from '@hcengineering/presentation'
 import task, {
   getStatusIndex,
+  getTaskTypeStates,
   makeRank,
   type TaskType,
   type TaskTypeKind,
@@ -58,6 +59,7 @@ import {
 import {
   IssuePriority,
   MilestoneStatus,
+  PdcaFrequency,
   TimeReportDayType,
   type Component,
   type Issue,
@@ -1199,3 +1201,38 @@ onClient(() => {
     }
   )
 })
+
+/**
+ * Fields of a PDCA cycle configuration, shared by Issue, IssueTemplate and drafts.
+ */
+export interface PdcaConfigFields {
+  pdcaCycleActive?: boolean
+  pdcaCycleFrequency?: PdcaFrequency
+  pdcaCycleResetStatus?: Ref<IssueStatus>
+  pdcaCycleDueDays?: number[]
+  pdcaCycleCustomWeekdays?: number[]
+}
+
+/**
+ * Fills the fields an active PDCA cycle needs to be scheduled, using the same
+ * defaults the PDCA panel displays: weekly, due on Friday, reset to the first
+ * status of the task type.
+ *
+ * Templates saved before the toggle fix carry pdcaCycleActive=true without a
+ * frequency or reset status. Every issue created from them was skipped by the
+ * trigger and the worker, so it looked configured but never cycled. A custom
+ * frequency without weekdays is left as is: there is no default to show.
+ */
+export function completePdcaConfig<T extends PdcaConfigFields> (data: T, kind: Ref<TaskType> | undefined): T {
+  if (data.pdcaCycleActive !== true) return data
+  const frequency = data.pdcaCycleFrequency ?? PdcaFrequency.Weekly
+  const statuses = getTaskTypeStates(kind, get(taskTypeStore), get(statusStore).byId)
+  const resetStatus = data.pdcaCycleResetStatus ?? (statuses[0]?._id as Ref<IssueStatus> | undefined)
+  const dueDays = data.pdcaCycleDueDays ?? (frequency === PdcaFrequency.Weekly ? [5] : undefined)
+  return {
+    ...data,
+    pdcaCycleFrequency: frequency,
+    ...(resetStatus !== undefined ? { pdcaCycleResetStatus: resetStatus } : {}),
+    ...(dueDays !== undefined ? { pdcaCycleDueDays: dueDays } : {})
+  }
+}

@@ -8,7 +8,7 @@
   import core, { generateId, makeCollabId, type MarkupBlobRef, type Ref } from '@hcengineering/core'
   import presentation, { Card, createMarkup, getClient } from '@hcengineering/presentation'
   import tags, { type TagElement } from '@hcengineering/tags'
-  import task from '@hcengineering/task'
+  import task, { type TaskType } from '@hcengineering/task'
   import { isEmptyMarkup } from '@hcengineering/text'
   import type {
     AutomationScript,
@@ -24,6 +24,7 @@
   import { createEventDispatcher, onMount } from 'svelte'
 
   import tracker from '../../plugin'
+  import { completePdcaConfig } from '../../utils'
   import ClientNameSelector from '../issues/ClientNameSelector.svelte'
 
   export let scriptId: Ref<AutomationScript>
@@ -359,9 +360,18 @@
       const number = (inc as any).object.sequence as number
       const identifier = `${projeto.identifier}-${number}`
 
-      const pdcaActive = (template as any).pdcaCycleActive === true
-      const pdcaFrequency = (template as any).pdcaCycleFrequency
-      const pdcaDueDays = (template as any).pdcaCycleDueDays
+      const pdca = completePdcaConfig(
+        {
+          pdcaCycleActive: (template as any).pdcaCycleActive,
+          pdcaCycleFrequency: (template as any).pdcaCycleFrequency,
+          pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
+          pdcaCycleDueDays: (template as any).pdcaCycleDueDays
+        },
+        kind as Ref<TaskType> | undefined
+      )
+      const pdcaActive = pdca.pdcaCycleActive === true
+      const pdcaFrequency = pdca.pdcaCycleFrequency
+      const pdcaDueDays = pdca.pdcaCycleDueDays
       const pdcaDueDate = pdcaActive ? calculateCurrentCycleDueDate(pdcaFrequency, pdcaDueDays) : null
       // dueInDays do step sobrescreve o cálculo PDCA (admin definiu explicitamente)
       const dueDateFromStep =
@@ -416,7 +426,7 @@
           pdcaCycleActive: pdcaActive,
           pdcaCycleFrequency: pdcaFrequency,
           pdcaCycleDueDays: pdcaDueDays,
-          pdcaCycleResetStatus: (template as any).pdcaCycleResetStatus,
+          pdcaCycleResetStatus: pdca.pdcaCycleResetStatus,
           pdcaCycleResetSubIssues: (template as any).pdcaCycleResetSubIssues,
           dueDate: finalDueDate,
           template: { template: step.template }

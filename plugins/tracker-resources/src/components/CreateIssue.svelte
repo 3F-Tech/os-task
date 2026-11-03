@@ -90,6 +90,7 @@
 
   import { activeComponent, activeMilestone, generateIssueShortLink, updateIssueRelation } from '../issues'
   import tracker from '../plugin'
+  import { completePdcaConfig } from '../utils'
   import SetParentIssueActionPopup from './SetParentIssueActionPopup.svelte'
   import SubIssues from './SubIssues.svelte'
   import ComponentSelector from './components/ComponentSelector.svelte'
@@ -675,6 +676,19 @@
 
       const identifier = `${currentProject?.identifier}-${number}`
 
+      // A template saved with PDCA half configured would otherwise create an
+      // issue that never cycles.
+      const pdca = completePdcaConfig(
+        {
+          pdcaCycleActive: object.pdcaCycleActive,
+          pdcaCycleFrequency: object.pdcaCycleFrequency,
+          pdcaCycleResetStatus: object.pdcaCycleResetStatus,
+          pdcaCycleDueDays: object.pdcaCycleDueDays,
+          pdcaCycleCustomWeekdays: object.pdcaCycleCustomWeekdays
+        },
+        kind
+      )
+
       const value: DocData<Issue> = {
         title: getTitle(object.title),
         description: null,
@@ -713,11 +727,7 @@
         clientName: getTitle((object as any).clientName),
         clientStage: (object as any).clientStage,
         clientCoreId: (object as any).clientCoreId,
-        pdcaCycleActive: object.pdcaCycleActive,
-        pdcaCycleFrequency: object.pdcaCycleFrequency,
-        pdcaCycleResetStatus: object.pdcaCycleResetStatus,
-        pdcaCycleDueDays: object.pdcaCycleDueDays,
-        pdcaCycleCustomWeekdays: object.pdcaCycleCustomWeekdays,
+        ...pdca,
         pdcaCycleDuplicate: object.pdcaCycleDuplicate,
         pdcaCycleResetSubIssues: object.pdcaCycleResetSubIssues
       } as any
