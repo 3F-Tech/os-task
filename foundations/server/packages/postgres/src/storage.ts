@@ -209,6 +209,15 @@ class ValuesVariables {
   }
 }
 
+// Shallow copy of a model doc for use as a lookup value. `$lookup` is dropped so a
+// doc that was already polluted does not carry it along, and so a nested lookup
+// starts from an empty object instead of sharing one with the model.
+function detachModelDoc<D extends Doc> (doc: D): D {
+  const copy: WithLookup<D> = { ...doc }
+  delete copy.$lookup
+  return copy
+}
+
 abstract class PostgresAdapterBase implements DbAdapter {
   protected readonly _helper: DBCollectionHelper
   protected readonly tableFields = new Map<string, string[]>()
@@ -687,9 +696,13 @@ abstract class PostgresAdapterBase implements DbAdapter {
         const val = this.getModelLookupValue<T>(doc, modelJoin, [...simpleJoins, ...modelJoins])
 
         if (val !== undefined && modelJoin.toClass !== undefined) {
+          // findAllSync returns the transactor's live model docs. A nested model
+          // lookup (status → category) then writes `$lookup` into whatever sits at
+          // obj[key], so it must be a copy: writing into the model doc leaked that
+          // `$lookup` into every later read of the status.
           const res2 = this.modelDb.findAllSync(modelJoin.toClass, {
             [modelJoin.toField]: val
-          })
+          }).map(detachModelDoc)
           obj[key] = modelJoin.isReverse ? res2 : res2[0]
         }
       }

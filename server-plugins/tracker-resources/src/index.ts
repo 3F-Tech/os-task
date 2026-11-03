@@ -728,13 +728,24 @@ function calculateNextCycleDate (frequency: PdcaFrequency, from: number, customW
   return date.getTime()
 }
 
+// Every weekly cycle lands on Monday 00:00 and every monthly one on the 1st, so
+// enabling PDCA on many issues at once scheduled them all for the same instant.
+// Same stable per-issue offset (0–4h) as services/worker/src/pdca.ts, so the
+// trigger and the worker agree on when an issue fires.
+const SCHEDULE_JITTER_MS = 4 * 60 * 60 * 1000
+function scheduleJitter (issueId: string): number {
+  let h = 0
+  for (let i = 0; i < issueId.length; i++) h = (h * 31 + issueId.charCodeAt(i)) | 0
+  return Math.abs(h) % SCHEDULE_JITTER_MS
+}
+
 async function schedulePdcaTimer (issue: Issue, control: TriggerControl): Promise<number | undefined> {
   if (control.queue == null) return
   const frequency = (issue as any).pdcaCycleFrequency as PdcaFrequency | undefined
   if (frequency == null) return
   const customWeekdays = (issue as any).pdcaCycleCustomWeekdays as number[] | undefined
   if (frequency === PdcaFrequency.Custom && (customWeekdays == null || customWeekdays.length === 0)) return
-  const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays)
+  const nextDate = calculateNextCycleDate(frequency, Date.now(), customWeekdays) + scheduleJitter(String(issue._id))
   const producer = control.queue.getProducer<TimeMachineMessage>(control.ctx, QueueTopic.TimeMachine)
   await producer.send(control.ctx, control.workspace.uuid, [{
     type: 'schedule',

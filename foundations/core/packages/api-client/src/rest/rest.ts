@@ -122,7 +122,12 @@ export class RestClientImpl implements RestClient {
       throw new PlatformError(result.error)
     }
 
-    if (result.lookupMap !== undefined) {
+    // The server serializes an absent lookupMap as null (rpcJSONReplacer maps
+    // undefined to null), so `!== undefined` let a null map through and
+    // `result.lookupMap[v]` threw "Cannot read properties of null (reading
+    // '#<Object>')" for any doc that already carried a $lookup (model statuses the
+    // postgres adapter had mutated in the transactor's memory).
+    if (result.lookupMap != null) {
       // We need to extract lookup map to document lookups
       for (const d of result) {
         if (d.$lookup !== undefined) {
