@@ -59,10 +59,23 @@ import {
 } from './utils'
 import { WatchController } from './watch'
 
+// Abaixo disso a página vai no findOne por evento (ver prefetchExistingEvents).
+const PREFETCH_MIN_ITEMS = 20
+
+// Why: cada push do Google cria um IncomingSyncManager novo, e fillParticipants faz
+// findAll de SocialIdentity, Channel e Integration do workspace inteiro. Com dezenas
+// de pushes por minuto isso repetia as mesmas varreduras sem limite e ajudou a
+// entupir o transactor em 05/11/2026. O mapa e-mail → pessoa muda pouco, então ele é
+// compartilhado por workspace durante alguns minutos.
+const PARTICIPANTS_TTL_MS = 10 * 60 * 1000
+const participantsCache = new Map<string, { loadedAt: number, map: Map<string, Ref<Person>> }>()
+
 export class IncomingSyncManager {
   private readonly rateLimiter: RateLimiter
   private calendars: ExternalCalendar[] = []
   private readonly participants = new Map<string, Ref<Person>>()
+  // eventos já sincronizados, por agenda → eventId (ver prefetchExistingEvents)
+  private readonly existingEvents = new Map<Ref<ExternalCalendar>, Map<string, Event>>()
   private readonly systemClient: TxOperations
   private constructor (
     private readonly ctx: MeasureContext,
@@ -371,7 +384,14 @@ export class IncomingSyncManager {
 
   private async getParticipantsMap (): Promise<Map<string, Ref<Person>>> {
     if (this.participants.size === 0) {
-      await this.fillParticipants()
+      const key = String(this.user.workspace)
+      const cached = participantsCache.get(key)
+      if (cached !== undefined && Date.now() - cached.loadedAt < PARTICIPANTS_TTL_MS) {
+        for (const [email, person] of cached.map) this.participants.set(email, person)
+      } else {
+        await this.fillParticipants()
+        participantsCache.set(key, { loadedAt: Date.now(), map: new Map(this.participants) })
+      }
     }
     return this.participants
   }
@@ -487,6 +507,7 @@ export class IncomingSyncManager {
         return
       }
       const nextPageToken = res.data.nextPageToken
+      await this.prefetchExistingEvents(calendarId, res.data.items ?? [])
       for (const event of res.data.items ?? []) {
         try {
           await this.syncEvent(calendarId, event, res.data.accessRole ?? 'reader')
@@ -532,14 +553,47 @@ export class IncomingSyncManager {
     return _calendar
   }
 
+  // Why: `eventId` mora no JSONB `data`, então o findOne por evento é caro. Num full
+  // resync (410, calendário de feriados) são milhares deles em rajada, o que entope a
+  // fila do workspace no transactor e trava o app para todo mundo (incidentes de
+  // julho e 05/11/2026). Páginas grandes carregam de uma vez os eventos da agenda,
+  // numa query pela coluna `calendar`. O cache vale para esta instância (um push ou
+  // um ciclo de sync) e é reusado entre páginas e no retry do 410.
+  // Páginas pequenas (push incremental, poucas mudanças) seguem no findOne, que sai
+  // mais barato que carregar a agenda inteira.
+  private async prefetchExistingEvents (calendarId: string, items: calendar_v3.Schema$Event[]): Promise<void> {
+    if (items.length < PREFETCH_MIN_ITEMS) return
+    const refs = new Set<Ref<ExternalCalendar>>()
+    for (const event of items) {
+      if (event.id == null) continue
+      const _calendar = this.getEventCalendar(calendarId, event)
+      if (_calendar !== undefined && !this.existingEvents.has(_calendar._id)) refs.add(_calendar._id)
+    }
+    if (refs.size === 0) return
+    const events = (await this.client.findAll(calendar.class.Event, { calendar: { $in: [...refs] } })) as Event[]
+    for (const ref of refs) this.existingEvents.set(ref, new Map())
+    for (const e of events) {
+      this.existingEvents.get(e.calendar as Ref<ExternalCalendar>)?.set(e.eventId, e)
+    }
+  }
+
+  private async findExistingEvent (_calendar: ExternalCalendar, eventId: string): Promise<Event | undefined> {
+    const cached = this.existingEvents.get(_calendar._id)?.get(eventId)
+    if (cached !== undefined) return cached
+    // Miss no cache = evento novo (raro fora do primeiro sync). Confirma no banco:
+    // pode ter sido criado nesta mesma sync (outra página, retry do 410) e o cache
+    // não o vê; criar sem conferir duplicaria o evento.
+    return (await this.client.findOne(calendar.class.Event, {
+      eventId,
+      calendar: _calendar._id
+    })) as Event | undefined
+  }
+
   async syncEvent (calendarId: string, event: calendar_v3.Schema$Event, accessRole: string): Promise<void> {
     if (event.id != null) {
       const _calendar = this.getEventCalendar(calendarId, event)
       if (_calendar !== undefined) {
-        const exists = (await this.client.findOne(calendar.class.Event, {
-          eventId: event.id,
-          calendar: _calendar._id
-        })) as Event | undefined
+        const exists = await this.findExistingEvent(_calendar, event.id)
         if (exists === undefined) {
           await this.saveExtEvent(event, accessRole, _calendar)
         } else {
@@ -552,6 +606,7 @@ export class IncomingSyncManager {
   private async updateExtEvent (event: calendar_v3.Schema$Event, current: Event): Promise<void> {
     if (event.status === 'cancelled' && current._class !== calendar.class.ReccuringInstance) {
       await this.client.remove(current)
+      this.existingEvents.get(current.calendar as Ref<ExternalCalendar>)?.delete(current.eventId)
       return
     }
     const data: Partial<AttachedData<Event>> = await this.parseUpdateData(event)
