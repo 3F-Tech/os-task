@@ -17,6 +17,7 @@ import { AccountClient } from '@hcengineering/account-client'
 import { calendarIntegrationKind } from '@hcengineering/calendar'
 import { MeasureContext, TxOperations } from '@hcengineering/core'
 import { evictClientOnConnError, getClient } from './client'
+import { withOpContext } from './opMonitor'
 import { IncomingSyncManager } from './sync'
 import { GoogleEmail, Token } from './types'
 import { getGoogleClient, getUserByEmail, removeIntegrationSecret, removeUserByEmail, setCredentials } from './utils'
@@ -28,6 +29,12 @@ export class PushHandler {
   ) {}
 
   async sync (token: Token, calendarId: string | null): Promise<void> {
+    await withOpContext({ trigger: 'google-push', email: token.email, calendarId: calendarId ?? undefined }, async () => {
+      await this.syncInner(token, calendarId)
+    })
+  }
+
+  private async syncInner (token: Token, calendarId: string | null): Promise<void> {
     await this.ctx.with(
       'Push handler',
       {},

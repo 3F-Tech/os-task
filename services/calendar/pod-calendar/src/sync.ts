@@ -58,6 +58,7 @@ import {
   setCredentials
 } from './utils'
 import { WatchController } from './watch'
+import { withOpContext } from './opMonitor'
 
 // Abaixo disso a página vai no findOne por evento (ver prefetchExistingEvents).
 const PREFETCH_MIN_ITEMS = 20
@@ -127,7 +128,11 @@ export class IncomingSyncManager {
         return
       }
       const syncManager = new IncomingSyncManager(ctx, accountClient, txOp, user, email, google.google)
-      await syncManager.startSync()
+      const started = Date.now()
+      await withOpContext({ phase: 'user-sync', email }, async () => {
+        await syncManager.startSync()
+      })
+      ctx.info('User sync finished', { workspace: user.workspace, email, durationMs: Date.now() - started })
     } catch (err) {
       // Why: só evicta se o erro indica conexão quebrada. Antes, qualquer
       // erro (Google rate limit, parse) evictava o pool e derrubava os outros
@@ -407,12 +412,14 @@ export class IncomingSyncManager {
     const syncManager = new IncomingSyncManager(ctx, accountClient, client, user, user.email, googleClient)
     const mutex = await lock(`${user.workspace}:${user.userId}:${user.email}`)
     try {
-      await syncManager.getMyCalendars()
-      if (calendarId !== null) {
-        await syncManager.sync(calendarId)
-      } else {
-        await syncManager.syncCalendars()
-      }
+      await withOpContext({ phase: 'push', email: user.email }, async () => {
+        await syncManager.getMyCalendars()
+        if (calendarId !== null) {
+          await syncManager.sync(calendarId)
+        } else {
+          await syncManager.syncCalendars()
+        }
+      })
     } finally {
       mutex()
     }
@@ -425,7 +432,9 @@ export class IncomingSyncManager {
       email: this.email,
       calendarId
     })
-    await this.syncEvents(calendarId)
+    await withOpContext({ calendarId }, async () => {
+      await this.syncEvents(calendarId)
+    })
     this.ctx.info('Sync calendar finished', {
       workspace: this.user.workspace,
       user: this.user.userId,

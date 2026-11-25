@@ -29,6 +29,7 @@ import { getIntegrations } from './integrations'
 import { IncomingSyncManager } from './sync'
 import { getWorkspaceTokens } from './tokens'
 import { WorkspaceClient } from './workspaceClient'
+import { withOpContext } from './opMonitor'
 
 interface WorkspaceStateInfo {
   shouldStart: boolean
@@ -39,6 +40,8 @@ export class CalendarController {
   protected static _instance: CalendarController
   private periodicSyncTimer: NodeJS.Timeout | undefined
   private periodicSyncRunning = false
+  // Rodada de sync de todos os workspaces em andamento (ver startAll).
+  private runAllPromise: Promise<void> | undefined
 
   private constructor (
     private readonly ctx: MeasureContext,
@@ -54,7 +57,17 @@ export class CalendarController {
     return new CalendarController(ctx, accountClient)
   }
 
-  async startAll (): Promise<void> {
+  // Why: antes, startAll disparava runAll sem esperar (`void`), então a trava do sync
+  // periódico soltava na hora e, quando uma rodada passava de 30 min, a próxima começava
+  // por cima. As rodadas se empilhavam (memória do pod 0,5 → 3,4 GB numa noite) e o
+  // volume entupiu a fila do workspace no transactor (freeze de 25/11/2026).
+  // Agora só existe uma rodada por vez; o boot não espera, o periódico espera.
+  async startAll (waitForCompletion = false): Promise<void> {
+    if (this.runAllPromise !== undefined) {
+      this.ctx.info('Start integrations skipped — previous run still in progress')
+      if (waitForCompletion) await this.runAllPromise
+      return
+    }
     try {
       const integrations = await getIntegrations(this.accountClient)
       this.ctx.info('Start integrations', { count: integrations.length })
@@ -70,7 +83,14 @@ export class CalendarController {
           groups.set(int.workspaceUuid, group)
         }
       }
-      void this.runAll(groups)
+      this.runAllPromise = this.runAll(groups)
+        .catch((err: any) => {
+          this.ctx.error('Run all integrations error', { err: err?.message ?? String(err) })
+        })
+        .finally(() => {
+          this.runAllPromise = undefined
+        })
+      if (waitForCompletion) await this.runAllPromise
     } catch (err: any) {
       this.ctx.error('Failed to start existing integrations', err)
     }
@@ -107,7 +127,9 @@ export class CalendarController {
     const started = Date.now()
     try {
       this.ctx.info('Periodic sync started')
-      await this.startAll()
+      await withOpContext({ trigger: 'periodic' }, async () => {
+        await this.startAll(true)
+      })
       this.ctx.info('Periodic sync finished', { durationMs: Date.now() - started })
     } catch (err: any) {
       this.ctx.error('Periodic sync error', { err: err?.message ?? String(err) })

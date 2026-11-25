@@ -31,6 +31,7 @@ import config from './config'
 import { getSyncHistory, setSyncHistory } from './kvsUtils'
 import { synced } from './mutex'
 import { IncomingSyncManager } from './sync'
+import { withOpContext } from './opMonitor'
 import { getWorkspaceTokens } from './tokens'
 import { GoogleEmail, Token } from './types'
 import { addUserByEmail } from './utils'
@@ -54,8 +55,10 @@ export class WorkspaceClient {
     const txOp = new TxOperations(client, core.account.System)
     const instance = new WorkspaceClient(ctx, accountClient, txOp, workspace)
 
-    await instance.init()
-    await instance.startAll()
+    await withOpContext({ phase: 'workspace-run' }, async () => {
+      await instance.init()
+      await instance.startAll()
+    })
     await instance.close()
   }
 
@@ -94,7 +97,7 @@ export class WorkspaceClient {
       addUserByEmail(parsedToken, token.key as GoogleEmail)
       await this.createCalendarClient(parsedToken)
     }
-    const limiter = new RateLimiter(config.InitLimit)
+    const limiter = new RateLimiter(config.SyncUserLimit)
     for (const token of tokens) {
       await limiter.add(async () => {
         const parsedToken = JSON.parse(token.secret)
@@ -102,7 +105,9 @@ export class WorkspaceClient {
       })
     }
     await limiter.waitProcessing()
-    await this.getNewEvents()
+    await withOpContext({ phase: 'outgoing-catchup' }, async () => {
+      await this.getNewEvents()
+    })
   }
 
   private async createCalendarClient (user: Token): Promise<CalendarClient | undefined> {

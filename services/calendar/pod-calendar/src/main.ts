@@ -35,6 +35,7 @@ import { createServer, listen } from './server'
 import { GoogleEmail, type Endpoint, type State } from './types'
 import { getServiceToken } from './utils'
 import { WatchController } from './watch'
+import { startOpWatchdog, withOpContext } from './opMonitor'
 
 export const main = async (): Promise<void> => {
   const ctx = initStatisticsContext(calendarIntegrationKind, {
@@ -68,7 +69,10 @@ export const main = async (): Promise<void> => {
   const watchController = WatchController.get(ctx, accountClient)
 
   const calendarController = CalendarController.getCalendarController(ctx, accountClient)
-  await calendarController.startAll()
+  startOpWatchdog(ctx)
+  await withOpContext({ trigger: 'boot' }, async () => {
+    await calendarController.startAll()
+  })
   ctx.info('Calendar controller started')
   watchController.startCheck()
   calendarController.startPeriodicSync()
@@ -193,7 +197,9 @@ export const main = async (): Promise<void> => {
           res.status(400).send({ err: "'event' or 'workspace' or 'type' is missing" })
           return
         }
-        void OutcomingClient.push(ctx, accountClient, workspace, event, type).catch((err: any) => {
+        void withOpContext({ trigger: 'outgoing-push', type }, async () => {
+          await OutcomingClient.push(ctx, accountClient, workspace, event, type)
+        }).catch((err: any) => {
           ctx.error('Outcoming sync failed', { eventId: event.eventId, workspace, type, error: err.message })
         })
         res.send()

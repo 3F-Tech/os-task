@@ -23,6 +23,7 @@ interface Config {
   Credentials: string
   WATCH_URL: string
   InitLimit: number
+  SyncUserLimit: number // Usuários de um mesmo workspace sincronizando ao mesmo tempo.
   WorkspaceInactivityInterval: number // Interval in days to stop workspace synchronization if not visited
   PeriodicSyncInterval: number // Interval in minutes for safety-net periodic sync. 0 disables.
 }
@@ -36,6 +37,7 @@ const envMap: { [key in keyof Config]: string } = {
   Credentials: 'Credentials',
   WATCH_URL: 'WATCH_URL',
   InitLimit: 'INIT_LIMIT',
+  SyncUserLimit: 'SYNC_USER_LIMIT',
   KvsUrl: 'KVS_URL',
   WorkspaceInactivityInterval: 'WORKSPACE_INACTIVITY_INTERVAL',
   PeriodicSyncInterval: 'PERIODIC_SYNC_INTERVAL'
@@ -51,6 +53,11 @@ const config: Config = (() => {
     Secret: process.env[envMap.Secret],
     Credentials: process.env[envMap.Credentials],
     InitLimit: parseNumber(process.env[envMap.InitLimit]) ?? 50,
+    // Why: todos os usuários de um workspace dividem um client e a mesma fila no
+    // transactor; 50 em paralelo (o INIT_LIMIT) disputavam lock nos mesmos eventos
+    // recorrentes e entupiam a fila do workspace grande. Um por vez é mais lento, mas
+    // o sync periódico é só rede de segurança (o tempo real vem do push do Google).
+    SyncUserLimit: parseNumber(process.env[envMap.SyncUserLimit]) ?? 1,
     WATCH_URL: process.env[envMap.WATCH_URL],
     KvsUrl: process.env[envMap.KvsUrl],
     WorkspaceInactivityInterval: parseNumber(process.env[envMap.WorkspaceInactivityInterval] ?? '3'), // In days

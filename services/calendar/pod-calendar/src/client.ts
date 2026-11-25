@@ -17,6 +17,7 @@ import client from '@hcengineering/client'
 import { WorkspaceUuid, type Client } from '@hcengineering/core'
 import { setMetadata } from '@hcengineering/platform'
 import { createClient, getTransactorEndpoint } from '@hcengineering/server-client'
+import { instrumentClient } from './opMonitor'
 import { getWorkspaceToken } from './utils'
 
 const endpoints = new Map<WorkspaceUuid, string>()
@@ -84,7 +85,8 @@ async function createClientForWorkspace (workspace: WorkspaceUuid, token: string
     .catch(() => {})
 
   try {
-    return await withTimeout(createPromise, CREATE_CLIENT_TIMEOUT_MS, 'createClient')
+    const created = await withTimeout(createPromise, CREATE_CLIENT_TIMEOUT_MS, 'createClient')
+    return instrumentClient(created, workspace)
   } catch (err) {
     timedOut = true
     throw err
